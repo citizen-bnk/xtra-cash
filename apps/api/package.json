@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "pnpm --filter @xtra/shared build && tsc -p tsconfig.build.json",
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "start": "node dist/main.js",
+    "start:prod": "node dist/db/migrate.js && node dist/db/create-admin.js && node dist/main.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "ts-node --transpile-only src/db/migrate.ts",
     "seed": "ts-node --transpile-only src/db/seed.ts",
