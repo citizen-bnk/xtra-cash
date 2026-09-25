@@ -1,4 +1,5 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+// Same-origin: /api/* is proxied to the API server-side (src/app/api/[...path]/route.ts).
+export const API_URL = '/api';
 export const ADMIN_URL = process.env.NEXT_PUBLIC_ADMIN_URL ?? 'http://localhost:3001';
 
 import type { Me } from '@xtra/shared';
