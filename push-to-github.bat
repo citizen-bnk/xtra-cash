@@ -51,7 +51,7 @@ if not errorlevel 1 goto :done
 
 echo.
 echo  GitHub has commits this computer doesn't have yet. Merging them in and trying again...
-git pull origin %BRANCH% --allow-unrelated-histories --no-edit
+git pull origin %BRANCH% --no-rebase --allow-unrelated-histories --no-edit
 if errorlevel 1 goto :conflict
 git push -u origin %BRANCH%
 if errorlevel 1 goto :failed

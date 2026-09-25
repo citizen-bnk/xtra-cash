@@ -25,7 +25,7 @@ fi
 echo; echo "Pushing to GitHub (sign in if asked)..."; echo
 if ! git push -u origin "$BRANCH"; then
   echo; echo "GitHub has commits this computer doesn't have. Merging and retrying..."
-  git pull origin "$BRANCH" --allow-unrelated-histories --no-edit || { echo "Conflicting changes - nothing was lost. Ask Claude for help."; finish 1; }
+  git pull origin "$BRANCH" --no-rebase --allow-unrelated-histories --no-edit || { echo "Conflicting changes - nothing was lost. Ask Claude for help."; finish 1; }
   git push -u origin "$BRANCH" || { echo "Push failed. Check you have write access to citizen-bnk/xtra-cash and are online."; finish 1; }
 fi
 echo; echo "SUCCESS - https://github.com/citizen-bnk/xtra-cash"
