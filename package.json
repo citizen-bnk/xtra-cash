@@ -1,0 +1,17 @@
+{
+  "name": "xtra-cash",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.18.0",
+  "scripts": {
+    "build:shared": "pnpm --filter @xtra/shared build",
+    "dev:api": "pnpm --filter @xtra/api dev",
+    "dev:web": "pnpm --filter @xtra/web dev",
+    "dev:admin": "pnpm --filter @xtra/admin dev",
+    "dev:mobile": "pnpm --filter @xtra/mobile start",
+    "db:migrate": "pnpm --filter @xtra/api db:migrate",
+    "db:seed": "pnpm --filter @xtra/api seed",
+    "test": "pnpm --filter @xtra/api test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

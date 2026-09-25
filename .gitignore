@@ -1,0 +1,10 @@
+node_modules
+dist
+.next
+.expo
+*.tsbuildinfo
+.env
+.env.local
+coverage
+apps/api/uploads/*
+!apps/api/uploads/.gitkeep
