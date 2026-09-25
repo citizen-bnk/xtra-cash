@@ -117,7 +117,7 @@ const tones = {
 export type Tone = keyof typeof tones;
 
 export function Badge({ tone = 'gray', children, className }: { tone?: Tone; children: React.ReactNode; className?: string }) {
-  return <span className={cx('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold', tones[tone], className)}>{children}</span>;
+  return <span className={cx('inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold', tones[tone], className)}>{children}</span>;
 }
 
 const STATUS_TONES: Record<string, Tone> = {
