@@ -71,6 +71,10 @@ pnpm dev:mobile   # Expo. Set EXPO_PUBLIC_API_URL to your computer's LAN IP for 
 | Lender (awaiting review) | fatima@mzansiquick.co.za | Passw0rd! |
 | Affiliate | thabo.affiliate@example.com | Passw0rd! |
 
+## Deploying
+
+See [DEPLOY.md](DEPLOY.md). It covers a one-click Render Blueprint (`render.yaml`) for the API, Postgres, web and admin.
+
 ## Tests
 
 ```bash
