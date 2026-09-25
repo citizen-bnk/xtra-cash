@@ -144,6 +144,15 @@ export class XtraClient {
     return data as T;
   }
 
+  /** Fetches an authenticated file (e.g. an accreditation document) as a Blob. */
+  async blob(path: string, retry = true): Promise<Blob> {
+    const tokens = await this.opts.tokens.get();
+    const res = await this.fetchImpl(this.url(path), { headers: tokens?.accessToken ? { Authorization: `Bearer ${tokens.accessToken}` } : {} });
+    if (res.status === 401 && retry && tokens?.refreshToken && (await this.tryRefresh(tokens.refreshToken))) return this.blob(path, false);
+    if (!res.ok) throw new ApiError(res.status, 'Could not download file');
+    return res.blob();
+  }
+
   private tryRefresh(refreshToken: string): Promise<boolean> {
     if (!this.refreshing) {
       this.refreshing = this.request<Tokens>('POST', '/auth/refresh', { refreshToken }, undefined, false)
@@ -208,6 +217,11 @@ export class XtraClient {
     submitAccreditation: (assisted: boolean) => this.request<LenderOrg>('POST', '/lender/accreditation/submit', { assisted }),
     payAccreditationFee: () => this.request<LenderOrg>('POST', '/lender/accreditation/pay-fee'),
     stats: () => this.request<LenderStats>('GET', '/lender/stats'),
+    fundingInstructions: () =>
+      this.request<{ bankDetails: string; maxRateBps: number; maxMonthlyServiceFeeCents: number; assistedAccreditationFeeCents: number; platformShareBps: number }>(
+        'GET',
+        '/lender/funding-instructions',
+      ),
     funding: () => this.request<LenderFunding[]>('GET', '/lender/funding'),
     requestFunding: (type: 'LOAD' | 'WITHDRAWAL', amountCents: number) =>
       this.request<LenderFunding>('POST', '/lender/funding', { type, amountCents }),

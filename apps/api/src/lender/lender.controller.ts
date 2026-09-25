@@ -4,12 +4,26 @@ import type { Response } from 'express';
 import { CurrentUser, Roles, type AuthUser } from '../common/auth';
 import { LoansService } from '../consumer/loans.service';
 import { LenderService } from './lender.service';
+import { SettingsService } from '../common/settings.service';
 import { CriteriaDto, DocumentDto, FundingDto, LenderOrgDto, OfferDto, SubmitAccreditationDto, UpdateOfferDto } from './lender.dto';
 
 @Roles('LENDER')
 @Controller('lender')
 export class LenderController {
-  constructor(private lender: LenderService, private loans: LoansService) {}
+  constructor(private lender: LenderService, private loans: LoansService, private settings: SettingsService) {}
+
+  /** Where lenders send EFTs to load their stall, plus the current regulatory caps for offers. */
+  @Get('funding-instructions')
+  async instructions() {
+    const s = await this.settings.get();
+    return {
+      bankDetails: s.platformBankDetails,
+      maxRateBps: s.maxRateBps,
+      maxMonthlyServiceFeeCents: s.maxMonthlyServiceFeeCents,
+      assistedAccreditationFeeCents: s.assistedAccreditationFeeCents,
+      platformShareBps: s.platformShareBps,
+    };
+  }
 
   @Get('org')
   org(@CurrentUser() u: AuthUser) {
