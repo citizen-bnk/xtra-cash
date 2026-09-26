@@ -43,7 +43,8 @@ services:
       # Set to "false" before handling real money.
       - key: ENABLE_SIMULATION
         value: "true"
-      # Comma-separated web + admin URLs, e.g. https://xtra-cash-web.onrender.com,https://xtra-cash-admin.onrender.com
+      # Browsers reach the API through the web/admin sites' /api proxy, so CORS only matters for other
+      # browser clients. Optional: comma-separated origins to allow; empty allows any.
       - key: CORS_ORIGINS
         sync: false
       - key: PUBLIC_URL
@@ -64,9 +65,11 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
-      # Baked in at build time: redeploy this service after changing them.
-      - key: NEXT_PUBLIC_API_URL
+      # The API's public URL, e.g. https://xtra-cash-api.onrender.com. Read at runtime by the /api proxy,
+      # so changing it only needs a restart.
+      - key: API_URL
         sync: false
+      # Link to the back office on the login page. Baked in at build time.
       - key: NEXT_PUBLIC_ADMIN_URL
         sync: false
 
@@ -80,5 +83,6 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
-      - key: NEXT_PUBLIC_API_URL
+      # The API's public URL, e.g. https://xtra-cash-api.onrender.com (read at runtime by the /api proxy).
+      - key: API_URL
         sync: false

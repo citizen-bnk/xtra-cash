@@ -1,7 +1,8 @@
 'use client';
 import { ApiProvider, ToastProvider } from '@xtra/ui';
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+// Same-origin: /api/* is proxied to the API server-side (src/app/api/[...path]/route.ts).
+export const API_URL = '/api';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (

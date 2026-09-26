@@ -19,13 +19,13 @@ Everything is in the Frankfurt region, which is the closest Render region to Sou
 
 | Service | Key | Value |
 |---|---|---|
-| xtra-cash-api | `CORS_ORIGINS` | `https://xtra-cash-web.onrender.com,https://xtra-cash-admin.onrender.com` |
+| xtra-cash-api | `CORS_ORIGINS` | leave empty (the sites reach the API through their own `/api` proxy) |
 | xtra-cash-api | `PUBLIC_URL` | `https://xtra-cash-api.onrender.com` |
 | xtra-cash-api | `ADMIN_EMAIL` | the email you will sign in to the back office with |
 | xtra-cash-api | `ADMIN_PASSWORD` | a strong password, **at least 12 characters** |
-| xtra-cash-web | `NEXT_PUBLIC_API_URL` | `https://xtra-cash-api.onrender.com` |
+| xtra-cash-web | `API_URL` | `https://xtra-cash-api.onrender.com` |
 | xtra-cash-web | `NEXT_PUBLIC_ADMIN_URL` | `https://xtra-cash-admin.onrender.com` |
-| xtra-cash-admin | `NEXT_PUBLIC_API_URL` | `https://xtra-cash-api.onrender.com` |
+| xtra-cash-admin | `API_URL` | `https://xtra-cash-api.onrender.com` |
 
 4. Click **Apply**. The first build takes about 5 to 10 minutes. `JWT_SECRET` and `CARD_NETWORK_SECRET` are generated for you.
 
@@ -36,7 +36,9 @@ Everything is in the Frankfurt region, which is the closest Render region to Sou
 - Sign in to the admin site with `ADMIN_EMAIL` / `ADMIN_PASSWORD`
 - Register a shopper on the web site
 
-**If the URLs differ from the ones you entered:** fix the values under each service's **Environment** tab. Then redeploy **web** and **admin** (Manual Deploy → Deploy latest commit), because `NEXT_PUBLIC_*` values are built into those sites at build time.
+**If sign-in says "The XTRA-CASH API at … is not responding":** the message names the address the site tried. Open the web or admin service's **Environment** tab and set `API_URL` to the API's real URL (copy it from the top of the `xtra-cash-api` page). Saving restarts the site; no rebuild is needed. If the address is right, open `…/health` on it: the API may still be waking up (free plan) or failing to start (see its **Logs**).
+
+How it works: the browser never calls the API directly. The web and admin sites forward `/api/*` to `API_URL` from their server, so there is no CORS to configure.
 
 ## 3. Things to know
 
