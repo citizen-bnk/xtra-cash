@@ -58,7 +58,7 @@ export default function Dashboard() {
               <Link key={q.href} href={q.href} className="flex items-center justify-between py-2.5 text-sm hover:text-ink">
                 <span className={q.n ? 'font-medium' : 'text-muted'}>{q.label}</span>
                 <span className="flex items-center gap-2">
-                  <span className={`rounded-full px-2 text-xs font-bold ${q.n ? 'bg-lime text-ink' : 'bg-surface text-muted'}`}>{q.n}</span>
+                  <span className={`rounded-full px-2 text-xs font-bold ${q.n ? 'bg-brand text-white' : 'bg-surface text-muted'}`}>{q.n}</span>
                   <ArrowRight className="h-3.5 w-3.5 text-muted" />
                 </span>
               </Link>

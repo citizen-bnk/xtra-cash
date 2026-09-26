@@ -43,7 +43,7 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
         <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-white md:hidden">
           {NAV.map((n) => (
             <Link key={n.href} href={n.href} className={cx('flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium', active(n) ? 'text-ink' : 'text-muted')}>
-              <n.icon className={cx('h-5 w-5', active(n) && 'text-lime-dark')} />
+              <n.icon className={cx('h-5 w-5', active(n) && 'text-brand')} />
               {n.label}
             </Link>
           ))}

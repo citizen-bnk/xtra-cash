@@ -50,9 +50,9 @@ export function AppShell({
             isActive(n) ? 'bg-white/10 text-white' : 'text-white/65 hover:bg-white/5 hover:text-white',
           )}
         >
-          <n.icon className={cx('h-4 w-4', isActive(n) && 'text-lime')} />
+          <n.icon className={cx('h-4 w-4', isActive(n) && 'text-brand-orange')} />
           <span className="flex-1">{n.label}</span>
-          {n.badge ? <span className="rounded-full bg-lime px-1.5 text-xs font-bold text-ink">{n.badge}</span> : null}
+          {n.badge ? <span className="rounded-full bg-brand px-1.5 text-xs font-bold text-white">{n.badge}</span> : null}
         </Link>
       ))}
     </nav>

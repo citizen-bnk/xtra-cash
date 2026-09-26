@@ -194,7 +194,7 @@ function OfferEditor({ offer, onClose, onSaved }: { offer: LoanOffer | null; onC
           </div>
         </Field>
         {reach && (
-          <div className="flex items-center gap-2 rounded-xl bg-lime/30 px-3 py-2 text-sm">
+          <div className="flex items-center gap-2 rounded-xl bg-brand-soft px-3 py-2 text-sm">
             <Users className="h-4 w-4" /> <b>{reach.eligibleConsumers}</b> of {reach.totalConsumers} verified shoppers match these criteria (before affordability)
           </div>
         )}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle, RefreshControl } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from './theme';
 
@@ -46,8 +46,8 @@ export function Button({
   disabled?: boolean;
   style?: ViewStyle;
 }) {
-  const bg = { primary: colors.ink, accent: colors.lime, secondary: colors.white, danger: colors.red }[variant];
-  const fg = variant === 'accent' || variant === 'secondary' ? colors.ink : colors.white;
+  const bg = { primary: colors.ink, accent: colors.brand, secondary: colors.white, danger: colors.red }[variant];
+  const fg = variant === 'secondary' ? colors.ink : colors.white;
   return (
     <Pressable
       accessibilityRole="button"
@@ -147,12 +147,12 @@ export function Chip({ label, on, onPress }: { label: string; on: boolean; onPre
 
 export function Logo({ light }: { light?: boolean }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.lime, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ fontWeight: '900', color: colors.ink }}>X</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', padding: 2 }}>
+        <Image source={require('../assets/mark.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
       </View>
-      <Text style={{ fontWeight: '900', fontSize: 18, color: light ? colors.white : colors.ink }}>
-        XTRA<Text style={{ color: light ? colors.lime : colors.limeDark }}>-CASH</Text>
+      <Text style={{ fontWeight: '900', fontSize: 19, letterSpacing: -0.5, color: light ? colors.white : colors.violet }}>
+        XTRA<Text style={{ color: light ? colors.orange : colors.brand }}>-CASH</Text>
       </Text>
     </View>
   );

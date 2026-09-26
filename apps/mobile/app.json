@@ -7,9 +7,37 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "ios": { "bundleIdentifier": "za.co.xtracash.app", "supportsTablet": false },
-    "android": { "package": "za.co.xtracash.app", "edgeToEdgeEnabled": true },
-    "plugins": ["expo-router", "expo-secure-store"],
-    "experiments": { "typedRoutes": false }
+    "ios": {
+      "bundleIdentifier": "za.co.xtracash.app",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "za.co.xtracash.app",
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "icon": "./assets/icon.png",
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
   }
 }

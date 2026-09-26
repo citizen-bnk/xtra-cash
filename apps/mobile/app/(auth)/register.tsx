@@ -40,7 +40,7 @@ export default function Register() {
       <Field label="Password" hint="At least 8 characters" value={f.password} onChangeText={set('password')} secureTextEntry autoComplete="new-password" />
       <Field label="Referral code (optional)" value={f.referralCode} onChangeText={set('referralCode')} autoCapitalize="characters" />
       <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-        <Switch value={agree} onValueChange={setAgree} trackColor={{ true: colors.limeDark }} />
+        <Switch value={agree} onValueChange={setAgree} trackColor={{ true: colors.brand }} />
         <Text style={{ flex: 1, color: colors.muted }}>I agree to the Terms and consent to processing of my personal information (POPIA).</Text>
       </View>
       <ErrorText>{error}</ErrorText>
