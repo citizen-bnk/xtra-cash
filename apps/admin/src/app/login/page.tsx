@@ -22,7 +22,7 @@ export default function AdminLogin() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-ink px-4">
       <Card className="w-full max-w-sm p-6">
-        <Logo />
+        <Logo size={36} className="text-lg" />
         <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted">
           <ShieldCheck className="h-3.5 w-3.5" /> Back office
         </div>

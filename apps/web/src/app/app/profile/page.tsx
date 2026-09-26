@@ -32,7 +32,7 @@ export default function ProfilePage() {
 
       <Card>
         <div className="flex items-start gap-3">
-          <Users className="mt-0.5 h-5 w-5 text-lime-dark" />
+          <Users className="mt-0.5 h-5 w-5 text-brand" />
           <div className="flex-1">
             <div className="font-semibold">Invite friends, earn commission</div>
             {me.affiliate ? (
@@ -70,7 +70,7 @@ export default function ProfilePage() {
 
       {me.roles.includes('LENDER') && (
         <Card className="flex items-center gap-3">
-          <Landmark className="h-5 w-5 text-lime-dark" />
+          <Landmark className="h-5 w-5 text-brand" />
           <div className="flex-1 text-sm font-medium">You also run a Credit Mall stall.</div>
           <Link href="/lender">
             <Button size="sm" variant="secondary">Lender portal</Button>

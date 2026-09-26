@@ -51,8 +51,10 @@ export default function ConsumerHome() {
       )}
 
       {b && (
-        <div className="overflow-hidden rounded-3xl bg-ink p-6 text-white">
-          <div className="flex flex-wrap items-end justify-between gap-6">
+        <div className="relative overflow-hidden rounded-3xl bg-ink p-6 text-white">
+          <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand/40 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 right-40 h-56 w-56 rounded-full bg-brand-orange/25 blur-3xl" />
+          <div className="relative flex flex-wrap items-end justify-between gap-6">
             <div>
               <div className="text-sm text-white/60">Available to spend now</div>
               <div className="mt-1 text-4xl font-black tabular-nums tracking-tight sm:text-5xl">{formatZAR(b.xtraBalanceCents)}</div>
@@ -61,7 +63,7 @@ export default function ConsumerHome() {
                   <Wallet className="h-4 w-4 text-white/60" /> Wallet {formatZAR(b.walletCents)}
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <Zap className="h-4 w-4 text-lime" /> XTRA-CASH credit {formatZAR(b.creditCents)}
+                  <Zap className="h-4 w-4 text-brand-orange" /> XTRA-CASH credit {formatZAR(b.creditCents)}
                 </span>
               </div>
             </div>

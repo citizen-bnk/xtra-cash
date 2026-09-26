@@ -93,7 +93,7 @@ export default function AccreditationPage() {
               { v: false, t: 'Standard review', d: 'I am NCR-registered and have uploaded all required documents. No fee.' },
               { v: true, t: `Assisted accreditation · ${formatZAR(info.data?.assistedAccreditationFeeCents ?? 0)}`, d: 'XTRA-CASH compliance helps you with NCR registration, FICA and documents.' },
             ].map((opt) => (
-              <button key={String(opt.v)} onClick={() => setAssisted(opt.v)} className={`rounded-xl border p-4 text-left transition ${assisted === opt.v ? 'border-ink ring-2 ring-lime' : 'border-line hover:border-ink/40'}`}>
+              <button key={String(opt.v)} onClick={() => setAssisted(opt.v)} className={`rounded-xl border p-4 text-left transition ${assisted === opt.v ? 'border-ink ring-2 ring-brand' : 'border-line hover:border-ink/40'}`}>
                 <div className="font-semibold">{opt.t}</div>
                 <div className="mt-1 text-sm text-muted">{opt.d}</div>
               </button>

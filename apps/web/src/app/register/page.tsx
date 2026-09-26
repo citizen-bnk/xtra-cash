@@ -49,7 +49,7 @@ function RegisterForm() {
               type === t.value ? 'border-ink bg-ink text-white' : 'border-line hover:border-ink/40',
             )}
           >
-            <t.icon className={cx('h-5 w-5', type === t.value ? 'text-lime' : 'text-muted')} />
+            <t.icon className={cx('h-5 w-5', type === t.value ? 'text-brand-orange' : 'text-muted')} />
             <div className="mt-2 text-sm font-semibold">{t.label}</div>
             <div className={cx('text-xs', type === t.value ? 'text-white/70' : 'text-muted')}>{t.text}</div>
           </button>
@@ -114,7 +114,7 @@ export default function RegisterPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 py-10">
       <Link href="/">
-        <Logo className="text-xl" />
+        <Logo size={44} className="text-2xl" />
       </Link>
       <Suspense>
         <RegisterForm />

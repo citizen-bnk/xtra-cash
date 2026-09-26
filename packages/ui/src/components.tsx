@@ -7,7 +7,7 @@ export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Bool
 type Variant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'danger';
 const variants: Record<Variant, string> = {
   primary: 'bg-ink text-white hover:bg-ink-2',
-  accent: 'bg-lime text-ink hover:bg-lime-dark',
+  accent: 'bg-brand text-white hover:bg-brand-dark',
   secondary: 'bg-white text-ink border border-line hover:bg-surface',
   ghost: 'text-ink hover:bg-black/5',
   danger: 'bg-red-600 text-white hover:bg-red-700',
@@ -27,7 +27,7 @@ export function Button({
       {...rest}
       disabled={disabled || loading}
       className={cx(
-        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-lime',
+        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60',
         size === 'sm' ? 'h-8 px-3 text-sm' : size === 'lg' ? 'h-12 px-6 text-base' : 'h-10 px-4 text-sm',
         variants[variant],
         className,
@@ -59,7 +59,7 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
 }
 
 const inputCls =
-  'w-full rounded-xl border border-line bg-white px-3 h-10 text-sm text-ink placeholder:text-muted/70 focus:border-ink focus:outline-none focus:ring-2 focus:ring-lime/60';
+  'w-full rounded-xl border border-line bg-white px-3 h-10 text-sm text-ink placeholder:text-muted/70 focus:border-ink focus:outline-none focus:ring-2 focus:ring-brand/30';
 
 export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className, ...rest },
@@ -112,7 +112,7 @@ const tones = {
   amber: 'bg-amber-50 text-amber-800 ring-1 ring-amber-600/20',
   red: 'bg-red-50 text-red-700 ring-1 ring-red-600/15',
   blue: 'bg-sky-50 text-sky-700 ring-1 ring-sky-600/15',
-  lime: 'bg-lime/40 text-ink',
+  lime: 'bg-brand-soft text-brand-dark',
 };
 export type Tone = keyof typeof tones;
 
@@ -289,7 +289,7 @@ export function Tabs<T extends string>({ value, onChange, options }: { value: T;
           className={cx('rounded-lg px-3 py-1.5 text-sm font-medium transition', value === o.value ? 'bg-ink text-white' : 'text-muted hover:text-ink')}
         >
           {o.label}
-          {o.count ? <span className={cx('ml-1.5 rounded-full px-1.5 text-xs', value === o.value ? 'bg-lime text-ink' : 'bg-surface')}>{o.count}</span> : null}
+          {o.count ? <span className={cx('ml-1.5 rounded-full px-1.5 text-xs', value === o.value ? 'bg-brand text-white' : 'bg-surface')}>{o.count}</span> : null}
         </button>
       ))}
     </div>
@@ -302,12 +302,13 @@ export function XtraCard({ name, maskedPan, expiry, frozen }: { name: string; ma
     <div
       className={cx(
         'relative aspect-[1.586] w-full max-w-sm overflow-hidden rounded-2xl p-5 text-white shadow-lg transition',
-        frozen ? 'bg-slate-500 grayscale' : 'bg-gradient-to-br from-ink via-ink-2 to-[#0f3b4a]',
+        frozen ? 'bg-slate-500 grayscale' : 'bg-brand-gradient',
       )}
     >
-      <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-lime/25 blur-2xl" />
-      <div className="flex items-start justify-between">
-        <Logo light />
+      <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-brand-orange/40 blur-2xl" />
+      <div className="absolute -bottom-16 -left-10 h-40 w-40 rounded-full bg-brand-violet/50 blur-2xl" />
+      <div className="relative flex items-start justify-between">
+        <Logo light mono />
         {frozen && <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">FROZEN</span>}
       </div>
       <div className="absolute bottom-5 left-5 right-5">
@@ -321,13 +322,24 @@ export function XtraCard({ name, maskedPan, expiry, frozen }: { name: string; ma
   );
 }
 
-export function Logo({ light, className }: { light?: boolean; className?: string }) {
+/**
+ * The XTRA-CASH logo: burning-wallet mark + wordmark (from the official brand artwork).
+ * Apps serve the mark at /brand/mark.png. `light` is for dark or coloured backgrounds.
+ */
+export function Logo({ light, mono, className, markOnly, size = 28 }: { light?: boolean; mono?: boolean; className?: string; markOnly?: boolean; size?: number }) {
+  const mark = light ? (
+    <span className="grid place-items-center rounded-lg bg-white p-0.5 shadow-sm" style={{ width: size, height: size }}>
+      <img src="/brand/mark.png" alt="" className="h-full w-full object-contain" />
+    </span>
+  ) : (
+    <img src="/brand/mark.png" alt="" style={{ width: size, height: size }} className="object-contain" />
+  );
   return (
-    <span className={cx('inline-flex items-center gap-1.5 font-black tracking-tight', light ? 'text-white' : 'text-ink', className)}>
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-lime text-sm text-ink">X</span>
-      <span>
-        XTRA<span className={light ? 'text-lime' : 'text-lime-dark'}>-CASH</span>
-      </span>
+    <span className={cx('inline-flex items-center gap-2 font-black tracking-tight', className)} aria-label="XTRA-CASH">
+      {mark}
+      {!markOnly && (
+        <span className={cx('text-[1.15em] leading-none', mono ? 'text-white' : light ? 'text-brand-gradient-light' : 'text-brand-gradient')}>XTRA-CASH</span>
+      )}
     </span>
   );
 }

@@ -41,7 +41,7 @@ export default function CardScreen() {
       <View style={{ backgroundColor: frozen ? '#64748b' : colors.ink, borderRadius: 20, padding: 20, aspectRatio: 1.586, justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <Text style={{ color: colors.white, fontWeight: '900', fontSize: 18 }}>
-            XTRA<Text style={{ color: colors.lime }}>-CASH</Text>
+            XTRA<Text style={{ color: colors.brand }}>-CASH</Text>
           </Text>
           {frozen && <Text style={{ color: colors.white, fontWeight: '700' }}>FROZEN</Text>}
         </View>

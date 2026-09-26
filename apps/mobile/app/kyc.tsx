@@ -60,7 +60,7 @@ export default function Kyc() {
       <Field label="Monthly expenses (R)" hint="Rent, transport, food, other debt" keyboardType="decimal-pad" value={expenses} onChangeText={setExpenses} />
       {inc != null && exp != null && <Muted>Left each month: {formatZAR(inc - exp)}</Muted>}
       <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-        <Switch value={consent} onValueChange={setConsent} trackColor={{ true: colors.limeDark }} />
+        <Switch value={consent} onValueChange={setConsent} trackColor={{ true: colors.brand }} />
         <Text style={{ flex: 1, color: colors.muted, fontSize: 13 }}>I consent to a credit bureau check by XTRA-CASH and its partner credit providers and confirm this information is true.</Text>
       </View>
       <ErrorText>{error}</ErrorText>
