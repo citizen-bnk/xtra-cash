@@ -47,3 +47,23 @@ How it works: the browser never calls the API directly. The web and admin sites 
 - **No demo data.** `pnpm db:seed` refuses to run when `NODE_ENV=production`, so the database starts empty apart from your super-admin. Before go-live, a compliance officer must confirm the regulatory caps and fees under Back office → Settings.
 - **Auto-deploy.** Every push to the branch you chose redeploys the affected services. Migrations run automatically on each API start.
 - **Mobile app.** It isn't hosted on Render. Build it with Expo EAS and set `EXPO_PUBLIC_API_URL=https://xtra-cash-api.onrender.com`.
+
+## 4. Optional: host the web and admin sites on Vercel
+
+The API and database stay on Render. Only the two Next.js sites move. Each site has a `vercel.json` (Frankfurt region, next to the Render API).
+
+Do this twice, once per site:
+
+1. On <https://vercel.com/new>, import `citizen-bnk/xtra-cash`.
+2. **Root Directory:** click **Edit** and choose `apps/web` (first project) or `apps/admin` (second project). Leave the other build settings as they are.
+3. **Environment Variables:**
+
+| Project | Key | Value |
+|---|---|---|
+| web | `API_URL` | your Render API URL, e.g. `https://xtra-cash-api.onrender.com` |
+| web | `NEXT_PUBLIC_ADMIN_URL` | the admin project's Vercel URL (set it after the admin project exists, then redeploy web) |
+| admin | `API_URL` | your Render API URL |
+
+4. Click **Deploy**. After that, every push to `main` redeploys both sites.
+
+The sites call the API through their own `/api` route, so the API needs no CORS change. Once the Vercel sites work, you can suspend or delete `xtra-cash-web` and `xtra-cash-admin` on Render.
