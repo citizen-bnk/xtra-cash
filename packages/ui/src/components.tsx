@@ -296,17 +296,22 @@ export function Tabs<T extends string>({ value, onChange, options }: { value: T;
   );
 }
 
-/** The XTRA-CASH card visual. */
+/**
+ * The XTRA-CASH card visual: the brand card artwork (apps serve /brand/card.jpg and
+ * /brand/card-frozen.jpg) with the cardholder's details on top. The brand gradient
+ * underneath shows if the artwork is missing or still loading.
+ */
 export function XtraCard({ name, maskedPan, expiry, frozen }: { name: string; maskedPan: string; expiry: string; frozen?: boolean }) {
   return (
     <div
-      className={cx(
-        'relative aspect-[1.586] w-full max-w-sm overflow-hidden rounded-2xl p-5 text-white shadow-lg transition',
-        frozen ? 'bg-slate-500 grayscale' : 'bg-brand-gradient',
-      )}
+      className="relative aspect-[1.586] w-full max-w-sm overflow-hidden rounded-2xl bg-cover bg-center p-5 text-white shadow-lg transition"
+      style={{
+        backgroundImage: frozen
+          ? 'url(/brand/card-frozen.jpg), linear-gradient(135deg, #64748b 0%, #334155 100%)'
+          : 'url(/brand/card.jpg), linear-gradient(135deg, #d91f63 0%, #a617d3 100%)',
+      }}
     >
-      <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-brand-orange/40 blur-2xl" />
-      <div className="absolute -bottom-16 -left-10 h-40 w-40 rounded-full bg-brand-violet/50 blur-2xl" />
+      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />
       <div className="relative flex items-start justify-between">
         <Logo light mono />
         {frozen && <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">FROZEN</span>}
