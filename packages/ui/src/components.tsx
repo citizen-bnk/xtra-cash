@@ -112,7 +112,7 @@ const tones = {
   amber: 'bg-amber-50 text-amber-800 ring-1 ring-amber-600/20',
   red: 'bg-red-50 text-red-700 ring-1 ring-red-600/15',
   blue: 'bg-sky-50 text-sky-700 ring-1 ring-sky-600/15',
-  lime: 'bg-brand-soft text-brand-dark',
+  brand: 'bg-brand-soft text-brand-dark',
 };
 export type Tone = keyof typeof tones;
 
