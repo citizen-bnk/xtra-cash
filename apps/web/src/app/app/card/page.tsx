@@ -46,7 +46,7 @@ export default function CardPage() {
 
   return (
     <div>
-      <PageHeader title="XTRA-CASH card" subtitle="Use it anywhere Mastercard is accepted — in store, online and on the XTRA-CASH marketplace." />
+      <PageHeader title="XTRA-CASH card" subtitle="Tap it in store, pay online or use it on the XTRA-CASH marketplace." />
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-4">
           <XtraCard

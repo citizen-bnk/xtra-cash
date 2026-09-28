@@ -37,18 +37,19 @@ export default function Landing() {
           poster="/brand/fire-poster.jpg"
           aria-hidden="true"
         >
+          <source src="/brand/fire.webm" type="video/webm" />
           <source src="/brand/fire.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-ink via-ink/70 to-ink/30" />
 
         <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
-          <Logo light size={36} className="text-lg" />
+          <Logo light size={36} className="whitespace-nowrap text-lg" />
           <nav className="flex items-center gap-2">
-            <Link href="/login" className="px-3 text-sm font-semibold text-white hover:underline">
+            <Link href="/login" className="hidden px-3 text-sm font-semibold text-white hover:underline sm:inline">
               Sign in
             </Link>
             <Link href="/register">
-              <Button size="sm" variant="accent">Get started</Button>
+              <Button size="sm" variant="accent" className="whitespace-nowrap">Get started</Button>
             </Link>
           </nav>
         </header>

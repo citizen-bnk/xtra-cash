@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect } from 'react';
-import { Loader2, X } from 'lucide-react';
+import { Flame, Loader2, X } from 'lucide-react';
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
 
@@ -297,28 +297,41 @@ export function Tabs<T extends string>({ value, onChange, options }: { value: T;
 }
 
 /**
- * The XTRA-CASH card visual: the brand card artwork (apps serve /brand/card.jpg and
- * /brand/card-frozen.jpg) with the cardholder's details on top. The brand gradient
- * underneath shows if the artwork is missing or still loading.
+ * The XTRA-CASH card visual, drawn to match the brand card artwork (orange-to-purple flames).
+ * A frozen card shows the frosted ice artwork (apps serve /brand/card-frozen.jpg) over an
+ * icy gradient fallback. No card-network logo until XTRA-CASH has an issuing agreement.
  */
 export function XtraCard({ name, maskedPan, expiry, frozen }: { name: string; maskedPan: string; expiry: string; frozen?: boolean }) {
   return (
     <div
-      className="relative aspect-[1.586] w-full max-w-sm overflow-hidden rounded-2xl bg-cover bg-center p-5 text-white shadow-lg transition"
+      className={cx(
+        'relative aspect-[1.586] w-full max-w-sm overflow-hidden rounded-2xl bg-cover bg-center p-5 shadow-lg transition',
+        frozen ? 'text-ink' : 'text-white',
+      )}
       style={{
         backgroundImage: frozen
-          ? 'url(/brand/card-frozen.jpg), linear-gradient(135deg, #64748b 0%, #334155 100%)'
-          : 'url(/brand/card.jpg), linear-gradient(135deg, #d91f63 0%, #a617d3 100%)',
+          ? 'url(/brand/card-frozen.jpg), linear-gradient(135deg, #bfe3f5 0%, #6fb3d9 100%)'
+          : 'linear-gradient(135deg, #fb9320 0%, #e5476a 42%, #a617d3 76%, #5c2394 100%)',
       }}
     >
-      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />
+      {!frozen && (
+        <>
+          <Flame className="absolute -bottom-8 -right-6 h-48 w-48 text-white/15" strokeWidth={1.25} aria-hidden="true" />
+          <Flame className="absolute -top-6 right-24 h-24 w-24 rotate-12 text-white/10" strokeWidth={1.25} aria-hidden="true" />
+          <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-[#ffd29a]/40 blur-2xl" />
+        </>
+      )}
       <div className="relative flex items-start justify-between">
-        <Logo light mono />
-        {frozen && <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">FROZEN</span>}
+        <Logo light={!frozen} mono={!frozen} />
+        {frozen && <span className="rounded-full bg-ink/80 px-2 py-0.5 text-xs font-bold text-white">FROZEN</span>}
       </div>
+      <div
+        className="relative mt-4 h-8 w-11 rounded-md border border-black/10 bg-gradient-to-br from-[#f6e27a] via-[#d4af37] to-[#b8912a] shadow-inner"
+        aria-hidden="true"
+      />
       <div className="absolute bottom-5 left-5 right-5">
-        <div className="font-mono text-lg tracking-widest">{maskedPan}</div>
-        <div className="mt-2 flex justify-between text-xs uppercase text-white/80">
+        <div className="font-mono text-lg tracking-widest drop-shadow-sm">{maskedPan}</div>
+        <div className={cx('mt-2 flex justify-between text-xs font-semibold uppercase', frozen ? 'text-ink/80' : 'text-white/85')}>
           <span>{name}</span>
           <span>{expiry}</span>
         </div>

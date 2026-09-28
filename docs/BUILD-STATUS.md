@@ -3,7 +3,8 @@
 ## ▶ NEXT SESSION: do this first
 1. **Vercel account is blocked.** Every Vercel deployment (xtra-cash-web, xtra-cash-admin, xtra-cash-api) fails with "Account is blocked" (see https://vercel.com/knowledge/why-is-my-account-deployment-blocked). It failed on `49d59b9` too, before the brand refresh, and again on `612d217` after the merge. Claude sessions cannot reach api.vercel.com (network policy) and have no Vercel token, so they cannot deploy or unblock it. The account owner must fix it in the Vercel dashboard. Then redeploy `main` on the web and admin projects and check the live sites show the burning-wallet logo.
 2. The `xtra-cash-api` Vercel project is left over from the superseded serverless-API approach. The API runs on Render, so disconnect or delete that project.
-3. This file (`docs/BUILD-STATUS.md`) is the build status; keep it updated in the repo. Always start sessions with `citizen-bnk/xtra-cash` attached as a source. Commit and push every change; no more zips or bundles.
+3. **Brand follow-ups:** replace the fire video with a clean export without the Veo mark when available; add the Mastercard logo only after an issuing agreement; ask the designer for a flat, front-on blank card design if the drawn card should be replaced with artwork. Messaging rules are in `docs/MESSAGING.md`.
+4. This file (`docs/BUILD-STATUS.md`) is the build status; keep it updated in the repo. Always start sessions with `citizen-bnk/xtra-cash` attached as a source. Commit and push every change; no more zips or bundles.
 
 ## Done 26 Sep 2026
 - Brand refresh published: commit `98cffc5` went through https://github.com/citizen-bnk/xtra-cash/pull/4 and merged to `main` as `612d217`. Before pushing, `pnpm install --frozen-lockfile`, the web and admin `next build` and mobile `tsc` all passed.

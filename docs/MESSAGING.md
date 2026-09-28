@@ -49,6 +49,17 @@ The metaphor lives in marketing, onboarding and empty states. Screens that show 
 | Balances, payments, repayments | Plain language: "Available to spend now", "Pay", "Repayments" |
 | Lender and affiliate portals, back office | Plain language; brand colours only |
 
+## Brand assets in the product
+
+Source files live in Google Drive under `XTRA-CASH/BRAND IMAGES`.
+
+| Asset | Where it's used | Notes |
+| --- | --- | --- |
+| Fire video (`fire.webm`, `fire.mp4`, `fire-poster.jpg`) | Website hero; mobile welcome screen | Letterbox bars cropped and sound removed. The still frame shows when reduced motion is on. It still carries Google's "Veo" AI-generation mark; replace it with a clean, licensed export when one is available. |
+| Card | Website and mobile, drawn in code | Matches the realistic card artwork (orange-to-purple flames, chip). The artwork itself isn't used because it has sample numbers and names printed on it. |
+| Frozen card (`card-frozen.jpg`) | Card when frozen | Ice card front, frosted so the printed sample details and network logo can't be read. |
+| Mastercard logo | Not shown anywhere | Add it only once XTRA-CASH has a Mastercard issuing agreement (through a sponsor bank). |
+
 ## Proof points
 
 - **Speed:** approved at the till in seconds.
