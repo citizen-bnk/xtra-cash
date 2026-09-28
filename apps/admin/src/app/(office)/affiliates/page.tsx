@@ -54,7 +54,7 @@ function Affiliates() {
                 { header: 'Date', cell: (c) => new Date(c.createdAt).toLocaleDateString('en-ZA') },
                 { header: 'Affiliate', cell: (c) => c.affiliate && `${c.affiliate.firstName} ${c.affiliate.lastName}` },
                 { header: 'Type', cell: (c) => TYPE[c.type] },
-                { header: 'Details', cell: (c) => <span className="text-xs text-muted">{c.description}</span> },
+                { header: 'Details', className: 'min-w-56 whitespace-normal', cell: (c) => <span className="text-xs text-muted">{c.description}</span> },
                 { header: 'Amount', align: 'right', cell: (c) => <b>{formatZAR(c.amountCents)}</b> },
                 { header: 'Status', cell: (c) => <StatusBadge status={c.status} /> },
                 { header: '', cell: (c) => c.status === 'PENDING' && <div className="flex justify-end gap-2"><Button size="sm" onClick={() => decideC.run(c.id, true)}>Approve</Button><Button size="sm" variant="ghost" onClick={() => decideC.run(c.id, false)}>Reject</Button></div> },

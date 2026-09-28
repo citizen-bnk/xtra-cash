@@ -1,13 +1,27 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/auth';
 import { AuthService } from './auth.service';
-import { LoginDto, RefreshDto, RegisterDto } from './auth.dto';
+import { DemoService } from './demo.service';
+import { DemoLoginDto, LoginDto, RefreshDto, RegisterDto } from './auth.dto';
 
 @Public()
 @Controller('auth')
 export class AuthController {
-  constructor(private auth: AuthService) {}
+  constructor(private auth: AuthService, private demo: DemoService) {}
+
+  /** Demo accounts shown on the sign-in pages (empty unless ENABLE_DEMO_LOGIN=true). */
+  @Get('demo')
+  demoPersonas() {
+    return this.demo.personas();
+  }
+
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @HttpCode(200)
+  @Post('demo/login')
+  demoLogin(@Body() dto: DemoLoginDto) {
+    return this.demo.login(dto.persona);
+  }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('register')

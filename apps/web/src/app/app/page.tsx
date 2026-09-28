@@ -135,15 +135,15 @@ export default function ConsumerHome() {
             openLoans.slice(0, 4).map((l) => (
               <Link key={l.id} href={`/app/loans/${l.id}`}>
                 <Card className="mb-3 p-4 transition hover:border-ink/30">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold">{l.lenderName}</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 truncate text-sm font-semibold">{l.lenderName}</div>
                     <StatusBadge status={l.status} />
                   </div>
-                  <div className="mt-2 flex items-end justify-between">
-                    <div className="text-xs text-muted">
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <div className="min-w-0 text-xs text-muted">
                       Next: {l.nextDue ? `${formatZAR(l.nextDue.amountCents - l.nextDue.paidCents)} on ${new Date(l.nextDue.dueDate).toLocaleDateString('en-ZA')}` : '—'}
                     </div>
-                    <div className="text-sm font-bold tabular-nums">{formatZAR(l.outstandingCents)}</div>
+                    <div className="shrink-0 text-sm font-bold tabular-nums">{formatZAR(l.outstandingCents)}</div>
                   </div>
                 </Card>
               </Link>

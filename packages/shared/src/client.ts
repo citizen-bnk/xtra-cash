@@ -3,6 +3,7 @@ import type {
   AffiliateSummary,
   AuditEntry,
   AuthResponse,
+  DemoPersona,
   Card,
   Commission,
   KycProfile,
@@ -177,6 +178,12 @@ export class XtraClient {
     },
     login: async (identifier: string, password: string) => {
       const r = await this.request<AuthResponse>('POST', '/auth/login', { identifier, password });
+      await this.opts.tokens.set({ accessToken: r.accessToken, refreshToken: r.refreshToken });
+      return r;
+    },
+    demoPersonas: () => this.request<{ enabled: boolean; personas: DemoPersona[] }>('GET', '/auth/demo'),
+    demoLogin: async (persona: string) => {
+      const r = await this.request<AuthResponse>('POST', '/auth/demo/login', { persona });
       await this.opts.tokens.set({ accessToken: r.accessToken, refreshToken: r.refreshToken });
       return r;
     },

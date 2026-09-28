@@ -27,7 +27,7 @@ export function Button({
       {...rest}
       disabled={disabled || loading}
       className={cx(
-        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60',
+        'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60',
         size === 'sm' ? 'h-8 px-3 text-sm' : size === 'lg' ? 'h-12 px-6 text-base' : 'h-10 px-4 text-sm',
         variants[variant],
         className,
@@ -243,7 +243,7 @@ export function Table<T>({ rows, columns, onRowClick, empty = 'Nothing here yet'
               className={cx('border-b border-line last:border-0', onRowClick && 'cursor-pointer hover:bg-surface/70')}
             >
               {columns.map((c) => (
-                <td key={c.header} className={cx('px-4 py-3 align-middle', c.align === 'right' && 'text-right tabular-nums', c.className)}>
+                <td key={c.header} className={cx('whitespace-nowrap px-4 py-3 align-middle', c.align === 'right' && 'text-right tabular-nums', c.className)}>
                   {c.cell(r)}
                 </td>
               ))}
@@ -265,7 +265,7 @@ export function Modal({ open, onClose, title, children, footer }: { open: boolea
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
-      <div role="dialog" aria-modal className="w-full max-w-lg rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">{title}</h2>
           <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface" aria-label="Close">
@@ -330,7 +330,7 @@ export function XtraCard({ name, maskedPan, expiry, frozen }: { name: string; ma
         aria-hidden="true"
       />
       <div className="absolute bottom-5 left-5 right-5">
-        <div className="font-mono text-lg tracking-widest drop-shadow-sm">{maskedPan}</div>
+        <div className="whitespace-nowrap font-mono text-base tracking-widest drop-shadow-sm sm:text-lg">{maskedPan}</div>
         <div className={cx('mt-2 flex justify-between text-xs font-semibold uppercase', frozen ? 'text-ink/80' : 'text-white/85')}>
           <span>{name}</span>
           <span>{expiry}</span>
@@ -353,7 +353,7 @@ export function Logo({ light, mono, className, markOnly, size = 28 }: { light?: 
     <img src="/brand/mark.png" alt="" style={{ width: size, height: size }} className="object-contain" />
   );
   return (
-    <span className={cx('inline-flex items-center gap-2 font-black tracking-tight', className)} aria-label="XTRA-CASH">
+    <span className={cx('inline-flex shrink-0 items-center gap-2 whitespace-nowrap font-black tracking-tight', className)} aria-label="XTRA-CASH">
       {mark}
       {!markOnly && (
         <span className={cx('text-[1.15em] leading-none', mono ? 'text-white' : light ? 'text-brand-gradient-light' : 'text-brand-gradient')}>XTRA-CASH</span>
