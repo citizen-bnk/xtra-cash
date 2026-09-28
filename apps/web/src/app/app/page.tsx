@@ -84,7 +84,7 @@ export default function ConsumerHome() {
         <div className="space-y-3 md:col-span-3">
           <div className="flex items-center justify-between">
             <h2 className="font-bold">Your matched lender offers</h2>
-            <Badge tone="lime">
+            <Badge tone="brand">
               <Sparkles className="mr-1 h-3 w-3" /> {b?.offers.length ?? 0} match{b?.offers.length === 1 ? '' : 'es'}
             </Badge>
           </div>

@@ -13,7 +13,7 @@ export default function ActivityPage() {
       <PageHeader title="Activity" subtitle="Every card payment and how it was funded." />
       <Table
         rows={d.items}
-        empty="No payments yet"
+        empty="No fires today. You're all clear."
         columns={[
           { header: 'Date', cell: (t) => new Date(t.createdAt).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) },
           { header: 'Merchant', cell: (t) => <div><div className="font-medium">{t.merchantName}</div><div className="text-xs text-muted">{t.channel.replace('_', ' ').toLowerCase()}</div></div> },
