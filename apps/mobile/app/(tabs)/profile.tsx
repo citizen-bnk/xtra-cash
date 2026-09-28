@@ -34,7 +34,7 @@ export default function Profile() {
           </>
         )}
       </Card>
-      <Button title="Sign out" variant="danger" onPress={async () => { await logout(); router.replace('/(auth)/login'); }} />
+      <Button title="Sign out" variant="danger" onPress={async () => { await logout(); router.replace('/(auth)/welcome'); }} />
     </Screen>
   );
 }

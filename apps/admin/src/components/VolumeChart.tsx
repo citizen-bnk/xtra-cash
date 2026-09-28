@@ -2,10 +2,10 @@
 import { useState } from 'react';
 import { formatZAR } from '@xtra/shared';
 
-// Validated with the dataviz palette checker (light surface): both pass lightness, chroma, CVD & normal-vision.
-// Credit green is below 3:1 contrast, so the chart always ships a legend, hover values and the totals row.
-const WALLET = '#2563b8';
-const CREDIT = '#7fae12';
+// Brand purple + a deepened brand orange. Validated with the dataviz palette checker (white surface):
+// both pass lightness, chroma, CVD, normal-vision and 3:1 contrast. The legend, hover values and totals row stay.
+const WALLET = '#a617d3';
+const CREDIT = '#e07a10';
 
 export function VolumeChart({ data }: { data: { date: string; walletCents: number; creditCents: number }[] }) {
   const [hover, setHover] = useState<number | null>(null);
@@ -29,8 +29,8 @@ export function VolumeChart({ data }: { data: { date: string; walletCents: numbe
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Daily approved card volume, last 30 days" onMouseLeave={() => setHover(null)}>
           {ticks.map((t) => (
             <g key={t}>
-              <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#e3e8ef" strokeWidth={1} />
-              <text x={pad.l - 8} y={y(t) + 4} textAnchor="end" fontSize={11} fill="#5b6b82">
+              <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#ebe6f0" strokeWidth={1} />
+              <text x={pad.l - 8} y={y(t) + 4} textAnchor="end" fontSize={11} fill="#6b6180">
                 {formatZAR(t, { decimals: false })}
               </text>
             </g>
@@ -44,11 +44,11 @@ export function VolumeChart({ data }: { data: { date: string; walletCents: numbe
             const gap = d.walletCents > 0 && d.creditCents > 0 ? 2 : 0;
             return (
               <g key={d.date} onMouseEnter={() => setHover(i)}>
-                <rect x={pad.l + i * bw} y={pad.t} width={bw} height={H - pad.t - pad.b} fill={hover === i ? 'rgba(11,27,51,0.04)' : 'transparent'} />
+                <rect x={pad.l + i * bw} y={pad.t} width={bw} height={H - pad.t - pad.b} fill={hover === i ? 'rgba(27,16,48,0.04)' : 'transparent'} />
                 {d.walletCents > 0 && <path d={bar(x, yw, w, base - yw, d.creditCents > 0 ? 0 : 3)} fill={WALLET} />}
                 {d.creditCents > 0 && <path d={bar(x, yc, w, Math.max(0, yw - yc - gap), 3)} fill={CREDIT} />}
                 {(data.length - 1 - i) % 7 === 0 && (
-                  <text x={pad.l + i * bw + bw / 2} y={H - 6} textAnchor="middle" fontSize={11} fill="#5b6b82">
+                  <text x={pad.l + i * bw + bw / 2} y={H - 6} textAnchor="middle" fontSize={11} fill="#6b6180">
                     {new Date(d.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
                   </text>
                 )}

@@ -1,9 +1,13 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { ImageBackground, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useApi, useAuth } from '../../src/auth';
 import { Button, Card, H1, Loading, Muted, Row, Screen, Status } from '../../src/ui';
 import { colors } from '../../src/theme';
+
+// Brand card artwork; the cardholder's details are drawn on top.
+const CARD = require('../../assets/card.jpg');
+const CARD_FROZEN = require('../../assets/card-frozen.jpg');
 
 export default function CardScreen() {
   const { me, client } = useAuth();
@@ -38,12 +42,17 @@ export default function CardScreen() {
   return (
     <Screen>
       <H1>XTRA-CASH card</H1>
-      <View style={{ backgroundColor: frozen ? '#64748b' : colors.ink, borderRadius: 20, padding: 20, aspectRatio: 1.586, justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text style={{ color: colors.white, fontWeight: '900', fontSize: 18 }}>
-            XTRA<Text style={{ color: colors.brand }}>-CASH</Text>
-          </Text>
-          {frozen && <Text style={{ color: colors.white, fontWeight: '700' }}>FROZEN</Text>}
+      <ImageBackground
+        source={frozen ? CARD_FROZEN : CARD}
+        resizeMode="cover"
+        style={{ backgroundColor: frozen ? '#64748b' : colors.brand, borderRadius: 20, overflow: 'hidden', padding: 20, aspectRatio: 1.586, justifyContent: 'space-between' }}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+          {frozen && (
+            <Text style={{ color: colors.white, fontWeight: '700', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, overflow: 'hidden' }}>
+              FROZEN
+            </Text>
+          )}
         </View>
         <View style={{ gap: 6 }}>
           <Text style={{ color: colors.white, fontSize: 20, letterSpacing: 2, fontVariant: ['tabular-nums'] }}>{card.maskedPan}</Text>
@@ -54,7 +63,7 @@ export default function CardScreen() {
             </Text>
           </View>
         </View>
-      </View>
+      </ImageBackground>
       <Card>
         <Row k="Status" v={<Status status={card.status} />} />
         <Row k="Type" v={card.kind === 'VIRTUAL' ? 'Virtual' : 'Physical'} />

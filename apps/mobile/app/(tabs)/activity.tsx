@@ -16,7 +16,7 @@ export default function Activity() {
       <H1>Activity</H1>
       {tx.data.items.length === 0 && (
         <Card>
-          <Muted>No payments yet.</Muted>
+          <Muted>No fires today. You're all clear.</Muted>
         </Card>
       )}
       {tx.data.items.map((t) => (
