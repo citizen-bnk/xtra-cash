@@ -4,6 +4,16 @@
 1. **Vercel account is blocked.** Every Vercel deployment (xtra-cash-web, xtra-cash-admin, xtra-cash-api) fails with "Account is blocked" (see https://vercel.com/knowledge/why-is-my-account-deployment-blocked). It failed on `49d59b9` too, before the brand refresh, and again on `612d217` after the merge. Claude sessions cannot reach api.vercel.com (network policy) and have no Vercel token, so they cannot deploy or unblock it. The account owner must fix it in the Vercel dashboard. Then redeploy `main` on the web and admin projects and check the live sites show the burning-wallet logo.
 2. The `xtra-cash-api` Vercel project is left over from the superseded serverless-API approach. The API runs on Render, so disconnect or delete that project.
 3. This file (`docs/BUILD-STATUS.md`) is the build status; keep it updated in the repo. Always start sessions with `citizen-bnk/xtra-cash` attached as a source. Commit and push every change; no more zips or bundles.
+4. On Render, check the `xtra-cash-api` service has `ENABLE_DEMO_LOGIN=true` (added to render.yaml on 28 Sep; add it by hand under **Environment** if the Blueprint didn't sync it). Switch it to `false` before real customers sign up.
+
+## Done 28 Sep 2026 (commit `2d1e178`, pushed straight to `main`)
+- **One-click demo sign-in.** The web and back-office sign-in pages show a "Try a demo" panel: shoppers (salaried, gig worker, student, KYC pending), micro-lenders (accredited, assisted, awaiting review), affiliate, super-admin and operations admin. Each tile is a role description; one click signs in, no password.
+  - API: `GET /auth/demo`, `POST /auth/demo/login` (apps/api/src/auth/demo.service.ts). Off unless `ENABLE_DEMO_LOGIN=true`.
+  - On an empty database (the live site) the first click builds the demo world once through the real services (about 5 s). Demo staff are `demo.superadmin@xtracash.co.za` / `demo.ops@xtracash.co.za`; in production a tile never resolves to the local-seed staff addresses, so it can't sign in as the real super-admin.
+  - The demo world lives in apps/api/src/db/demo-data.ts; `pnpm db:seed` uses it and behaves as before.
+- **Responsive fixes**, checked with screenshots at 390 / 820 / 1440 px on 15 pages (no sideways scroll anywhere): landing header stays on one line and the hero glow no longer overflows on phones; receipt sits above the card; buttons and logo never wrap; tables keep cells on one line and scroll inside their card (free-text columns still wrap); shopper home repayment amounts no longer collide with dates; modals scroll.
+- Moved the uploaded `brand/fire.mp4` to `apps/web/public/brand/fire.mp4`, where the landing hero plays it.
+- Verified before pushing: typecheck (all 6 packages), 24 API tests, web and admin `next build`.
 
 ## Done 26 Sep 2026
 - Brand refresh published: commit `98cffc5` went through https://github.com/citizen-bnk/xtra-cash/pull/4 and merged to `main` as `612d217`. Before pushing, `pnpm install --frozen-lockfile`, the web and admin `next build` and mobile `tsc` all passed.
@@ -34,7 +44,7 @@ The Claude session that built most of this was started **without** the GitHub re
 - Back office: dashboard, users, KYC, lenders, funding, offers, loans, transactions, affiliates, settings, audit log, ledger check
 - Double-entry ledger; 24 passing tests (unit + e2e)
 
-## Demo logins (seed)
+## Demo logins (local seed; on the live site use the "Try a demo" tiles)
 superadmin@xtracash.co.za / Admin@12345; naledi@example.com, lindiwe@kasicapital.co.za, thabo.affiliate@example.com / Passw0rd!
 
 ## Defaults to confirm with compliance
