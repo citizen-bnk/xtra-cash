@@ -37,6 +37,7 @@ export default function Landing() {
           poster="/brand/fire-poster.jpg"
           aria-hidden="true"
         >
+          <source src="/brand/fire.webm" type="video/webm" />
           <source src="/brand/fire.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-ink via-ink/70 to-ink/30" />
@@ -48,7 +49,7 @@ export default function Landing() {
               Sign in
             </Link>
             <Link href="/register">
-              <Button size="sm" variant="accent">Get started</Button>
+              <Button size="sm" variant="accent" className="whitespace-nowrap">Get started</Button>
             </Link>
           </nav>
         </header>

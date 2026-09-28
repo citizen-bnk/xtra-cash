@@ -297,28 +297,36 @@ export function Tabs<T extends string>({ value, onChange, options }: { value: T;
 }
 
 /**
- * The XTRA-CASH card visual: the brand card artwork (apps serve /brand/card.jpg and
- * /brand/card-frozen.jpg) with the cardholder's details on top. The brand gradient
- * underneath shows if the artwork is missing or still loading.
+ * The XTRA-CASH card: the official card artwork (apps serve /brand/card.jpg; the logo and chip
+ * are printed on it) with the cardholder's details on top. A frozen card shows the frosted ice
+ * artwork (/brand/card-frozen.jpg) with its own logo. Gradients show if an image is missing.
+ * No card-network logo until XTRA-CASH has an issuing agreement.
  */
 export function XtraCard({ name, maskedPan, expiry, frozen }: { name: string; maskedPan: string; expiry: string; frozen?: boolean }) {
   return (
     <div
-      className="relative aspect-[1.586] w-full max-w-sm overflow-hidden rounded-2xl bg-cover bg-center p-5 text-white shadow-lg transition"
+      className={cx(
+        'relative aspect-[1.586] w-full max-w-sm overflow-hidden rounded-2xl bg-cover bg-center p-5 shadow-lg transition',
+        frozen ? 'text-ink' : 'text-white',
+      )}
       style={{
         backgroundImage: frozen
-          ? 'url(/brand/card-frozen.jpg), linear-gradient(135deg, #64748b 0%, #334155 100%)'
-          : 'url(/brand/card.jpg), linear-gradient(135deg, #d91f63 0%, #a617d3 100%)',
+          ? 'url(/brand/card-frozen.jpg), linear-gradient(135deg, #bfe3f5 0%, #6fb3d9 100%)'
+          : 'url(/brand/card.jpg), linear-gradient(135deg, #fb9320 0%, #e5476a 42%, #a617d3 76%, #5c2394 100%)',
       }}
+      role="img"
+      aria-label={`XTRA-CASH card ${maskedPan}${frozen ? ', frozen' : ''}`}
     >
-      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />
-      <div className="relative flex items-start justify-between">
-        <Logo light mono />
-        {frozen && <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">FROZEN</span>}
-      </div>
+      {frozen && (
+        <div className="relative flex items-start justify-between">
+          <Logo />
+          <span className="rounded-full bg-ink/80 px-2 py-0.5 text-xs font-bold text-white">FROZEN</span>
+        </div>
+      )}
+      {!frozen && <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/35 to-transparent" />}
       <div className="absolute bottom-5 left-5 right-5">
-        <div className="whitespace-nowrap font-mono text-base tracking-widest sm:text-lg">{maskedPan}</div>
-        <div className="mt-2 flex justify-between text-xs uppercase text-white/80">
+        <div className="whitespace-nowrap font-mono text-base tracking-widest drop-shadow sm:text-lg">{maskedPan}</div>
+        <div className={cx('mt-2 flex justify-between text-xs font-semibold uppercase drop-shadow', frozen ? 'text-ink/80' : 'text-white/90')}>
           <span>{name}</span>
           <span>{expiry}</span>
         </div>
@@ -329,16 +337,11 @@ export function XtraCard({ name, maskedPan, expiry, frozen }: { name: string; ma
 
 /**
  * The XTRA-CASH logo: burning-wallet mark + wordmark (from the official brand artwork).
- * Apps serve the mark at /brand/mark.png. `light` is for dark or coloured backgrounds.
+ * Apps serve the mark at /brand/mark.png (transparent). `light` is for dark or coloured backgrounds.
  */
 export function Logo({ light, mono, className, markOnly, size = 28 }: { light?: boolean; mono?: boolean; className?: string; markOnly?: boolean; size?: number }) {
-  const mark = light ? (
-    <span className="grid place-items-center rounded-lg bg-white p-0.5 shadow-sm" style={{ width: size, height: size }}>
-      <img src="/brand/mark.png" alt="" className="h-full w-full object-contain" />
-    </span>
-  ) : (
-    <img src="/brand/mark.png" alt="" style={{ width: size, height: size }} className="object-contain" />
-  );
+  // The mark has a transparent background, so it sits directly on light and dark surfaces.
+  const mark = <img src="/brand/mark.png" alt="" style={{ width: size, height: size }} className="shrink-0 object-contain" />;
   return (
     <span className={cx('inline-flex shrink-0 items-center gap-2 whitespace-nowrap font-black tracking-tight', className)} aria-label="XTRA-CASH">
       {mark}

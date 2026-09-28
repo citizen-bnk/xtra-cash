@@ -1,13 +1,8 @@
 import { useState } from 'react';
-import { ImageBackground, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useApi, useAuth } from '../../src/auth';
 import { Button, Card, H1, Loading, Muted, Row, Screen, Status } from '../../src/ui';
-import { colors } from '../../src/theme';
-
-// Brand card artwork; the cardholder's details are drawn on top.
-const CARD = require('../../assets/card.jpg');
-const CARD_FROZEN = require('../../assets/card-frozen.jpg');
+import { XtraCard } from '../../src/XtraCard';
 
 export default function CardScreen() {
   const { me, client } = useAuth();
@@ -42,28 +37,12 @@ export default function CardScreen() {
   return (
     <Screen>
       <H1>XTRA-CASH card</H1>
-      <ImageBackground
-        source={frozen ? CARD_FROZEN : CARD}
-        resizeMode="cover"
-        style={{ backgroundColor: frozen ? '#64748b' : colors.brand, borderRadius: 20, overflow: 'hidden', padding: 20, aspectRatio: 1.586, justifyContent: 'space-between' }}
-      >
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-          {frozen && (
-            <Text style={{ color: colors.white, fontWeight: '700', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, overflow: 'hidden' }}>
-              FROZEN
-            </Text>
-          )}
-        </View>
-        <View style={{ gap: 6 }}>
-          <Text style={{ color: colors.white, fontSize: 20, letterSpacing: 2, fontVariant: ['tabular-nums'] }}>{card.maskedPan}</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>{`${me?.firstName} ${me?.lastName}`.toUpperCase()}</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
-              {String(card.expiryMonth).padStart(2, '0')}/{String(card.expiryYear).slice(-2)}
-            </Text>
-          </View>
-        </View>
-      </ImageBackground>
+      <XtraCard
+        name={`${me?.firstName} ${me?.lastName}`.toUpperCase()}
+        maskedPan={card.maskedPan}
+        expiry={`${String(card.expiryMonth).padStart(2, '0')}/${String(card.expiryYear).slice(-2)}`}
+        frozen={frozen}
+      />
       <Card>
         <Row k="Status" v={<Status status={card.status} />} />
         <Row k="Type" v={card.kind === 'VIRTUAL' ? 'Virtual' : 'Physical'} />
