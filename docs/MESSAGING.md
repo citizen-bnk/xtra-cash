@@ -55,8 +55,8 @@ Source files live in Google Drive under `XTRA-CASH/BRAND IMAGES`.
 
 | Asset | Where it's used | Notes |
 | --- | --- | --- |
-| Fire video (`fire.webm`, `fire.mp4`, `fire-poster.jpg`) | Website hero; mobile welcome screen | Letterbox bars cropped and sound removed. The still frame shows when reduced motion is on. It still carries Google's "Veo" AI-generation mark; replace it with a clean, licensed export when one is available. |
-| Card | Website and mobile, drawn in code | Matches the realistic card artwork (orange-to-purple flames, chip). The artwork itself isn't used because it has sample numbers and names printed on it. |
+| Fire video (`fire.webm`, `fire.mp4`, `fire-poster.jpg`) | Website hero; mobile welcome screen | Letterbox bars cropped and sound removed; the untouched source is `brand/fire-original.mp4`. The still frame shows when reduced motion is on. It still carries Google's "Veo" AI-generation mark; replace it with a clean, licensed export when one is available. |
+| Card (`card.jpg`) | Website and mobile | The official blank card artwork (logo and chip printed on it), cropped to card shape, with the Mastercard logo removed. The cardholder's number, name and expiry are drawn on top. The untouched original is `brand/xtra-cash-card-front-original.jpg`. |
 | Frozen card (`card-frozen.jpg`) | Card when frozen | Ice card front, frosted so the printed sample details and network logo can't be read. |
 | Mastercard logo | Not shown anywhere | Add it only once XTRA-CASH has a Mastercard issuing agreement (through a sponsor bank). |
 

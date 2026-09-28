@@ -3,7 +3,7 @@
 ## ▶ NEXT SESSION: do this first
 1. **Vercel is working again** (account block cleared 28 Sep). `main` deploys web, admin and api automatically; PRs get preview deployments.
 2. The `xtra-cash-api` Vercel project is left over from the superseded serverless-API approach. The API runs on Render, so disconnect or delete that project.
-3. **Brand follow-ups:** replace the fire video with a clean export without the Veo mark when available; add the Mastercard logo only after an issuing agreement; ask the designer for a flat, front-on blank card design if the drawn card should be replaced with artwork. Messaging rules are in `docs/MESSAGING.md`.
+3. **Brand follow-ups:** replace the fire video with a clean export without the Veo mark when available; add the Mastercard logo only after an issuing agreement (the untouched card artwork with the logo is `brand/xtra-cash-card-front-original.jpg`; crop it the same way into `card.jpg` for web and mobile). Messaging rules are in `docs/MESSAGING.md`.
 4. This file (`docs/BUILD-STATUS.md`) is the build status; keep it updated in the repo. Always start sessions with `citizen-bnk/xtra-cash` attached as a source. Commit and push every change; no more zips or bundles.
 5. On Render, check the `xtra-cash-api` service has `ENABLE_DEMO_LOGIN=true` (added to render.yaml on 28 Sep; add it by hand under **Environment** if the Blueprint didn't sync it). Switch it to `false` before real customers sign up.
 
@@ -13,7 +13,7 @@
   - On an empty database (the live site) the first click builds the demo world once through the real services (about 5 s). Demo staff are `demo.superadmin@xtracash.co.za` / `demo.ops@xtracash.co.za`; in production a tile never resolves to the local-seed staff addresses, so it can't sign in as the real super-admin.
   - The demo world lives in apps/api/src/db/demo-data.ts; `pnpm db:seed` uses it and behaves as before.
 - **Responsive fixes**, checked with screenshots at 390 / 820 / 1440 px on 15 pages (no sideways scroll anywhere): landing header stays on one line and the hero glow no longer overflows on phones; receipt sits above the card; buttons and logo never wrap; tables keep cells on one line and scroll inside their card (free-text columns still wrap); shopper home repayment amounts no longer collide with dates; modals scroll.
-- Moved the uploaded `brand/fire.mp4` to `apps/web/public/brand/fire.mp4`, where the landing hero plays it. (Since replaced by an optimised version: bars cropped, no audio, WebM 1.2 MB + MP4 1.9 MB; the original stays in `brand/fire.mp4`.)
+- Moved the uploaded `brand/fire.mp4` to `apps/web/public/brand/fire.mp4`, where the landing hero plays it. (Since replaced by an optimised version: bars cropped, no audio, WebM 1.2 MB + MP4 1.9 MB; the original is kept as the source in `brand/fire-original.mp4`.)
 - Verified before pushing: typecheck (all 6 packages), 24 API tests, web and admin `next build`.
 
 ## Done 26 Sep 2026
