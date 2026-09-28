@@ -148,9 +148,7 @@ export function Chip({ label, on, onPress }: { label: string; on: boolean; onPre
 export function Logo({ light }: { light?: boolean }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', padding: 2 }}>
-        <Image source={require('../assets/mark.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
-      </View>
+      <Image source={require('../assets/mark.png')} style={{ width: 30, height: 32 }} resizeMode="contain" />
       <Text style={{ fontWeight: '900', fontSize: 19, letterSpacing: -0.5, color: light ? colors.white : colors.violet }}>
         XTRA<Text style={{ color: light ? colors.orange : colors.brand }}>-CASH</Text>
       </Text>

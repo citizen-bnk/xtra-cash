@@ -337,16 +337,11 @@ export function XtraCard({ name, maskedPan, expiry, frozen }: { name: string; ma
 
 /**
  * The XTRA-CASH logo: burning-wallet mark + wordmark (from the official brand artwork).
- * Apps serve the mark at /brand/mark.png. `light` is for dark or coloured backgrounds.
+ * Apps serve the mark at /brand/mark.png (transparent). `light` is for dark or coloured backgrounds.
  */
 export function Logo({ light, mono, className, markOnly, size = 28 }: { light?: boolean; mono?: boolean; className?: string; markOnly?: boolean; size?: number }) {
-  const mark = light ? (
-    <span className="grid place-items-center rounded-lg bg-white p-0.5 shadow-sm" style={{ width: size, height: size }}>
-      <img src="/brand/mark.png" alt="" className="h-full w-full object-contain" />
-    </span>
-  ) : (
-    <img src="/brand/mark.png" alt="" style={{ width: size, height: size }} className="object-contain" />
-  );
+  // The mark has a transparent background, so it sits directly on light and dark surfaces.
+  const mark = <img src="/brand/mark.png" alt="" style={{ width: size, height: size }} className="shrink-0 object-contain" />;
   return (
     <span className={cx('inline-flex shrink-0 items-center gap-2 whitespace-nowrap font-black tracking-tight', className)} aria-label="XTRA-CASH">
       {mark}
