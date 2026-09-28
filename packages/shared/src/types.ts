@@ -25,6 +25,16 @@ export interface AuthResponse extends Tokens {
   user: User;
 }
 
+/** A one-click demo account shown on the sign-in pages when demo mode is on. */
+export interface DemoPersona {
+  key: string;
+  /** Which site signs in with it: the shopper/lender/affiliate web app or the back office. */
+  app: 'web' | 'admin';
+  group: string;
+  title: string;
+  description: string;
+}
+
 export interface User {
   id: string;
   email: string;

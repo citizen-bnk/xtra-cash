@@ -22,7 +22,7 @@ export default function Landing() {
   }, [me, router]);
 
   return (
-    <div className="bg-white">
+    <div className="overflow-x-clip bg-white">
       <section className="relative isolate flex min-h-[88svh] flex-col overflow-hidden bg-ink text-white">
         {/* Fallback glow shows if the video is missing, still loading or reduced motion is on. */}
         <div className="absolute -right-24 -top-24 -z-20 h-96 w-96 rounded-full bg-brand/40 blur-3xl" />
@@ -41,10 +41,10 @@ export default function Landing() {
         </video>
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-ink via-ink/70 to-ink/30" />
 
-        <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
-          <Logo light size={36} className="text-lg" />
-          <nav className="flex items-center gap-2">
-            <Link href="/login" className="px-3 text-sm font-semibold text-white hover:underline">
+        <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-5 sm:px-6">
+          <Logo light size={36} className="text-base sm:text-lg" />
+          <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <Link href="/login" className="whitespace-nowrap px-2 text-sm font-semibold text-white hover:underline sm:px-3">
               Sign in
             </Link>
             <Link href="/register">
@@ -97,9 +97,9 @@ export default function Landing() {
           </Link>
         </div>
         <div className="relative mx-auto w-full max-w-sm">
-          <div className="absolute -inset-8 -z-10 rounded-[3rem] bg-gradient-to-br from-brand/25 to-brand-orange/25 blur-2xl" />
+          <div className="absolute -inset-4 -z-10 rounded-[3rem] bg-gradient-to-br from-brand/25 to-brand-orange/25 blur-2xl sm:-inset-8" />
           <XtraCard name="NALEDI KHUMALO" maskedPan="5399 99•• •••• 4821" expiry="09/30" />
-          <div className="-mt-6 ml-10 rounded-2xl border border-line bg-white p-4 shadow-xl">
+          <div className="relative z-10 -mt-3 ml-6 rounded-2xl border border-line bg-white p-4 shadow-xl sm:ml-10">
             <div className="text-xs font-medium text-muted">Shoprite Soweto · R1 850.00</div>
             <div className="mt-2 flex items-center justify-between text-sm">
               <span>From wallet</span>

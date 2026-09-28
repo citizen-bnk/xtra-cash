@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Alert, Button, Card, Field, Input, Logo, useAction, useAuth } from '@xtra/ui';
+import { Alert, Button, Card, DemoAccounts, Field, Input, Logo, useAction, useAuth } from '@xtra/ui';
 import { ADMIN_URL, homeFor } from '@/lib/config';
 
 function LoginForm() {
@@ -24,7 +24,7 @@ function LoginForm() {
   });
 
   return (
-    <Card className="w-full max-w-sm p-6">
+    <Card className="w-full max-w-sm shrink-0 p-6">
       <h1 className="text-xl font-bold">Welcome back</h1>
       <p className="mt-1 text-sm text-muted">Sign in with your email or mobile number.</p>
       <form
@@ -67,8 +67,34 @@ export default function LoginPage() {
         <Logo size={44} className="text-2xl" />
       </Link>
       <Suspense>
-        <LoginForm />
+        <LoginArea />
       </Suspense>
+    </div>
+  );
+}
+
+function LoginArea() {
+  const { refreshMe } = useAuth();
+  const router = useRouter();
+  return (
+    <div className="flex w-full max-w-5xl flex-col items-center gap-6 lg:flex-row lg:items-start lg:justify-center">
+      <LoginForm />
+      <DemoAccounts
+        app="web"
+        className="max-w-sm sm:max-w-xl lg:max-w-2xl"
+        onSignedIn={async (r) => {
+          const me = await refreshMe();
+          router.replace(homeFor(me ?? r.user));
+        }}
+        footer={
+          <>
+            XTRA-CASH staff?{' '}
+            <a className="font-semibold text-ink underline" href={`${ADMIN_URL}/login`}>
+              Try the back-office demo
+            </a>
+          </>
+        }
+      />
     </div>
   );
 }

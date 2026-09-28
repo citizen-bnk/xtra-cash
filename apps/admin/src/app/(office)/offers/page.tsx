@@ -18,7 +18,7 @@ export default function OffersPage() {
           { header: 'Price', cell: (o) => `${bpsToPercent(o.monthlyInterestRateBps)} p/m · ${o.termMonths}m` },
           { header: 'Fees', cell: (o) => `${formatZAR(o.initiationFeeCents)} + ${formatZAR(o.monthlyServiceFeeCents)}/m` },
           { header: 'Amount', cell: (o) => `${formatZAR(o.minAmountCents, { decimals: false })}–${formatZAR(o.maxAmountPerUserCents, { decimals: false })}` },
-          { header: 'Criteria', cell: (o) => <span className="text-xs text-muted">≥{formatZAR(o.minMonthlyIncomeCents, { decimals: false })} · score ≥{o.minCreditScore} · {o.minAge}–{o.maxAge}y · {o.employmentStatuses.length ? o.employmentStatuses.map((e) => EMPLOYMENT_LABELS[e]).join(', ') : 'any job'} · {o.provinces.length ? o.provinces.join(', ') : 'all SA'}</span> },
+          { header: 'Criteria', className: 'min-w-64 whitespace-normal', cell: (o) => <span className="text-xs text-muted">≥{formatZAR(o.minMonthlyIncomeCents, { decimals: false })} · score ≥{o.minCreditScore} · {o.minAge}–{o.maxAge}y · {o.employmentStatuses.length ? o.employmentStatuses.map((e) => EMPLOYMENT_LABELS[e]).join(', ') : 'any job'} · {o.provinces.length ? o.provinces.join(', ') : 'all SA'}</span> },
           { header: 'Status', cell: (o) => <Badge tone={o.active ? 'green' : 'gray'}>{o.active ? 'Active' : 'Disabled'}</Badge> },
           {
             header: '',

@@ -110,7 +110,7 @@ export default function AffiliateDashboard() {
             columns={[
               { header: 'Date', cell: (c) => new Date(c.createdAt).toLocaleDateString('en-ZA') },
               { header: 'Type', cell: (c) => TYPE_LABEL[c.type] },
-              { header: 'Details', cell: (c) => <span className="text-muted">{c.description}</span> },
+              { header: 'Details', className: 'min-w-56 whitespace-normal', cell: (c) => <span className="text-muted">{c.description}</span> },
               { header: 'Amount', align: 'right', cell: (c) => <b>{formatZAR(c.amountCents)}</b> },
               { header: 'Status', cell: (c) => <StatusBadge status={c.status} /> },
             ]}

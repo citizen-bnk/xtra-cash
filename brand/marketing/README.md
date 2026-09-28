@@ -11,5 +11,5 @@ From Google Drive: `My Drive/XTRA-CASH/BRAND IMAGES`.
 | `email-signature.png` | EMAIL DESIGNS | Email signature design |
 
 Not in the repo yet (too large for the Drive connector):
-- `Videos/Animate_the_file_burning_and_m.mp4` (7.6 MB). The landing hero plays it from `apps/web/public/brand/fire.mp4`; until it is added, the backdrop image shows instead.
+- `Videos/Animate_the_file_burning_and_m.mp4` (7.6 MB). The landing hero plays it from `apps/web/public/brand/fire.mp4`.
 - `VOUCHERS/XTTRA_CASH Voucher Card.png` (7.7 MB, voucher card front).

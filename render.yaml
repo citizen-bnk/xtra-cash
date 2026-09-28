@@ -43,6 +43,10 @@ services:
       # Set to "false" before handling real money.
       - key: ENABLE_SIMULATION
         value: "true"
+      # One-click demo sign-in on the login pages. The first click builds the sample accounts and data.
+      # Set to "false" before real customers sign up.
+      - key: ENABLE_DEMO_LOGIN
+        value: "true"
       # Browsers reach the API through the web/admin sites' /api proxy, so CORS only matters for other
       # browser clients. Optional: comma-separated origins to allow; empty allows any.
       - key: CORS_ORIGINS

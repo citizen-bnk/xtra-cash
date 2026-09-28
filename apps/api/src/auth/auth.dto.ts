@@ -22,3 +22,7 @@ export class LoginDto {
 export class RefreshDto {
   @IsString() refreshToken: string;
 }
+
+export class DemoLoginDto {
+  @IsString() @MaxLength(40) persona: string;
+}
