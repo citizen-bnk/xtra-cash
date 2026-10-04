@@ -9,15 +9,20 @@
 import 'dotenv/config';
 import path from 'path';
 import { execFileSync } from 'child_process';
+import { databaseUrl } from './config';
 
 const env = process.env.VERCEL_ENV; // 'production' | 'preview' | 'development' on Vercel, unset elsewhere
 if (env && env !== 'production') {
   console.log(`Release: skipping database steps for a ${env} build`);
   process.exit(0);
 }
-if (!process.env.DATABASE_URL) {
-  console.warn('Release: DATABASE_URL is not set, so migrations were NOT applied. Add it to the API project on Vercel.');
-  process.exit(0);
+if (!databaseUrl()) {
+  console.error('Release: database URL is missing. Configure DATABASE_URL or XTR_DATABASE_URL before deploying.');
+  process.exit(1);
+}
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.error('Release: JWT_SECRET must contain at least 32 characters before deploying.');
+  process.exit(1);
 }
 
 for (const step of ['migrate.js', 'create-admin.js']) {
