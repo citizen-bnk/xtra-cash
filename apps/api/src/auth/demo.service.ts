@@ -28,7 +28,10 @@ const PERSONAS: PersonaDef[] = [
   { key: 'staff-ops', app: 'admin', group: 'XTRA-CASH staff', title: 'Operations admin', description: 'Day-to-day queues: KYC reviews, lender accreditation, EFT confirmations and commissions.', emails: [DEMO_LOGIN_STAFF.ops.email, SEED_STAFF.ops.email] },
 ];
 
-/** One-click demo sign-in. Off unless ENABLE_DEMO_LOGIN=true. */
+/**
+ * One-click demo sign-in. On by default while XTRA-CASH is in its demo phase; set ENABLE_DEMO_LOGIN=false
+ * to switch it off (do this before real customers sign up: the demo staff tiles have back-office access).
+ */
 @Injectable()
 export class DemoService {
   private readonly logger = new Logger(DemoService.name);
@@ -37,7 +40,7 @@ export class DemoService {
   constructor(@InjectDb() private db: Db, private auth: AuthService, private audit: AuditService, private moduleRef: ModuleRef) {}
 
   get enabled() {
-    return process.env.ENABLE_DEMO_LOGIN === 'true';
+    return (process.env.ENABLE_DEMO_LOGIN ?? 'true').trim().toLowerCase() !== 'false';
   }
 
   personas(): { enabled: boolean; personas: DemoPersona[] } {
@@ -52,8 +55,15 @@ export class DemoService {
 
     let user = await this.findUser(persona);
     if (!user) {
-      await this.ensureDemoData();
-      user = await this.findUser(persona);
+      try {
+        await this.ensureDemoData();
+      } catch (e) {
+        // Another server instance may have built the demo world at the same moment (its inserts win the
+        // unique constraints and ours fail). If the account exists now, carry on.
+        user = await this.findUser(persona);
+        if (!user) throw e;
+      }
+      user ??= await this.findUser(persona);
     }
     if (!user) throw new ServiceUnavailableException('The demo account is not available. Please try again shortly.');
     if (user.status === 'SUSPENDED') throw new UnauthorizedException('This demo account has been suspended in the back office.');

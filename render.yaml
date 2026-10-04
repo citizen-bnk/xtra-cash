@@ -43,7 +43,7 @@ services:
       # Set to "false" before handling real money.
       - key: ENABLE_SIMULATION
         value: "true"
-      # One-click demo sign-in on the login pages. The first click builds the sample accounts and data.
+      # One-click demo sign-in on the login pages (on unless "false"). The first click builds the sample accounts and data.
       # Set to "false" before real customers sign up.
       - key: ENABLE_DEMO_LOGIN
         value: "true"

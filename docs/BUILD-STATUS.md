@@ -1,15 +1,20 @@
-# XTRA-CASH — MVP build status (26 Sep 2026)
+# XTRA-CASH — MVP build status (4 Oct 2026)
 
 ## ▶ NEXT SESSION: do this first
 1. **Vercel is working again** (account block cleared 28 Sep). `main` deploys web, admin and api automatically; PRs get preview deployments.
 2. The `xtra-cash-api` Vercel project is left over from the superseded serverless-API approach. The API runs on Render, so disconnect or delete that project.
 3. **Brand follow-ups:** replace the fire video with a clean export without the Veo mark when available; add the Mastercard logo only after an issuing agreement (the untouched card artwork with the logo is `brand/xtra-cash-card-front-original.jpg`; crop it the same way into `card.jpg` for web and mobile). Messaging rules are in `docs/MESSAGING.md`.
 4. This file (`docs/BUILD-STATUS.md`) is the build status; keep it updated in the repo. Always start sessions with `citizen-bnk/xtra-cash` attached as a source. Commit and push every change; no more zips or bundles.
-5. On Render, check the `xtra-cash-api` service has `ENABLE_DEMO_LOGIN=true` (added to render.yaml on 28 Sep; add it by hand under **Environment** if the Blueprint didn't sync it). Switch it to `false` before real customers sign up.
+5. **Confirm the live API.** No Render deployments appear on GitHub and `https://xtra-cash-api.onrender.com/health` returned 404 on 28 Sep, so check which service the web and admin sites' `API_URL` points to, and that `<API_URL>/health` and `<API_URL>/auth/demo` answer. Demo sign-in is on by default; set `ENABLE_DEMO_LOGIN=false` on the API before real customers sign up (the demo staff tiles have back-office access).
+
+## Done 4 Oct 2026
+- Demo sign-in is **on by default** (only `ENABLE_DEMO_LOGIN=false` turns it off), so the live site shows it even where the variable was never set.
+- If two visitors (or two server instances) make the very first demo click at the same moment, both now sign in instead of one getting an error.
+- New `apps/api/test/demo.e2e.spec.ts`: from an empty database in production mode with simulation off, the first click builds the demo world, simultaneous clicks both succeed, all 10 roles reach the right account, tokens work, no login details are exposed, and the switch turns it off. 28 tests pass.
 
 ## Done 28 Sep 2026 (commit `2d1e178`, pushed straight to `main`)
 - **One-click demo sign-in.** The web and back-office sign-in pages show a "Try a demo" panel: shoppers (salaried, gig worker, student, KYC pending), micro-lenders (accredited, assisted, awaiting review), affiliate, super-admin and operations admin. Each tile is a role description; one click signs in, no password.
-  - API: `GET /auth/demo`, `POST /auth/demo/login` (apps/api/src/auth/demo.service.ts). Off unless `ENABLE_DEMO_LOGIN=true`.
+  - API: `GET /auth/demo`, `POST /auth/demo/login` (apps/api/src/auth/demo.service.ts). On unless `ENABLE_DEMO_LOGIN=false` (since 4 Oct).
   - On an empty database (the live site) the first click builds the demo world once through the real services (about 5 s). Demo staff are `demo.superadmin@xtracash.co.za` / `demo.ops@xtracash.co.za`; in production a tile never resolves to the local-seed staff addresses, so it can't sign in as the real super-admin.
   - The demo world lives in apps/api/src/db/demo-data.ts; `pnpm db:seed` uses it and behaves as before.
 - **Responsive fixes**, checked with screenshots at 390 / 820 / 1440 px on 15 pages (no sideways scroll anywhere): landing header stays on one line and the hero glow no longer overflows on phones; receipt sits above the card; buttons and logo never wrap; tables keep cells on one line and scroll inside their card (free-text columns still wrap); shopper home repayment amounts no longer collide with dates; modals scroll.

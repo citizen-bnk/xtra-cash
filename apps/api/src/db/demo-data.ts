@@ -4,7 +4,7 @@
  * (affordability, ledger, commissions...).
  *
  * Used by `pnpm db:seed` (after wiping a local database) and by one-click demo sign-in
- * (`ENABLE_DEMO_LOGIN=true`), which builds it once on first use without touching other data.
+ * (on unless `ENABLE_DEMO_LOGIN=false`), which builds it once on first use without touching other data.
  */
 import type { INestApplicationContext } from '@nestjs/common';
 import type { ModuleRef } from '@nestjs/core';
