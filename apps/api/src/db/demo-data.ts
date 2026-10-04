@@ -9,11 +9,13 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import type { ModuleRef } from '@nestjs/core';
 import * as bcrypt from 'bcryptjs';
+import { eq } from 'drizzle-orm';
 import { makeSaId } from '@xtra/shared';
 import { DB } from '../common/db.module';
 import { Db } from './client';
 import { users } from './schema';
 import { AuthService } from '../auth/auth.service';
+import { RegisterDto } from '../auth/auth.dto';
 import { KycService } from '../consumer/kyc.service';
 import { LenderService } from '../lender/lender.service';
 import { AdminService } from '../admin/admin.service';
@@ -80,8 +82,16 @@ export async function buildDemoData(app: Resolver, staffAccounts = SEED_STAFF) {
   const cards = get<CardsService>(CardsService);
   const affiliates = get<AffiliateService>(AffiliateService);
 
+  // Registration commits before token issuance. Reuse demo accounts left by an interrupted build.
+  const registerDemo = async (dto: RegisterDto) => {
+    const existing = await db.query.users.findFirst({ where: eq(users.email, dto.email) });
+    return existing ? { user: existing } : auth.register(dto);
+  };
+
   // ---- staff
   const staff = async (a: DemoStaffAccount, roles: any[]) => {
+    const existing = await db.query.users.findFirst({ where: eq(users.email, a.email) });
+    if (existing) return { id: existing.id, email: existing.email, roles: existing.roles };
     const [u] = await db
       .insert(users)
       .values({
@@ -100,7 +110,7 @@ export async function buildDemoData(app: Resolver, staffAccounts = SEED_STAFF) {
   await staff(staffAccounts.ops, ['ADMIN']);
 
   // ---- affiliate
-  const aff = await auth.register({
+  const aff = await registerDemo({
     email: 'thabo.affiliate@example.com',
     phone: '0831110001',
     password: DEMO_PASSWORD,
@@ -113,7 +123,7 @@ export async function buildDemoData(app: Resolver, staffAccounts = SEED_STAFF) {
 
   // ---- lenders
   const makeLender = async (email: string, phone: string, first: string, last: string, org: string, withRef: boolean) => {
-    const r = await auth.register({
+    const r = await registerDemo({
       email,
       phone,
       password: DEMO_PASSWORD,
@@ -243,7 +253,7 @@ export async function buildDemoData(app: Resolver, staffAccounts = SEED_STAFF) {
     k: { province: string; employmentStatus: any; income: number; expenses: number; employer?: string },
     withRef = true,
   ) => {
-    const r = await auth.register({ email, phone, password: DEMO_PASSWORD, firstName: first, lastName: last, accountType: 'CONSUMER', referralCode: withRef ? ref : undefined });
+    const r = await registerDemo({ email, phone, password: DEMO_PASSWORD, firstName: first, lastName: last, accountType: 'CONSUMER', referralCode: withRef ? ref : undefined });
     await kyc.submit(r.user.id, {
       idNumber: makeSaId(new Date(dob), seq),
       province: k.province,

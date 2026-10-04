@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { DemoService } from './demo.service';
+import { accessTokenTtl } from './config';
 
 @Global()
 @Module({
@@ -14,7 +15,7 @@ import { DemoService } from './demo.service';
         if (!secret || (process.env.NODE_ENV === 'production' && secret.length < 32)) {
           throw new Error('JWT_SECRET must be set (32+ chars in production)');
         }
-        return { secret, signOptions: { expiresIn: (process.env.JWT_ACCESS_TTL ?? '15m') as any } };
+        return { secret, signOptions: { expiresIn: accessTokenTtl() } };
       },
     }),
   ],
