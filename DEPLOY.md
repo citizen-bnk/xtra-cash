@@ -24,7 +24,7 @@ Set these under each project's **Settings → Environment Variables** (Productio
 
 | Key | Value |
 |---|---|
-| `DATABASE_URL` | added by Vercel Storage, or your Postgres connection string |
+| `DATABASE_URL` or `XTR_DATABASE_URL` | your Postgres connection string; the API also accepts the `XTR_` prefix used by the existing Neon integration |
 | `JWT_SECRET` | a random string, **at least 32 characters** |
 | `CARD_NETWORK_SECRET` | a random string (signs card-processor webhooks) |
 | `CRON_SECRET` | a random string. Vercel Cron sends it to `/jobs/arrears` each night |
@@ -51,6 +51,7 @@ Set these under each project's **Settings → Environment Variables** (Productio
 ## 3. What happens on each deploy
 
 - **API production build** (`apps/api/vercel.json` → `pnpm run vercel-build`): compiles the API, applies database migrations, and creates the super-admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` if it doesn't exist yet. Preview builds skip the database steps, so a pull request never changes the live schema. If migrations fail, the deploy fails and the previous version stays live.
+  A missing database URL or a JWT secret shorter than 32 characters also fails the production build, so a successful build cannot silently skip the database release.
 - **Nightly arrears check:** Vercel Cron calls `GET /jobs/arrears` at 01:05 South African time (23:05 UTC), authorised with `CRON_SECRET`. The back office's "Run arrears check" button does the same on demand.
 - **Uploaded documents** (lender accreditation) are stored in the database, because serverless functions have no shared disk. Uploads are limited to 4 MB (Vercel's request limit is 4.5 MB).
 

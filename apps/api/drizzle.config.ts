@@ -1,8 +1,9 @@
 import { defineConfig } from 'drizzle-kit';
+import { databaseUrl } from './src/db/config';
 
 export default defineConfig({
   dialect: 'postgresql',
   schema: './src/db/schema.ts',
   out: './drizzle',
-  dbCredentials: { url: process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/xtracash' },
+  dbCredentials: { url: databaseUrl() ?? 'postgresql://postgres:postgres@localhost:5432/xtracash' },
 });
