@@ -73,7 +73,7 @@ pnpm dev:mobile   # Expo. Set EXPO_PUBLIC_API_URL to your computer's LAN IP for 
 
 ## Deploying
 
-See [DEPLOY.md](DEPLOY.md). It covers a one-click Render Blueprint (`render.yaml`) for the API, Postgres, web and admin.
+Everything runs on Vercel: the API, web and admin are three projects built from this repo, and every push to `main` deploys them. See [DEPLOY.md](DEPLOY.md) for the projects, environment variables and checks.
 
 ## Tests
 

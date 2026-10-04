@@ -134,7 +134,7 @@ function Documents({ org, onChange }: { org: LenderOrg; onChange: () => void }) 
   return (
     <Card>
       <h2 className="mb-1 font-bold">Documents</h2>
-      <p className="mb-4 text-sm text-muted">PDF, JPG or PNG up to 10 MB.</p>
+      <p className="mb-4 text-sm text-muted">PDF, JPG or PNG up to 4 MB.</p>
       <input
         ref={fileRef}
         type="file"

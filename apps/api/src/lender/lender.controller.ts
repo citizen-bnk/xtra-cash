@@ -36,7 +36,8 @@ export class LenderController {
   }
 
   @Post('documents')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  // Vercel functions accept request bodies up to 4.5 MB.
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 4 * 1024 * 1024 } }))
   upload(@CurrentUser() u: AuthUser, @Body() dto: DocumentDto, @UploadedFile() file: Express.Multer.File) {
     return this.lender.uploadDocument(u, dto.type, file);
   }

@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { relations } from 'drizzle-orm';
 import {
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -15,6 +16,9 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+
+/** Raw file bytes (Postgres bytea). */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' });
 
 const id = () => text('id').primaryKey().$defaultFn(() => randomUUID());
 const createdAt = () => timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow();
@@ -419,3 +423,15 @@ export const journalRelations = relations(ledgerJournals, ({ many }) => ({ entri
 export const entryRelations = relations(ledgerEntries, ({ one }) => ({
   journal: one(ledgerJournals, { fields: [ledgerEntries.journalId], references: [ledgerJournals.id] }),
 }));
+
+/**
+ * Uploaded files (lender accreditation documents). Kept in the database because the API runs as
+ * serverless functions on Vercel, where the local disk is read-only and not shared between instances.
+ */
+export const storedFiles = pgTable('stored_files', {
+  key: text('key').primaryKey(),
+  originalName: text('original_name').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  content: bytea('content').notNull(),
+  createdAt: createdAt(),
+});

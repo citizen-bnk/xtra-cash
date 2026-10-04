@@ -2,12 +2,16 @@
 
 ## ▶ NEXT SESSION: do this first
 1. **Vercel is working again** (account block cleared 28 Sep). `main` deploys web, admin and api automatically; PRs get preview deployments.
-2. The `xtra-cash-api` Vercel project is left over from the superseded serverless-API approach. The API runs on Render, so disconnect or delete that project.
+2. **Hosting is all Vercel** (since 4 Oct): `xtra-cash-api` (root `apps/api`), `xtra-cash-web` (`apps/web`), `xtra-cash-admin` (`apps/admin`). Render is not used; `render.yaml` was removed. Setup, environment variables and checks: `DEPLOY.md`.
 3. **Brand follow-ups:** replace the fire video with a clean export without the Veo mark when available; add the Mastercard logo only after an issuing agreement (the untouched card artwork with the logo is `brand/xtra-cash-card-front-original.jpg`; crop it the same way into `card.jpg` for web and mobile). Messaging rules are in `docs/MESSAGING.md`.
 4. This file (`docs/BUILD-STATUS.md`) is the build status; keep it updated in the repo. Always start sessions with `citizen-bnk/xtra-cash` attached as a source. Commit and push every change; no more zips or bundles.
-5. **Confirm the live API.** No Render deployments appear on GitHub and `https://xtra-cash-api.onrender.com/health` returned 404 on 28 Sep, so check which service the web and admin sites' `API_URL` points to, and that `<API_URL>/health` and `<API_URL>/auth/demo` answer. Demo sign-in is on by default; set `ENABLE_DEMO_LOGIN=false` on the API before real customers sign up (the demo staff tiles have back-office access).
+5. **On the `xtra-cash-api` Vercel project, add `CRON_SECRET`** (any random string) so the nightly arrears job runs, and check `DATABASE_URL`, `JWT_SECRET` (32+ chars), `ADMIN_EMAIL`/`ADMIN_PASSWORD` are set. Then check `<API_URL>/health` and `<API_URL>/auth/demo`. Demo sign-in is on by default; set `ENABLE_DEMO_LOGIN=false` before real customers sign up (the demo staff tiles have back-office access).
 
-## Done 4 Oct 2026
+## Done 4 Oct 2026 — API moved fully to Vercel
+- **Render removed:** `render.yaml` deleted; `DEPLOY.md` rewritten for the three Vercel projects.
+- **Migrations + first super-admin** now run in the API's production build on Vercel (`apps/api/vercel.json` → `pnpm run vercel-build` → `dist/db/release.js`). Preview builds skip them, so pull requests never change the live schema. Before this, nothing ran migrations on Vercel.
+- **Uploaded documents stored in Postgres** (`stored_files` table, migration `0001_stored_files`), because Vercel functions can't write to disk. Previously lender uploads, and the demo world's first build, would fail there. Upload limit 4 MB (Vercel's body limit is 4.5 MB).
+- **Nightly arrears job** via Vercel Cron → `GET /jobs/arrears` (23:05 UTC = 01:05 SAST), authorised with `CRON_SECRET`; the in-process timer is off on Vercel. Rate limiting trusts Vercel's proxy automatically. DB pool is 3 connections per serverless instance.
 - Demo sign-in is **on by default** (only `ENABLE_DEMO_LOGIN=false` turns it off), so the live site shows it even where the variable was never set.
 - If two visitors (or two server instances) make the very first demo click at the same moment, both now sign in instead of one getting an error.
 - New `apps/api/test/demo.e2e.spec.ts`: from an empty database in production mode with simulation off, the first click builds the demo world, simultaneous clicks both succeed, all 10 roles reach the right account, tokens work, no login details are exposed, and the switch turns it off. 28 tests pass.
@@ -29,7 +33,7 @@
 The Claude session that built most of this was started **without** the GitHub repo attached as a source. The git proxy only lets a session write to repositories attached to that session, even with a personal token (tested: a token is refused too). Connecting a GitHub account isn't enough; the repo has to be picked as a source when the task is created. The session that made branch `claude/jolly-thompson-3hfli2` (PRs #1–#3) had it attached and could push.
 
 ## Current state
-- **Hosting:** the API runs on **Render** (render.yaml). Web and admin run on **Vercel** and proxy `/api/*` to the API server-side (`API_URL` env var; packages/ui/src/api-proxy.ts). `main` is at `612d217` (PRs #1–#4 merged).
+- **Hosting:** API, web and admin all run on **Vercel** (see `DEPLOY.md`). Web and admin proxy `/api/*` to the API server-side (`API_URL` env var; packages/ui/src/api-proxy.ts).
 - The earlier "Vercel serverless API" approach (`claude/vercel-deploy.patch`) is **superseded**. Don't apply it.
 - **Brand refresh** (live on `main`, PR #4): the burning-wallet logo (mark + gradient wordmark) in web, admin and mobile; favicons and Apple icons; Expo icon, adaptive icon and splash; theme tokens on the brand palette (ink #1b1030, brand #D91F63, purple #A617D3, violet #5C2394, orange #FB9320); gradient card; brand glow on the balance hero; originals in `brand/`.
 - Brand assets and the original prototype's design notes: `claude/xtra-cash-brand-and-design.md`.

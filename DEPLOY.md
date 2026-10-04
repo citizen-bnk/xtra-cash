@@ -1,69 +1,75 @@
-# Deploying XTRA-CASH to Render
+# Deploying XTRA-CASH on Vercel
 
-`render.yaml` describes the whole platform. Render creates it from that one file:
+Everything runs on **Vercel**, as three projects built from this one repository. Every push to `main` redeploys all three to production; pull requests get preview deployments.
 
-| Render service | What it is | URL (if the names are free) |
+| Vercel project | Root Directory | What it is |
 |---|---|---|
-| `xtra-cash-db` | PostgreSQL 16 | internal only |
-| `xtra-cash-api` | NestJS API. It runs migrations and creates the first super-admin on start | `https://xtra-cash-api.onrender.com` |
-| `xtra-cash-web` | Shopper, lender and affiliate portals | `https://xtra-cash-web.onrender.com` |
-| `xtra-cash-admin` | Back office | `https://xtra-cash-admin.onrender.com` |
+| `xtra-cash-api` | `apps/api` | NestJS API, running as serverless functions. Swagger docs at `/docs` |
+| `xtra-cash-web` | `apps/web` | Shopper, lender (Credit Mall) and affiliate portals |
+| `xtra-cash-admin` | `apps/admin` | Back office |
 
-Everything is in the Frankfurt region, which is the closest Render region to South Africa, and on the free plan.
+The browser never calls the API directly. The web and admin sites forward `/api/*` to the API from their own server (`API_URL`), so there is no CORS to configure.
 
-## 1. Create the Blueprint
+## 1. Database
 
-1. Sign in at <https://dashboard.render.com> and connect your GitHub account when asked.
-2. Click **New → Blueprint**, pick `citizen-bnk/xtra-cash`, and choose the branch you want to deploy.
-3. Render reads `render.yaml` and asks for the values marked `sync: false`. Enter them as below. Replace the URLs if Render gives your services different names; you'll see the names on the next screen.
+The API needs PostgreSQL. On the `xtra-cash-api` project, open **Storage → Create Database** and pick Postgres (Neon). Vercel adds `DATABASE_URL` to the project for you. Any other managed Postgres works too; set `DATABASE_URL` yourself.
 
-| Service | Key | Value |
-|---|---|---|
-| xtra-cash-api | `CORS_ORIGINS` | leave empty (the sites reach the API through their own `/api` proxy) |
-| xtra-cash-api | `PUBLIC_URL` | `https://xtra-cash-api.onrender.com` |
-| xtra-cash-api | `ADMIN_EMAIL` | the email you will sign in to the back office with |
-| xtra-cash-api | `ADMIN_PASSWORD` | a strong password, **at least 12 characters** |
-| xtra-cash-web | `API_URL` | `https://xtra-cash-api.onrender.com` |
-| xtra-cash-web | `NEXT_PUBLIC_ADMIN_URL` | `https://xtra-cash-admin.onrender.com` |
-| xtra-cash-admin | `API_URL` | `https://xtra-cash-api.onrender.com` |
+Pick a region close to the API's functions (Frankfurt, `fra1`, is closest to South Africa).
 
-4. Click **Apply**. The first build takes about 5 to 10 minutes. `JWT_SECRET` and `CARD_NETWORK_SECRET` are generated for you.
+## 2. Environment variables
 
-## 2. Check it works
+Set these under each project's **Settings → Environment Variables** (Production, and Preview if you use preview deployments). Changing a variable needs a redeploy (**Deployments → … → Redeploy**).
 
-- `https://xtra-cash-api.onrender.com/health` returns `{"status":"ok",...}`
-- `https://xtra-cash-api.onrender.com/docs` shows the API docs
-- Sign in to the admin site with `ADMIN_EMAIL` / `ADMIN_PASSWORD`
-- Register a shopper on the web site
+**xtra-cash-api**
 
-**If sign-in says "The XTRA-CASH API at … is not responding":** the message names the address the site tried. Open the web or admin service's **Environment** tab and set `API_URL` to the API's real URL (copy it from the top of the `xtra-cash-api` page). Saving restarts the site; no rebuild is needed. If the address is right, open `…/health` on it: the API may still be waking up (free plan) or failing to start (see its **Logs**).
+| Key | Value |
+|---|---|
+| `DATABASE_URL` | added by Vercel Storage, or your Postgres connection string |
+| `JWT_SECRET` | a random string, **at least 32 characters** |
+| `CARD_NETWORK_SECRET` | a random string (signs card-processor webhooks) |
+| `CRON_SECRET` | a random string. Vercel Cron sends it to `/jobs/arrears` each night |
+| `NODE_ENV` | `production` |
+| `ENABLE_SIMULATION` | `true` while no card processor is connected (allows "simulate purchase" and mock top-ups). `false` before real money moves |
+| `ENABLE_DEMO_LOGIN` | optional. Demo sign-in tiles are **on** unless this is `false`. Set `false` before real customers sign up: the demo staff tiles open the back office |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | your first super-admin (password 12+ characters). Created once by the production build |
+| `PUBLIC_URL` | the API's own URL, e.g. `https://xtra-cash-api.vercel.app` |
+| `JWT_ACCESS_TTL`, `REFRESH_TTL_DAYS` | optional, default `15m` and `30` |
 
-How it works: the browser never calls the API directly. The web and admin sites forward `/api/*` to `API_URL` from their server, so there is no CORS to configure.
+**xtra-cash-web**
 
-## 3. Things to know
+| Key | Value |
+|---|---|
+| `API_URL` | the API's URL, e.g. `https://xtra-cash-api.vercel.app` (no trailing slash) |
+| `NEXT_PUBLIC_ADMIN_URL` | the back office's URL (used for the "staff" link on the sign-in page) |
 
-- **Free plan limits.** Free web services sleep after about 15 minutes idle, so the first request after that takes around a minute. The free Postgres database **expires after 30 days**. Upgrade the database, and ideally the API, to a paid plan before any real users sign up.
-- **Demo mode is on.** `ENABLE_SIMULATION=true` turns on "simulate purchase" and mock top-ups, because no card processor is connected yet. Set it to `false` before any real money moves.
-- **No demo data.** `pnpm db:seed` refuses to run when `NODE_ENV=production`, so the database starts empty apart from your super-admin. Before go-live, a compliance officer must confirm the regulatory caps and fees under Back office → Settings.
-- **Auto-deploy.** Every push to the branch you chose redeploys the affected services. Migrations run automatically on each API start.
-- **Mobile app.** It isn't hosted on Render. Build it with Expo EAS and set `EXPO_PUBLIC_API_URL=https://xtra-cash-api.onrender.com`.
+**xtra-cash-admin**
 
-## 4. Optional: host the web and admin sites on Vercel
+| Key | Value |
+|---|---|
+| `API_URL` | the API's URL |
 
-The API and database stay on Render. Only the two Next.js sites move. Each site has a `vercel.json` (Frankfurt region, next to the Render API).
+## 3. What happens on each deploy
 
-Do this twice, once per site:
+- **API production build** (`apps/api/vercel.json` → `pnpm run vercel-build`): compiles the API, applies database migrations, and creates the super-admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` if it doesn't exist yet. Preview builds skip the database steps, so a pull request never changes the live schema. If migrations fail, the deploy fails and the previous version stays live.
+- **Nightly arrears check:** Vercel Cron calls `GET /jobs/arrears` at 01:05 South African time (23:05 UTC), authorised with `CRON_SECRET`. The back office's "Run arrears check" button does the same on demand.
+- **Uploaded documents** (lender accreditation) are stored in the database, because serverless functions have no shared disk. Uploads are limited to 4 MB (Vercel's request limit is 4.5 MB).
 
-1. On <https://vercel.com/new>, import `citizen-bnk/xtra-cash`.
-2. **Root Directory:** click **Edit** and choose `apps/web` (first project) or `apps/admin` (second project). Leave the other build settings as they are.
-3. **Environment Variables:**
+## 4. Check it works
 
-| Project | Key | Value |
-|---|---|---|
-| web | `API_URL` | your Render API URL, e.g. `https://xtra-cash-api.onrender.com` |
-| web | `NEXT_PUBLIC_ADMIN_URL` | the admin project's Vercel URL (set it after the admin project exists, then redeploy web) |
-| admin | `API_URL` | your Render API URL |
+- `<API_URL>/health` returns `{"status":"ok",...}` (this also proves the database connection)
+- `<API_URL>/auth/demo` lists the demo roles (`"enabled": true`)
+- `<API_URL>/docs` shows the API docs
+- The web sign-in page shows **Try a demo**. The first demo click builds the sample accounts and data (a few seconds), then signs you in
+- Sign in to the back office with `ADMIN_EMAIL` / `ADMIN_PASSWORD`
 
-4. Click **Deploy**. After that, every push to `main` redeploys both sites.
+**If sign-in says "The XTRA-CASH API at … is not responding":** the message names the address the site tried. Fix `API_URL` on the web or admin project and redeploy it. If the address is right, open `…/health` on it and check the API project's **Logs**.
 
-The sites call the API through their own `/api` route, so the API needs no CORS change. Once the Vercel sites work, you can suspend or delete `xtra-cash-web` and `xtra-cash-admin` on Render.
+## 5. Before real customers
+
+- Set `ENABLE_DEMO_LOGIN=false` and `ENABLE_SIMULATION=false` on the API, then redeploy.
+- A compliance officer confirms the regulatory caps and fees under Back office → Settings.
+- `pnpm db:seed` (local demo data) refuses to run when `NODE_ENV=production`.
+
+## Mobile app
+
+Not hosted on Vercel. Build it with Expo EAS and set `EXPO_PUBLIC_API_URL` to the API's URL.

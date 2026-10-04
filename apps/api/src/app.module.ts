@@ -14,6 +14,7 @@ import { AdminModule } from './admin/admin.module';
 import { CardNetworkModule } from './card-network/card-network.module';
 import { HealthController } from './health.controller';
 import { JobsService } from './common/jobs.service';
+import { JobsController } from './common/jobs.controller';
 
 @Module({
   imports: [
@@ -29,7 +30,7 @@ import { JobsService } from './common/jobs.service';
     AdminModule,
     CardNetworkModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, JobsController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
