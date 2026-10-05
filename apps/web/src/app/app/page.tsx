@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { ArrowRight, Plus, ShieldCheck, Sparkles, Wallet, Zap } from 'lucide-react';
 import { bpsToPercent, formatZAR } from '@xtra/shared';
-import { Alert, Badge, Button, Card, Loading, Stat, StatusBadge, useApi, useAuth } from '@xtra/ui';
+import { Alert, Badge, Button, Card, Loading, SecuritySettings, Stat, StatusBadge, useApi, useAuth } from '@xtra/ui';
 import { PayModal, TopUpModal } from '@/components/PayModal';
 
 export default function ConsumerHome() {
@@ -30,11 +30,11 @@ export default function ConsumerHome() {
   return (
     <div className="space-y-6">
       <div>
-        <div className="text-sm text-muted">Sawubona, {me?.firstName}</div>
+        <div className="text-sm text-muted">Sawubona{me?.firstName ? `, ${me.firstName}` : ''}</div>
         <h1 className="text-2xl font-bold">Your XTRA-Balance</h1>
       </div>
 
-      {(!kyc || kyc.status !== 'VERIFIED') && (
+      {kyc && kyc.status !== 'VERIFIED' && (
         <Alert tone={kyc?.status === 'REJECTED' ? 'red' : 'amber'} title={kyc?.status === 'PENDING' ? 'Verification in progress' : kyc?.status === 'REJECTED' ? 'Verification unsuccessful' : 'Unlock XTRA-CASH credit'}>
           {kyc?.status === 'PENDING'
             ? 'We are reviewing your details. You will be notified once approved.'
@@ -54,6 +54,7 @@ export default function ConsumerHome() {
       <section className="relative overflow-hidden rounded-3xl bg-brand-gradient p-6 text-white">
         <div className="flex flex-wrap items-center justify-between gap-5"><div><span className="text-xs font-bold uppercase tracking-widest text-white/75">Beyond BNPL</span><h2 className="mt-2 text-2xl font-black">Need a personal loan?</h2><p className="mt-2 max-w-lg text-sm text-white/80">Apply one question at a time. View your progress and see matched lenders after KYC and FICA review.</p></div><Link href="/app/personal-loan"><Button variant="secondary" size="lg">Apply for a loan <ArrowRight className="h-4 w-4" /></Button></Link></div>
       </section>
+      <SecuritySettings compact />
       <div className="grid gap-3 sm:grid-cols-3"><Stat href="/app/personal-loan" label="Loan applications" value={applications.data?.length ?? '…'} sub="Latest personal-loan requests" /><Stat href="/app/loans" label="Open advances" value={openLoans.length} sub="View repayment details" /><Stat href="#matched-offers" label="BNPL matches" value={b?.offers.length ?? 0} sub="View matched card-credit offers" /></div>
 
       {b && (

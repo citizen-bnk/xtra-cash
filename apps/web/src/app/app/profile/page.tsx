@@ -1,19 +1,24 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { ServiceProfile } from '@/components/ServiceProfile';
 import { Copy, Landmark, LogOut, Users } from 'lucide-react';
 import { EMPLOYMENT_LABELS, formatZAR } from '@xtra/shared';
-import { Button, Card, PageHeader, StatusBadge, useAuth, useToast } from '@xtra/ui';
+import { Button, Card, PageHeader, SecuritySettings, StatusBadge, useAuth, useToast } from '@xtra/ui';
 
 export default function ProfilePage() {
   const { me, client, logout, refreshMe } = useAuth();
   const router = useRouter();
   const toast = useToast();
+  const [joining, setJoining] = useState(false);
   if (!me) return null;
+  if (joining && me.profileComplete === false) return <ServiceProfile afterSave={async () => { await client.affiliate.join(); await refreshMe(); setJoining(false); toast('Welcome to the affiliate programme!'); }} />;
   const link = typeof window !== 'undefined' ? `${window.location.origin}/register?ref=${me.referralCode}` : '';
   return (
     <div className="space-y-4">
       <PageHeader title="Profile" />
+      <SecuritySettings />
       <Card className="grid gap-3 text-sm sm:grid-cols-2">
         <Row k="Name" v={`${me.firstName} ${me.lastName}`} />
         <Row k="Email" v={me.email} />
@@ -55,6 +60,7 @@ export default function ProfilePage() {
                   size="sm"
                   className="mt-3"
                   onClick={async () => {
+                    if (me.profileComplete === false) { setJoining(true); return; }
                     await client.affiliate.join();
                     await refreshMe();
                     toast('Welcome to the affiliate programme!');

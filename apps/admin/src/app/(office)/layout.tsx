@@ -32,6 +32,7 @@ export default function OfficeLayout({ children }: { children: React.ReactNode }
   const s = stats.data;
   const nav = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+    { href: '/security', label: 'Sign-in & security', icon: UserCheck },
     { href: '/users', label: 'Users', icon: Users },
     { href: '/kyc', label: 'KYC review', icon: UserCheck, badge: s?.kycPending },
     { href: '/lenders', label: 'Credit Mall lenders', icon: Store, badge: s?.lendersPendingReview },

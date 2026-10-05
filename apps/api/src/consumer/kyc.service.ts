@@ -11,6 +11,7 @@ import { AuditService } from '../common/audit.service';
 import type { AuthUser } from '../common/auth';
 import { CardsService } from './cards.service';
 import { KycDto } from './consumer.dto';
+import { decryptIdentity } from '../auth/identity-crypto';
 
 @Injectable()
 export class KycService {
@@ -30,6 +31,7 @@ export class KycService {
 
     const user = await this.db.query.users.findFirst({ where: eq(users.id, userId) });
     if (!user) throw new NotFoundException();
+    if (user.identityEncrypted && (user.identityType !== 'ID' || decryptIdentity(user.identityEncrypted) !== dto.idNumber)) throw new BadRequestException('Use the identity registered to your account. Contact support to correct it.');
     const existing = await this.db.query.kycProfiles.findFirst({ where: eq(kycProfiles.userId, userId) });
     if (existing?.status === 'VERIFIED' && existing.idNumber !== dto.idNumber) {
       throw new BadRequestException('Your ID number is already verified and cannot be changed. Contact support.');
@@ -37,11 +39,12 @@ export class KycService {
     const taken = await this.db.query.kycProfiles.findFirst({ where: and(eq(kycProfiles.idNumber, dto.idNumber), ne(kycProfiles.userId, userId)) });
     if (taken) throw new ConflictException('This ID number is already linked to another account');
 
-    const bureau = await this.bureau.fetchScore({ idNumber: dto.idNumber, firstName: user.firstName, lastName: user.lastName });
+    const demo = process.env.DEMO_MODE === 'true';
+    const bureau = demo ? await this.bureau.fetchScore({ idNumber: dto.idNumber, firstName: user.firstName, lastName: user.lastName }) : { score: null, reference: null };
     const age = ageOn(id.dateOfBirth!);
 
     // Automated checks. Production: add Home Affairs identity verification + liveness (e.g. Smile ID / VerifyID).
-    let status: 'VERIFIED' | 'PENDING' | 'REJECTED' = 'VERIFIED';
+    let status: 'VERIFIED' | 'PENDING' | 'REJECTED' = demo ? 'VERIFIED' : 'PENDING';
     let rejectionReason: string | null = null;
     if (age < 18) {
       status = 'REJECTED';

@@ -91,6 +91,26 @@ export const refreshTokens = pgTable('refresh_tokens', {
   expiresAt: ts('expires_at').notNull(),
   revokedAt: ts('revoked_at'),
   createdAt: createdAt(),
+  authenticatedAt: ts('authenticated_at').notNull().defaultNow(),
+  replacementEncrypted: text('replacement_encrypted'),
+});
+
+export const passkeys = pgTable('passkeys', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  publicKey: text('public_key').notNull(),
+  counter: integer('counter').notNull().default(0),
+  transports: jsonb('transports').$type<string[]>().notNull().default([]),
+  rpId: text('rp_id').notNull(),
+  name: text('name').notNull().default('My passkey'),
+  createdAt: createdAt(),
+  lastUsedAt: ts('last_used_at'),
+});
+
+export const serviceDrafts = pgTable('service_drafts', {
+  userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  encrypted: text('encrypted').notNull(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
 });
 
 export const kycProfiles = pgTable(

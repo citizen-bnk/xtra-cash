@@ -16,7 +16,7 @@ export default function AuthCallback() {
     if (params.has('error') || !state || !code) { setError('Sign-in was cancelled or did not complete. Please start again.'); return; }
     const binding = sessionStorage.getItem('xtra-sign-in-' + state); sessionStorage.removeItem('xtra-sign-in-' + state);
     if (!binding) { setError('This sign-in session does not belong to this browser. Please start again.'); return; }
-    client.auth.finishSocial({ state, binding, code }).then(async () => { const me = await refreshMe(); if (me) router.replace(me.profileComplete === false ? '/welcome' : homeFor(me)); else setError('Could not load your account. Please sign in again.'); }).catch(e => setError(e instanceof Error ? e.message : 'Could not complete sign-in'));
+    client.auth.finishSocial({ state, binding, code }).then(async () => { const me = await refreshMe(); if (me) router.replace(homeFor(me)); else setError('Could not load your account. Please sign in again.'); }).catch(e => setError(e instanceof Error ? e.message : 'Could not complete sign-in'));
   }, [client, refreshMe, router]);
   return <AuthPageShell currentPath="/login">{error ? <div className="max-w-lg"><Alert tone="red">{error}</Alert><Link className="mt-4 block font-semibold underline" href="/register">Start sign-in again</Link></div> : <Loading />}</AuthPageShell>;
 }

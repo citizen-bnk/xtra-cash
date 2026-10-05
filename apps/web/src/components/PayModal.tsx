@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { formatZAR, type Transaction, type XtraBalance } from '@xtra/shared';
-import { Alert, Button, Field, Input, Modal, MoneyInput, Select, useAction, useClient } from '@xtra/ui';
+import { Alert, Button, Field, Input, Modal, MoneyInput, Select, useAction, useAuth, useClient } from '@xtra/ui';
+import { ServiceProfile } from './ServiceProfile';
 
 /**
  * In-app payment (marketplace / demo card swipe). Shows exactly how the purchase will be split
@@ -135,12 +136,14 @@ export function PayModal({ open, onClose, cardId, balance, onDone }: { open: boo
 
 export function TopUpModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const client = useClient();
+  const { me } = useAuth();
   const [amount, setAmount] = useState<number | null>(null);
   const a = useAction(async () => {
     await client.consumer.topUp(amount!);
     onDone();
     onClose();
   });
+  if (me?.profileComplete === false) return <Modal open={open} onClose={onClose} title="Before your first top-up"><ServiceProfile /></Modal>;
   return (
     <Modal open={open} onClose={onClose} title="Top up wallet">
       <div className="space-y-4">

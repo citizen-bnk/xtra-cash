@@ -142,7 +142,7 @@ export class PasswordlessService {
     if (!current || current.profileComplete) throw new BadRequestException('Profile is already complete');
     await this.db.transaction(async tx => {
       await tx.update(users).set({ firstName: dto.firstName.trim(), lastName: dto.lastName.trim(), profileComplete: true }).where(eq(users.id, u.id));
-      if (u.roles.includes('LENDER')) await tx.insert(lenderOrgs).values({ ownerUserId: u.id, name: dto.lenderName!.trim(), contactEmail: current.email ?? '', contactPhone: current.phone ?? '' });
+      if (u.roles.includes('LENDER')) await tx.insert(lenderOrgs).values({ ownerUserId: u.id, name: dto.lenderName!.trim(), contactEmail: current.email ?? '', contactPhone: current.phone ?? '' }).onConflictDoUpdate({ target: lenderOrgs.ownerUserId, set: { name: dto.lenderName!.trim() } });
       await this.audit.log(u, 'user.profile_completed', 'user', u.id, {}, tx);
     });
     return { ok: true };

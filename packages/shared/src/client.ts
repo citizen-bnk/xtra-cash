@@ -45,6 +45,7 @@ export interface ClientOptions {
   tokens: TokenStore;
   onUnauthorized?: () => void;
   fetchImpl?: typeof fetch;
+  cookieSession?: boolean;
 }
 
 type Query = Record<string, string | number | boolean | undefined | null>;
@@ -173,6 +174,10 @@ export class XtraClient {
 
   // ---------- auth ----------
   auth = {
+    quickRegister: async (input: { identifier: string; password: string; consent: boolean; accountType: 'CONSUMER' | 'LENDER' | 'AFFILIATE'; referralCode?: string }) => {
+      const r = await this.request<AuthResponse>('POST', '/auth/quick-register', input);
+      await this.opts.tokens.set({ accessToken: r.accessToken, refreshToken: r.refreshToken }); return r;
+    },
     finishSocial: async (input: { state: string; binding: string; code: string }) => {
       const r = await this.request<AuthResponse>('POST', '/auth/passwordless/social/finish', input);
       await this.opts.tokens.set({ accessToken: r.accessToken, refreshToken: r.refreshToken }); return r;
@@ -199,6 +204,7 @@ export class XtraClient {
     },
     logout: async () => {
       const t = await this.opts.tokens.get();
+      if (this.opts.cookieSession) await this.request('POST', '/auth/logout', {}).catch(() => undefined);
       if (t?.refreshToken) await this.request('POST', '/auth/logout', { refreshToken: t.refreshToken }).catch(() => undefined);
       await this.opts.tokens.set(null);
     },

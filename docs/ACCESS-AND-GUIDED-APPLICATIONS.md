@@ -1,0 +1,44 @@
+# Guided onboarding and applications with a reusable verified profile
+
+Product request: "Let a user create an account with the minimum information, sign in with a passkey, and complete service-specific verification through a conversation. Reuse existing answers, confirm changes and financial freshness, and keep the chat and form synchronized. Never treat saved information as verified merely because it is present."
+
+## Account and service journey
+
+1. Returning users select Unlock XTRA-CASH and complete the device's passkey prompt. Password remains a backup.
+2. New users enter an email or mobile number and a password, accept terms, and reach their dashboard. Contact ownership is not represented as verified by this route.
+3. First service use asks for legal first name and surname in place, with a business name for lenders. Dashboard browsing does not require KYC.
+4. Personal loans show one saved-details summary. Applicants confirm identity/contact details and separately confirm that income and expenses are current for this application.
+5. Chat asks for missing information and fills the same state used by the optional form. Amounts such as R3000 and 3k are parsed locally. Ambiguous answers require correction, never a silent guess.
+6. Identity evidence and address evidence are requested within the loan service if there is no usable prior document submission. Existing verified or pending documents are reused. Verification and approval remain separate.
+7. The applicant reviews the application and grants explicit consent before submitting. Lender names remain hidden until KYC/FICA review. Selection sends a referral, not an approval or disbursement.
+
+## Data relationships and reuse rules
+
+| Information | Authoritative record | How it is reused |
+| --- | --- | --- |
+| Legal names and roles | users | First service use supplies missing names; applications do not repeat these questions. |
+| Identity number | encrypted account identity, then KYC or personal verification | Reused in the summary, masked on display. Saved format is not proof of identity. Bound identity cannot be replaced through a loan form. |
+| Province and employment | KYC profile | Prefilled; confirmed or updated for the new application. |
+| Contact and address | personal verification / account | Prefilled; verification status stays distinct from the value. |
+| Income and expenses | latest dated KYC declaration or loan application | Fresh applicant confirmation is required for each new request. These are declarations, not a verified affordability assessment. |
+| Document references | personal_verifications | Reuse reviewed/pending submissions. Rejected documents require correction. Files selected locally must be reattached if the user leaves before submission. |
+| In-progress answers | service_drafts, encrypted and scoped to user | Resume the draft. No document bytes, consent, verification flags, or authentication secrets are written here. Drafts older than 30 days are ignored. |
+| Submitted loan terms | personal_loan_applications | Immutable request/referral history with idempotency and review notes. |
+| Login credentials | passkeys / refresh_tokens | Public keys and hashed rotating session secrets; no biometric images or PINs are stored. |
+
+The chat is a guided, locally parsed conversation. It does not send identity numbers, financial declarations or documents to an external language model. The lender's separate AI offer assistant works with aggregate business data.
+
+## Security and delivery limits
+
+- Passkey registration and login require device user verification, one-time five-minute challenges, exact allowed origins and credential ownership. Enrollment/removal requires a recent login.
+- Web/admin tokens stay in Secure, HttpOnly cookies behind the same-origin proxy. Mutating requests require matching Origin. Mobile continues using its existing secure native token store.
+- Sessions are revocable. Refresh rotation preserves the original authentication time and handles parallel requests with a short encrypted replay window.
+- Public demo login is disabled in production. Existing accounts remain accessible through their existing credentials.
+- Passkeys are tied to each exact website hostname. Configure PASSKEY_ORIGINS when establishing permanent production domains; do not enroll customers on temporary preview domains.
+- The device controls its fallback PIN. A standalone five-digit server password is not introduced.
+- Google/Apple/WhatsApp and authorised identity/bureau providers require the planned credentials. Without a live bureau provider, new card KYC requests remain pending and do not receive a fabricated credit score.
+- Native biometric enrollment needs a separate device-tested mobile release. This release delivers browser passkeys on the website and back office.
+
+## Acceptance criteria
+
+Test registration without names/KYC, dashboard access, service-level name capture, saved-answer ownership, encrypted drafts, resume, fresh financial confirmation, chat/form synchronization, skipped identity questions, document requirements, consent, passkey signature/UV/origin/replay checks, session rotation/revocation, and production demo denial. Human review, real account recovery, provider checks and lending decisions must never be simulated as completed.

@@ -1,4 +1,12 @@
-import { IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Equals, IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+
+export class QuickRegisterDto {
+  @IsString() @MinLength(6) @MaxLength(254) identifier: string;
+  @IsString() @MinLength(12) @MaxLength(72) password: string;
+  @Equals(true) consent: boolean;
+  @IsIn(['CONSUMER', 'LENDER', 'AFFILIATE']) accountType: 'CONSUMER' | 'LENDER' | 'AFFILIATE';
+  @IsOptional() @IsString() @MaxLength(20) referralCode?: string;
+}
 
 export class RegisterDto {
   @IsEmail() email: string;
@@ -15,8 +23,8 @@ export class RegisterDto {
 
 export class LoginDto {
   /** Email or phone */
-  @IsString() identifier: string;
-  @IsString() password: string;
+  @IsString() @MaxLength(254) identifier: string;
+  @IsString() @MaxLength(72) password: string;
 }
 
 export class RefreshDto {

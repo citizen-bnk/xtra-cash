@@ -97,7 +97,8 @@ async function main() {
     const valid = await challenge('654321');
     const login = await http().post('/auth/passwordless/whatsapp/verify').send({ challengeId: valid.id, code: '654321' }).expect(200);
     assert.equal(login.body.user.profileComplete, false); assert.equal(login.body.user.identityEncrypted, undefined);
-    await http().get('/me/balance').set(bearer(login.body.accessToken)).expect(403);
+    await http().get('/me/balance').set(bearer(login.body.accessToken)).expect(200);
+    await http().post('/me/wallet/topup').set(bearer(login.body.accessToken)).send({ amountCents: 1000 }).expect(403);
     await http().put('/auth/passwordless/profile').set(bearer(login.body.accessToken)).send({ firstName: 'Verified', lastName: 'Test' }).expect(200);
     await http().get('/me/balance').set(bearer(login.body.accessToken)).expect(200);
     await http().post('/auth/passwordless/whatsapp/verify').send({ challengeId: valid.id, code: '654321' }).expect(401);
