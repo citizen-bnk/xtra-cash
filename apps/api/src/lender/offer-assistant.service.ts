@@ -39,8 +39,10 @@ export class OfferAssistantService {
     const [stats, offers, caps] = await Promise.all([this.lenders.stats(org.id), this.lenders.listOffers(org.id), this.settings.get()]);
     const model = process.env.OFFER_ASSISTANT_MODEL?.trim() || 'inception/mercury-2.5';
     let result;
+    let stage = 'load-sdk';
     try {
       const { generateText, Output, gateway } = await import('ai');
+      stage = 'generate-draft';
       result = await generateText({
         model: gateway(model),
         output: Output.object({ schema: assistantSchema(caps) }),
@@ -61,8 +63,9 @@ Use employmentStatuses=[] and provinces=[] unless the lender explicitly requests
         messages, maxOutputTokens: 2400, maxRetries: 0, abortSignal: AbortSignal.timeout(45000),
       });
     } catch (error) {
-      const failure = error as { name?: string; statusCode?: number };
-      this.logger.warn(`Offer assistant unavailable (${failure.name ?? 'unknown'}, status ${failure.statusCode ?? 'unknown'}); manual offer setup remains available`);
+      const failure = error as { name?: string; code?: string; statusCode?: number; message?: string };
+      const detail = (failure.message ?? '').replace(/Bearer\s+\S+|eyJ[\w.-]+|sk-[\w-]+/gi, '[redacted]').replace(/https?:\/\/\S+/g, '[url]').slice(0, 240);
+      this.logger.warn(`Offer assistant unavailable (${stage}, ${failure.name ?? 'unknown'}, ${failure.code ?? 'unknown'}, status ${failure.statusCode ?? 'unknown'}): ${detail}`);
       throw new ServiceUnavailableException('The AI assistant is unavailable right now. Try again or use the offer form.');
     }
     const output = result.output;
