@@ -37,7 +37,7 @@ export class OfferAssistantService {
     if (messages.some(m => /\b(?:\d[ -]?){13}\b|(?:\+27|0)[6-8](?:[ -]?\d){8}\b|\b[A-Z]{1,3}\d{6,12}\b/.test(m.content))) throw new BadRequestException('Remove identity, passport and mobile numbers from the offer-planning chat. Use aggregate business information only.');
     const org = await this.lenders.orgFor(user.id);
     const [stats, offers, caps] = await Promise.all([this.lenders.stats(org.id), this.lenders.listOffers(org.id), this.settings.get()]);
-    const model = process.env.OFFER_ASSISTANT_MODEL?.trim() || 'openai/gpt-6.1-sol';
+    const model = process.env.OFFER_ASSISTANT_MODEL?.trim() || 'inception/mercury-2.5';
     let result;
     try {
       const { generateText, Output, gateway } = await import('ai');
@@ -60,8 +60,9 @@ Employment values: EMPLOYED_FULL_TIME, EMPLOYED_PART_TIME, SELF_EMPLOYED, GIG_WO
 Use employmentStatuses=[] and provinces=[] unless the lender explicitly requests restrictions. Default age 18–100.`,
         messages, maxOutputTokens: 2400, maxRetries: 0, abortSignal: AbortSignal.timeout(45000),
       });
-    } catch {
-      this.logger.warn('Offer assistant unavailable; manual offer setup remains available');
+    } catch (error) {
+      const failure = error as { name?: string; statusCode?: number };
+      this.logger.warn(`Offer assistant unavailable (${failure.name ?? 'unknown'}, status ${failure.statusCode ?? 'unknown'}); manual offer setup remains available`);
       throw new ServiceUnavailableException('The AI assistant is unavailable right now. Try again or use the offer form.');
     }
     const output = result.output;
