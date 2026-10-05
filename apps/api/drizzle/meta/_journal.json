@@ -29,6 +29,13 @@
       "when": 1791164254879,
       "tag": "0003_easy_stardust",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791204929048,
+      "tag": "0004_public_glorian",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,14 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { EMPLOYMENT_LABELS, EmploymentStatus, formatZAR, parseSaId, PROVINCES } from '@xtra/shared';
-import { Alert, Button, Card, Field, Input, MoneyInput, PageHeader, Select, StatusBadge, useAction, useAuth, useToast } from '@xtra/ui';
+import { Alert, Button, Card, Field, Input, Loading, MoneyInput, PageHeader, Select, StatusBadge, useAction, useApi, useAuth, useToast } from '@xtra/ui';
 
 export default function KycPage() {
   const { me, client, refreshMe } = useAuth();
   const router = useRouter();
+  const profile = useApi(c => c.request<{ identityNumber: string; identityType: string; province: string; employment: EmploymentStatus | ''; income: number | null; expenses: number | null }>('GET', '/me/service-profile'));
+  const initialized = useRef(false);
   const toast = useToast();
   const k = me?.kyc;
   const [idNumber, setIdNumber] = useState(k?.idNumber ?? '');
@@ -16,6 +18,7 @@ export default function KycPage() {
   const [income, setIncome] = useState<number | null>(k?.monthlyIncomeCents ?? null);
   const [expenses, setExpenses] = useState<number | null>(k?.monthlyExpensesCents ?? null);
   const [consent, setConsent] = useState(false);
+  useEffect(() => { const p = profile.data; if (!p || initialized.current) return; initialized.current = true; if (p.identityType === 'ID' && p.identityNumber) setIdNumber(p.identityNumber); if (p.province) setProvince(p.province); if (p.employment) setEmployment(p.employment); if (p.income !== null) setIncome(p.income); if (p.expenses !== null) setExpenses(p.expenses); }, [profile.data]);
 
   const id = idNumber.length === 13 ? parseSaId(idNumber) : null;
   const submit = useAction(async () => {
@@ -30,12 +33,13 @@ export default function KycPage() {
     });
     await refreshMe();
     toast(p.status === 'VERIFIED' ? 'Verified! Your XTRA-CASH card is ready.' : 'Submitted for review');
-    router.push('/app');
+    router.push(new URLSearchParams(window.location.search).get('next') === '/app/card' ? '/app/card' : '/app');
   });
 
+  if (profile.loading) return <Loading />;
   return (
     <div className="mx-auto max-w-xl">
-      <PageHeader title="Verify your profile" subtitle="Lenders use this to match you with offers. We never share your details without your consent." actions={k && <StatusBadge status={k.status} />} />
+      <PageHeader title="Set up your card" subtitle="We reuse details already on your account. Confirm your current income and expenses to request card-credit verification." actions={k && <StatusBadge status={k.status} />} />
       <Card>
         <form
           className="space-y-4"
@@ -44,8 +48,8 @@ export default function KycPage() {
             submit.run();
           }}
         >
-          <Field label="South African ID number" error={id && !id.valid ? id.reason : undefined} hint={id?.valid ? `Born ${id.dateOfBirth!.toLocaleDateString('en-ZA')}` : '13 digits'}>
-            <Input inputMode="numeric" maxLength={13} value={idNumber} onChange={(e) => setIdNumber(e.target.value.replace(/\D/g, ''))} disabled={k?.status === 'VERIFIED'} required />
+          <Field label="South African ID number" error={id && !id.valid ? id.reason : undefined} hint={profile.data?.identityNumber ? 'Reused from your account; identity changes need support.' : '13 digits'}>
+            {profile.data?.identityNumber && id?.valid ? <p className="rounded-xl bg-surface p-3 text-sm">Document ending {idNumber.slice(-4)}</p> : <Input inputMode="numeric" maxLength={13} value={idNumber} onChange={(e) => setIdNumber(e.target.value.replace(/\D/g, ''))} disabled={k?.status === 'VERIFIED'} required />}
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Province">
@@ -84,7 +88,7 @@ export default function KycPage() {
           <label className="flex items-start gap-2 text-sm text-muted">
             <input type="checkbox" className="mt-1" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span>
-              I consent to XTRA-CASH and its partner credit providers obtaining my credit report from a registered credit bureau, and confirm the information above is true (National Credit Act).
+              I confirm these income and expense details are current and consent to XTRA-CASH and its partner credit providers obtaining my credit report from a registered credit bureau. Provider checks will run when connected; this request is subject to review.
             </span>
           </label>
           {submit.error && <Alert tone="red">{submit.error}</Alert>}

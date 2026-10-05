@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { Lock, Snowflake, Unlock } from 'lucide-react';
 import { formatZAR } from '@xtra/shared';
 import { Alert, Button, Card, Empty, Loading, PageHeader, StatusBadge, useApi, useAuth, useToast, XtraCard } from '@xtra/ui';
@@ -26,7 +27,7 @@ export default function CardPage() {
               Issue my virtual card
             </Button>
           ) : (
-            'Verify your profile to get your virtual card instantly.'
+            <div className="space-y-3"><p>To activate your card, we need to review your identity and affordability details.</p><Link href="/app/kyc?next=%2Fapp%2Fcard" className="inline-block rounded-xl bg-ink px-4 py-3 font-semibold text-white">Set up my card</Link></div>
           )}
         </Empty>
       </>

@@ -40,6 +40,7 @@ export class DemoService {
   constructor(@InjectDb() private db: Db, private auth: AuthService, private audit: AuditService, private moduleRef: ModuleRef) {}
 
   get enabled() {
+    if (process.env.NODE_ENV === 'production') return false;
     return (process.env.ENABLE_DEMO_LOGIN ?? 'true').trim().toLowerCase() !== 'false';
   }
 

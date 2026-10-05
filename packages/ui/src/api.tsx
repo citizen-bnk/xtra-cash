@@ -36,27 +36,24 @@ function localTokenStore(key: string) {
 export function ApiProvider({ baseUrl, storageKey, children }: { baseUrl: string; storageKey: string; children: React.ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
+  const authVersion = useRef(0);
   const client = useMemo(
-    () => new XtraClient({ baseUrl, tokens: localTokenStore(storageKey), onUnauthorized: () => setMe(null) }),
+    () => new XtraClient({ baseUrl, cookieSession: true, tokens: { get: () => null, set: () => undefined }, onUnauthorized: () => setMe(null) }),
     [baseUrl, storageKey],
   );
 
   const refreshMe = useCallback(async () => {
-    const hasToken = localTokenStore(storageKey).get();
-    if (!hasToken) {
-      setMe(null);
-      setLoading(false);
-      return null;
-    }
+    const version = ++authVersion.current;
+    localTokenStore(storageKey).set(null);
     try {
       const m = await client.auth.me();
-      setMe(m);
+      if (version === authVersion.current) setMe(m);
       return m;
     } catch {
-      setMe(null);
+      if (version === authVersion.current) setMe(null);
       return null;
     } finally {
-      setLoading(false);
+      if (version === authVersion.current) setLoading(false);
     }
   }, [client, storageKey]);
 
@@ -65,6 +62,7 @@ export function ApiProvider({ baseUrl, storageKey, children }: { baseUrl: string
   }, [refreshMe]);
 
   const logout = useCallback(async () => {
+    authVersion.current++;
     await client.auth.logout();
     setMe(null);
   }, [client]);

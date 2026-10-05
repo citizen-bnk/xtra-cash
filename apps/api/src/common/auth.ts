@@ -13,12 +13,14 @@ import type { Role } from '@xtra/shared';
 import { eq } from 'drizzle-orm';
 import { InjectDb } from './db.module';
 import type { Db } from '../db/client';
-import { users } from '../db/schema';
+import { refreshTokens, users } from '../db/schema';
 
 export interface AuthUser {
   id: string;
   email: string | null;
   roles: Role[];
+  authenticatedAt?: number;
+  sessionId?: string;
 }
 
 export const IS_PUBLIC = 'isPublic';
@@ -46,15 +48,21 @@ export class AuthGuard implements CanActivate {
     if (!header?.startsWith('Bearer ')) throw new UnauthorizedException('Missing access token');
     try {
       const payload = this.jwt.verify(header.slice(7));
-      req.user = { id: payload.sub, email: payload.email, roles: payload.roles } satisfies AuthUser;
+      req.user = { id: payload.sub, email: payload.email, roles: payload.roles, authenticatedAt: payload.auth_time, sessionId: payload.sid } satisfies AuthUser;
     } catch {
       throw new UnauthorizedException('Invalid or expired access token');
     }
     const account = await this.db.query.users.findFirst({ where: eq(users.id, req.user.id) });
     if (!account || account.status !== 'ACTIVE') throw new UnauthorizedException('Account unavailable');
     req.user.roles = account.roles;
+    if (req.user.sessionId) {
+      const session = await this.db.query.refreshTokens.findFirst({ where: eq(refreshTokens.id, req.user.sessionId) });
+      if (!session || session.userId !== account.id || session.revokedAt || session.expiresAt < new Date()) throw new UnauthorizedException('Session ended. Please sign in again.');
+    }
     const profileRoutes = ['/me', '/auth/passwordless/identity', '/auth/passwordless/profile', '/auth/passwordless/profile-prefill', '/auth/logout', '/auth/refresh'];
-    if (!account.profileComplete && !profileRoutes.includes(req.path)) throw new ForbiddenException('Complete your name and surname before using services');
+    const browsing = req.method === 'GET';
+    const security = req.path.startsWith('/auth/passkeys') || req.path.startsWith('/auth/sessions');
+    if (!account.profileComplete && !browsing && !security && !profileRoutes.includes(req.path)) throw new ForbiddenException('Add your name and surname to continue with this service');
 
     const required = this.reflector.getAllAndOverride<Role[]>(ROLES, targets);
     if (required?.length) {

@@ -3,7 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/auth';
 import { AuthService } from './auth.service';
 import { DemoService } from './demo.service';
-import { DemoLoginDto, LoginDto, RefreshDto, RegisterDto } from './auth.dto';
+import { DemoLoginDto, LoginDto, QuickRegisterDto, RefreshDto, RegisterDto } from './auth.dto';
 
 @Public()
 @Controller('auth')
@@ -15,6 +15,10 @@ export class AuthController {
   demoPersonas() {
     return this.demo.personas();
   }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('quick-register')
+  quickRegister(@Body() dto: QuickRegisterDto) { return this.auth.quickRegister(dto); }
 
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @HttpCode(200)

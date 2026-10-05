@@ -2,7 +2,9 @@
   "name": "@xtra/api",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": "22.x" },
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "build": "pnpm --filter @xtra/shared build && tsc -p tsconfig.build.json",
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
@@ -14,6 +16,7 @@
     "seed": "ts-node --transpile-only src/db/seed.ts",
     "test": "jest --runInBand",
     "test:personal": "node test/personal-flow.cjs",
+    "test:access": "node test/access-flow.cjs && node test/browser-session.cjs",
     "test:esm": "node --no-experimental-require-module test/esm-load.cjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -25,6 +28,7 @@
     "@nestjs/schedule": "^6.1.3",
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/throttler": "^6.4.0",
+    "@simplewebauthn/server": "^13.3.3",
     "@xtra/shared": "workspace:*",
     "ai": "^7.0.127",
     "bcryptjs": "^3.0.2",
