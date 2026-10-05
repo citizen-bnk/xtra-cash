@@ -105,8 +105,8 @@ export class AuthService {
     await this.db.update(refreshTokens).set({ revokedAt: new Date() }).where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
   }
 
-  async issueTokens(user: { id: string; email: string; roles: Role[] }) {
-    const accessToken = this.jwt.sign({ sub: user.id, email: user.email, roles: user.roles });
+  async issueTokens(user: { id: string; email: string | null; roles: Role[] }) {
+    const accessToken = this.jwt.sign({ sub: user.id, email: user.email ?? '', roles: user.roles });
     const refreshToken = randomBytes(48).toString('base64url');
     const days = Number(process.env.REFRESH_TTL_DAYS ?? 30);
     await this.db.insert(refreshTokens).values({

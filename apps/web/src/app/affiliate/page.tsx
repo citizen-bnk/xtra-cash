@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Coins, Copy, Hourglass, Landmark, Share2, Users } from 'lucide-react';
 import { formatZAR } from '@xtra/shared';
 import { Alert, Button, Card, Field, Input, Loading, Modal, MoneyInput, PageHeader, Stat, StatusBadge, Table, Tabs, useAction, useApi, useAuth, useToast } from '@xtra/ui';
@@ -18,6 +18,11 @@ export default function AffiliateDashboard() {
   const commissions = useApi((c) => c.affiliate.commissions());
   const payouts = useApi((c) => c.affiliate.payouts());
   const [tab, setTab] = useState<'referrals' | 'commissions' | 'payouts'>('referrals');
+  useEffect(() => {
+    const sync = () => { const t = window.location.hash.slice(1); if (t === 'referrals' || t === 'commissions' || t === 'payouts') setTab(t); };
+    sync(); window.addEventListener('hashchange', sync); return () => window.removeEventListener('hashchange', sync);
+  }, []);
+  useEffect(() => { if (window.location.hash) document.getElementById('affiliate-details')?.scrollIntoView({ block: 'start' }); }, [tab]);
   const [bankOpen, setBankOpen] = useState(false);
   const [payoutOpen, setPayoutOpen] = useState(false);
   const [bank, setBank] = useState({ bankName: '', bankAccountNumber: '' });
@@ -61,10 +66,10 @@ export default function AffiliateDashboard() {
         }
       />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Available to withdraw" value={formatZAR(s.commissionBalanceCents)} icon={<Coins className="h-4 w-4" />} />
-        <Stat label="Pending approval" value={formatZAR(s.pendingCents)} icon={<Hourglass className="h-4 w-4" />} />
-        <Stat label="Lifetime earned" value={formatZAR(s.lifetimeEarnedCents)} />
-        <Stat label="People referred" value={s.referrals} icon={<Users className="h-4 w-4" />} />
+        <Stat href="#payouts" label="Available to withdraw" value={formatZAR(s.commissionBalanceCents)} icon={<Coins className="h-4 w-4" />} />
+        <Stat href="#commissions" label="Pending approval" value={formatZAR(s.pendingCents)} icon={<Hourglass className="h-4 w-4" />} />
+        <Stat href="#commissions" label="Lifetime earned" value={formatZAR(s.lifetimeEarnedCents)} />
+        <Stat href="#referrals" label="People referred" value={s.referrals} icon={<Users className="h-4 w-4" />} />
       </div>
 
       <Card className="mt-6">
@@ -81,7 +86,7 @@ export default function AffiliateDashboard() {
         <p className="mt-3 text-xs text-muted">You earn when a shopper you refer is verified, when a lender you refer is accredited, and a share of the credit your shoppers use. Commissions are approved by XTRA-CASH before payout.</p>
       </Card>
 
-      <div className="mt-6">
+      <div id="affiliate-details" className="mt-6 scroll-mt-6">
         <Tabs
           value={tab}
           onChange={setTab}

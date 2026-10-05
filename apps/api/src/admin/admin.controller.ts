@@ -166,6 +166,7 @@ export class AdminController {
   @Get('ledger/check') ledger() {
     return this.admin.ledgerCheck();
   }
+  @Get('reports/revenue') revenue() { return this.admin.revenueDetails(); }
   @HttpCode(200) @Post('jobs/arrears') async arrears(@CurrentUser() a: AuthUser) {
     const r = await this.loans.runArrears();
     await this.audit.log(a, 'job.arrears', 'job', null, r);

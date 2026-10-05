@@ -1,10 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatZAR } from '@xtra/shared';
 import { Button, Loading, PageHeader, StatusBadge, Table, Tabs, useApi } from '@xtra/ui';
 
 export default function LenderLoans() {
   const [status, setStatus] = useState<string>('');
+  useEffect(() => { const v = new URLSearchParams(window.location.search).get('status'); if (v && ['ACTIVE', 'IN_ARREARS', 'SETTLED', 'DEFAULTED'].includes(v)) setStatus(v); }, []);
   const [page, setPage] = useState(1);
   const loans = useApi((c) => c.lender.loans(page, status || undefined), [page, status]);
   return (
@@ -35,6 +36,7 @@ export default function LenderLoans() {
               { header: 'Principal', align: 'right', cell: (l) => formatZAR(l.principalCents) },
               { header: 'Repayable', align: 'right', cell: (l) => formatZAR(l.totalRepayableCents) },
               { header: 'Outstanding', align: 'right', cell: (l) => <b>{formatZAR(l.outstandingCents)}</b> },
+              { header: 'Repaid to lender', align: 'right', cell: (l) => formatZAR(l.lenderRepaidCents ?? 0) },
               { header: 'Next due', cell: (l) => (l.nextDue ? new Date(l.nextDue.dueDate).toLocaleDateString('en-ZA') : '—') },
               { header: 'Status', cell: (l) => <StatusBadge status={l.status} /> },
             ]}

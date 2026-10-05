@@ -38,10 +38,10 @@ export default function Dashboard() {
         }
       />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Card volume (30 days)" value={formatZAR(s.transactions.last30DaysVolumeCents, { decimals: false })} sub={`${s.transactions.last30DaysCount} approved payments`} icon={<CreditCard className="h-4 w-4" />} />
-        <Stat label="XTRA-CASH credit used (30d)" value={formatZAR(s.transactions.last30DaysCreditCents, { decimals: false })} sub={`Decline rate ${(s.transactions.declineRate * 100).toFixed(1)}%`} icon={<TrendingUp className="h-4 w-4" />} />
-        <Stat label="Outstanding loan book" value={formatZAR(s.loans.outstandingCents, { decimals: false })} sub={`${s.loans.active} active · ${s.loans.inArrears} in arrears`} icon={<Landmark className="h-4 w-4" />} />
-        <Stat label="Platform revenue" value={formatZAR(s.platformRevenueCents, { decimals: false })} sub="Repayment share + accreditation fees" icon={<Wallet className="h-4 w-4" />} />
+        <Stat href="/transactions" label="Card volume (30 days)" value={formatZAR(s.transactions.last30DaysVolumeCents, { decimals: false })} sub={`${s.transactions.last30DaysCount} approved payments`} icon={<CreditCard className="h-4 w-4" />} />
+        <Stat href="/transactions" label="XTRA-CASH credit used (30d)" value={formatZAR(s.transactions.last30DaysCreditCents, { decimals: false })} sub={`Decline rate ${(s.transactions.declineRate * 100).toFixed(1)}%`} icon={<TrendingUp className="h-4 w-4" />} />
+        <Stat href="/loans" label="Outstanding loan book" value={formatZAR(s.loans.outstandingCents, { decimals: false })} sub={`${s.loans.active} active · ${s.loans.inArrears} in arrears`} icon={<Landmark className="h-4 w-4" />} />
+        <Stat href="/reports" label="Platform revenue" value={formatZAR(s.platformRevenueCents, { decimals: false })} sub="Repayment share + accreditation fees" icon={<Wallet className="h-4 w-4" />} />
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -67,11 +67,12 @@ export default function Dashboard() {
         </Card>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Users" value={s.users.total} sub={`${s.users.newLast7Days} new this week`} icon={<Users className="h-4 w-4" />} />
-        <Stat label="Shoppers · Lenders · Affiliates" value={`${s.users.consumers} · ${s.users.lenders} · ${s.users.affiliates}`} />
-        <Stat label="Lender liquidity" value={formatZAR(s.lenderLiquidityCents, { decimals: false })} sub="Uncommitted funds across stalls" icon={<Banknote className="h-4 w-4" />} />
+        <Stat href="/users" label="Users" value={s.users.total} sub={`${s.users.newLast7Days} new this week`} icon={<Users className="h-4 w-4" />} />
+        <Stat href="/applications" label="Personal-loan applications" value={s.personalApplications ?? 0} sub="Applications and document review" icon={<Landmark className="h-4 w-4" />} />
+        <Stat href="/users" label="Shoppers · Lenders · Affiliates" value={`${s.users.consumers} · ${s.users.lenders} · ${s.users.affiliates}`} />
+        <Stat href="/lenders" label="Lender liquidity" value={formatZAR(s.lenderLiquidityCents, { decimals: false })} sub="Uncommitted funds across stalls" icon={<Banknote className="h-4 w-4" />} />
         <Stat
-          label="Ledger"
+          href="/reports" label="Ledger"
           value={ledger.data ? (ledger.data.balanced ? 'Balanced' : 'OUT OF BALANCE') : '…'}
           sub="Double-entry trial balance"
           icon={<CircleAlert className={`h-4 w-4 ${ledger.data && !ledger.data.balanced ? 'text-red-600' : ''}`} />}

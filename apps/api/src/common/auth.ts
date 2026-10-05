@@ -10,10 +10,14 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import type { Role } from '@xtra/shared';
+import { eq } from 'drizzle-orm';
+import { InjectDb } from './db.module';
+import type { Db } from '../db/client';
+import { users } from '../db/schema';
 
 export interface AuthUser {
   id: string;
-  email: string;
+  email: string | null;
   roles: Role[];
 }
 
@@ -31,9 +35,9 @@ export const CurrentUser = createParamDecorator((_: unknown, ctx: ExecutionConte
 /** Global guard: JWT required unless @Public(); then role check when @Roles() present. */
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private jwt: JwtService, private reflector: Reflector) {}
+  constructor(private jwt: JwtService, private reflector: Reflector, @InjectDb() private db: Db) {}
 
-  canActivate(ctx: ExecutionContext): boolean {
+  async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const targets = [ctx.getHandler(), ctx.getClass()];
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return true;
 
@@ -46,6 +50,11 @@ export class AuthGuard implements CanActivate {
     } catch {
       throw new UnauthorizedException('Invalid or expired access token');
     }
+    const account = await this.db.query.users.findFirst({ where: eq(users.id, req.user.id) });
+    if (!account || account.status !== 'ACTIVE') throw new UnauthorizedException('Account unavailable');
+    req.user.roles = account.roles;
+    const profileRoutes = ['/me', '/auth/passwordless/identity', '/auth/passwordless/profile', '/auth/passwordless/profile-prefill', '/auth/logout', '/auth/refresh'];
+    if (!account.profileComplete && !profileRoutes.includes(req.path)) throw new ForbiddenException('Complete your name and surname before using services');
 
     const required = this.reflector.getAllAndOverride<Role[]>(ROLES, targets);
     if (required?.length) {

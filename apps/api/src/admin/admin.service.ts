@@ -16,6 +16,7 @@ import {
   loans,
   payouts,
   users,
+  ledgerEntries, ledgerJournals, personalLoanApplications,
 } from '../db/schema';
 import { AuditService } from '../common/audit.service';
 import { Accounts, LedgerService } from '../common/ledger.service';
@@ -87,6 +88,7 @@ export class AdminService {
       left join card_transactions t on t.created_at::date = d::date and t.status = 'APPROVED'
       group by d order by d`);
     const revenue = -(await this.ledger.balance(Accounts.platformRevenue));
+    const [applications] = await this.db.select({ n: count() }).from(personalLoanApplications);
 
     return {
       users: { total: u.total, consumers: num(u.consumers), lenders: num(u.lenders), affiliates: num(u.affiliates), newLast7Days: num(u.new7) },
@@ -104,6 +106,7 @@ export class AdminService {
       },
       lenderLiquidityCents: num(liq.total),
       platformRevenueCents: revenue,
+      personalApplications: applications.n,
       dailyVolume: daily.rows.map((r) => ({ date: r.date, walletCents: num(r.wallet), creditCents: num(r.credit) })),
     };
   }
@@ -314,6 +317,13 @@ export class AdminService {
 
   async ledgerCheck() {
     return { trialBalanceCents: await this.ledger.trialBalance(), balanced: (await this.ledger.trialBalance()) === 0 };
+  }
+  async revenueDetails() {
+    const [revenueCents, trialBalanceCents, entries] = await Promise.all([
+      this.ledger.balance(Accounts.platformRevenue), this.ledger.trialBalance(),
+      this.db.select({ id: ledgerEntries.id, amountCents: ledgerEntries.amountCents, type: ledgerJournals.type, reference: ledgerJournals.refId, memo: ledgerJournals.memo, createdAt: ledgerJournals.createdAt }).from(ledgerEntries).innerJoin(ledgerJournals, eq(ledgerEntries.journalId, ledgerJournals.id)).where(eq(ledgerEntries.account, Accounts.platformRevenue)).orderBy(desc(ledgerJournals.createdAt)).limit(100),
+    ]);
+    return { revenueCents: -revenueCents, trialBalanceCents, balanced: trialBalanceCents === 0, entries: entries.map(e => ({ ...e, amountCents: -e.amountCents })) };
   }
 
   loansPage(q: { page?: string; status?: string; lenderId?: string; userId?: string }) {

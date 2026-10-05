@@ -42,11 +42,11 @@ export default function FundsPage() {
         }
       />
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <Stat label="Available to lend" value={formatZAR(stats.data.availableCents)} />
-        <Stat label="Lent out (outstanding)" value={formatZAR(stats.data.outstandingCents)} />
-        <Stat label="Total loaded" value={formatZAR(stats.data.totalLoadedCents)} />
+        <Stat href="#funding-history" label="Available to lend" value={formatZAR(stats.data.availableCents)} />
+        <Stat href="/lender/loans" label="Lent out (outstanding)" value={formatZAR(stats.data.outstandingCents)} />
+        <Stat href="#funding-history" label="Total loaded" value={formatZAR(stats.data.totalLoadedCents)} />
       </div>
-      <h2 className="mb-3 font-bold">History</h2>
+      <h2 id="funding-history" className="mb-3 scroll-mt-6 font-bold">History</h2>
       <Table
         rows={funding.data ?? []}
         empty="No funding activity yet"

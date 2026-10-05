@@ -10,6 +10,7 @@ const NAV = [
   { href: '/lender/funds', label: 'Funds', icon: Banknote },
   { href: '/lender/offers', label: 'Offers & criteria', icon: Tags },
   { href: '/lender/loans', label: 'Loan book', icon: FileStack },
+  { href: '/lender/applications', label: 'Loan applications', icon: FileStack },
 ];
 
 export default function LenderLayout({ children }: { children: React.ReactNode }) {

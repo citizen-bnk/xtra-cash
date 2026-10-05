@@ -7,6 +7,7 @@ import { Alert, Button, Loading, PageHeader, Stat, StatusBadge, useApi } from '@
 export default function LenderOverview() {
   const org = useApi((c) => c.lender.org());
   const stats = useApi((c) => c.lender.stats());
+  const applications = useApi(c => c.lender.personalApplications());
   if (!org.data || !stats.data) return <Loading />;
   const o = org.data;
   const s = stats.data;
@@ -28,14 +29,15 @@ export default function LenderOverview() {
         </div>
       )}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Available to lend" value={formatZAR(s.availableCents)} icon={<Banknote className="h-4 w-4" />} sub={`${formatZAR(s.totalLoadedCents)} loaded to date`} />
-        <Stat label="Outstanding book" value={formatZAR(s.outstandingCents)} icon={<FileStack className="h-4 w-4" />} sub={`${s.activeLoans} active loans`} />
-        <Stat label="Advanced to date" value={formatZAR(s.totalAdvancedCents)} icon={<TrendingUp className="h-4 w-4" />} />
-        <Stat label="Repaid to you" value={formatZAR(s.totalRepaidCents)} icon={<HandCoins className="h-4 w-4" />} />
+        <Stat href="/lender/funds" label="Available to lend" value={formatZAR(s.availableCents)} icon={<Banknote className="h-4 w-4" />} sub={`${formatZAR(s.totalLoadedCents)} loaded to date`} />
+        <Stat href="/lender/loans" label="Outstanding book" value={formatZAR(s.outstandingCents)} icon={<FileStack className="h-4 w-4" />} sub={`${s.activeLoans} active loans`} />
+        <Stat href="/lender/loans" label="Advanced to date" value={formatZAR(s.totalAdvancedCents)} icon={<TrendingUp className="h-4 w-4" />} />
+        <Stat href="/lender/loans" label="Repaid to you" value={formatZAR(s.totalRepaidCents)} icon={<HandCoins className="h-4 w-4" />} />
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <Stat label="Loans in arrears" value={s.loansInArrears} icon={<AlertTriangle className="h-4 w-4" />} sub={s.activeLoans ? `${((s.loansInArrears / s.activeLoans) * 100).toFixed(1)}% of active loans` : undefined} />
-        <Stat label="Live offers" value={s.activeOffers} icon={<Tags className="h-4 w-4" />} sub={accredited ? 'Matching shoppers now' : 'Will go live once accredited'} />
+        <Stat href="/lender/applications" label="Loan applications" value={applications.data?.length ?? '…'} sub="Latest applications sent to your stall" />
+        <Stat href="/lender/loans?status=IN_ARREARS" label="Loans in arrears" value={s.loansInArrears} icon={<AlertTriangle className="h-4 w-4" />} sub={s.activeLoans ? `${((s.loansInArrears / s.activeLoans) * 100).toFixed(1)}% of active loans` : undefined} />
+        <Stat href="/lender/offers" label="Live offers" value={s.activeOffers} icon={<Tags className="h-4 w-4" />} sub={accredited ? 'Matching shoppers now' : 'Will go live once accredited'} />
       </div>
       <div className="mt-6 flex flex-wrap gap-2">
         <Link href="/lender/funds"><Button>Load funds</Button></Link>

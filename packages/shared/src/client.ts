@@ -24,6 +24,7 @@ import type {
   User,
   XtraBalance,
   OfferCriteria,
+  PersonalLoanInput, PersonalLoanApplication, PersonalLoanMatch, PersonalVerification, OfferAssistantResponse,
 } from './types';
 import type { EmploymentStatus, TxChannel, DocumentType, Role } from './enums';
 
@@ -78,6 +79,7 @@ export interface PurchaseInput {
 }
 
 export type OfferInput = OfferCriteria & {
+  productType?: 'BNPL' | 'PERSONAL';
   name: string;
   description?: string;
   active?: boolean;
@@ -171,6 +173,14 @@ export class XtraClient {
 
   // ---------- auth ----------
   auth = {
+    finishSocial: async (input: { state: string; binding: string; code: string }) => {
+      const r = await this.request<AuthResponse>('POST', '/auth/passwordless/social/finish', input);
+      await this.opts.tokens.set({ accessToken: r.accessToken, refreshToken: r.refreshToken }); return r;
+    },
+    verifyWhatsApp: async (input: { challengeId: string; code: string }) => {
+      const r = await this.request<AuthResponse>('POST', '/auth/passwordless/whatsapp/verify', input);
+      await this.opts.tokens.set({ accessToken: r.accessToken, refreshToken: r.refreshToken }); return r;
+    },
     register: async (input: RegisterInput) => {
       const r = await this.request<AuthResponse>('POST', '/auth/register', input);
       await this.opts.tokens.set({ accessToken: r.accessToken, refreshToken: r.refreshToken });
@@ -197,6 +207,11 @@ export class XtraClient {
 
   // ---------- consumer ----------
   consumer = {
+    personalVerification: () => this.request<PersonalVerification>('GET', '/personal-loans/verification'),
+    submitPersonalVerification: (body: FormData) => this.request<PersonalVerification>('POST', '/personal-loans/verification', body),
+    personalMatches: (input: PersonalLoanInput) => this.request<{ locked: boolean; reason: string | null; matches: PersonalLoanMatch[] }>('POST', '/personal-loans/matches', input),
+    personalApplications: () => this.request<PersonalLoanApplication[]>('GET', '/personal-loans/applications'),
+    applyPersonalLoan: (input: PersonalLoanInput) => this.request<PersonalLoanApplication>('POST', '/personal-loans/applications', input),
     submitKyc: (input: KycInput) => this.request<KycProfile>('PUT', '/me/kyc', input),
     balance: () => this.request<XtraBalance>('GET', '/me/balance'),
     quote: (offerId: string, amountCents: number) => this.request<QuoteResponse>('POST', '/me/quote', { offerId, amountCents }),
@@ -213,6 +228,8 @@ export class XtraClient {
 
   // ---------- lender (Credit Mall) ----------
   lender = {
+    assistOffer: (messages: { role: 'user' | 'assistant'; content: string }[]) => this.request<OfferAssistantResponse>('POST', '/lender/offers/assistant', { messages }),
+    personalApplications: () => this.request<PersonalLoanApplication[]>('GET', '/lender/personal-applications'),
     org: () => this.request<LenderOrg | null>('GET', '/lender/org'),
     saveOrg: (input: LenderOrgInput) => this.request<LenderOrg>('PUT', '/lender/org', input),
     uploadDocument: (type: DocumentType, file: Blob | { uri: string; name: string; type: string }, fileName?: string) => {
@@ -253,6 +270,9 @@ export class XtraClient {
 
   // ---------- admin / back office ----------
   admin = {
+    personalApplications: () => this.request<PersonalLoanApplication[]>('GET', '/personal-loans/review/applications'),
+    personalVerifications: () => this.request<PersonalVerification[]>('GET', '/personal-loans/review/verification'),
+    reviewPersonalVerification: (userId: string, approve: boolean, reason?: string) => this.request<PersonalVerification>('POST', `/personal-loans/review/verification/${userId}`, { approve, reason }),
     stats: () => this.request<AdminStats>('GET', '/admin/stats'),
     users: (q: Query = {}) => this.request<Paginated<User & { kycStatus: string }>>('GET', '/admin/users', undefined, q),
     user: (id: string) =>

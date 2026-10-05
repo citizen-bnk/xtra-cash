@@ -30,7 +30,7 @@ export class CreditService {
   constructor(@InjectDb() private db: Db, private settings: SettingsService) {}
 
   /** Loads everything needed for a credit decision. Call inside the authorisation transaction. */
-  async context(userId: string, conn: DbOrTx = this.db): Promise<CreditContext> {
+  async context(userId: string, conn: DbOrTx = this.db, productType: 'BNPL' | 'PERSONAL' = 'BNPL', declared?: { monthlyIncomeCents: number; monthlyExpensesCents: number }): Promise<CreditContext> {
     const user = await conn.query.users.findFirst({ where: eq(users.id, userId) });
     if (!user) throw new NotFoundException('User not found');
     const kyc = await conn.query.kycProfiles.findFirst({ where: eq(kycProfiles.userId, userId) });
@@ -47,6 +47,7 @@ export class CreditService {
       monthlyIncomeCents: kyc.monthlyIncomeCents,
       monthlyExpensesCents: kyc.monthlyExpensesCents,
       creditScore: kyc.creditScore,
+      ...declared,
     };
 
     const open = await conn.query.loans.findMany({ where: and(eq(loans.userId, userId), inArray(loans.status, [...OPEN_LOAN])) });
@@ -64,7 +65,7 @@ export class CreditService {
       .select({ offer: loanOffers, lenderName: lenderOrgs.name, lenderAvailable: lenderOrgs.availableCents })
       .from(loanOffers)
       .innerJoin(lenderOrgs, eq(loanOffers.lenderId, lenderOrgs.id))
-      .where(and(eq(loanOffers.active, true), eq(lenderOrgs.accreditationStatus, 'ACCREDITED'), sql`${lenderOrgs.ownerUserId} <> ${userId}`));
+      .where(and(eq(loanOffers.active, true), eq(loanOffers.productType, productType), eq(lenderOrgs.accreditationStatus, 'ACCREDITED'), sql`${lenderOrgs.ownerUserId} <> ${userId}`));
 
     const eligible = rows
       .map<CandidateOffer>(({ offer, lenderName, lenderAvailable }) => ({

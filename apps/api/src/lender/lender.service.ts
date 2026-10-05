@@ -214,7 +214,7 @@ export class LenderService {
   // ---------------- offers ----------------
   private validateOffer(dto: Partial<Record<keyof OfferDto, unknown>> & Partial<Pick<OfferDto, "monthlyInterestRateBps" | "monthlyServiceFeeCents" | "minAmountCents" | "maxAmountPerUserCents" | "minAge" | "maxAge">>, s: PlatformSettings) {
     if (dto.monthlyInterestRateBps !== undefined && dto.monthlyInterestRateBps > s.maxRateBps) {
-      throw new BadRequestException(`Monthly interest may not exceed ${s.maxRateBps / 100}% (regulatory cap)`);
+      throw new BadRequestException(`Monthly interest may not exceed ${s.maxRateBps / 100}% (platform cap)`);
     }
     if (dto.monthlyServiceFeeCents !== undefined && dto.monthlyServiceFeeCents > s.maxMonthlyServiceFeeCents) {
       throw new BadRequestException(`Monthly service fee may not exceed R${s.maxMonthlyServiceFeeCents / 100}`);

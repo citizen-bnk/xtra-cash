@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect } from 'react';
-import { Loader2, X } from 'lucide-react';
+import { ArrowUpRight, Loader2, X } from 'lucide-react';
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
 
@@ -152,17 +152,18 @@ export function StatusBadge({ status }: { status: string }) {
   return <Badge tone={STATUS_TONES[status] ?? 'gray'}>{status.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}</Badge>;
 }
 
-export function Stat({ label, value, sub, icon }: { label: string; value: React.ReactNode; sub?: React.ReactNode; icon?: React.ReactNode }) {
-  return (
+export function Stat({ label, value, sub, icon, href }: { label: string; value: React.ReactNode; sub?: React.ReactNode; icon?: React.ReactNode; href?: string }) {
+  const content = (
     <Card className="p-4">
       <div className="flex items-center justify-between text-sm text-muted">
         <span>{label}</span>
-        {icon}
+        <span className="flex items-center gap-2">{icon}{href && <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />}</span>
       </div>
       <div className="mt-1.5 text-2xl font-bold tracking-tight tabular-nums">{value}</div>
       {sub && <div className="mt-0.5 text-xs text-muted">{sub}</div>}
     </Card>
   );
+  return href ? <a href={href} aria-label={`View ${label.toLowerCase()} details`} className="block rounded-2xl transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{content}</a> : content;
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: React.ReactNode; actions?: React.ReactNode }) {

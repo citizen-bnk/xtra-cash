@@ -64,9 +64,13 @@ export const users = pgTable(
   'users',
   {
     id: id(),
-    email: text('email').notNull().unique(),
-    phone: text('phone').notNull().unique(),
-    passwordHash: text('password_hash').notNull(),
+    email: text('email').unique(),
+    phone: text('phone').unique(),
+    passwordHash: text('password_hash'),
+    identityType: text('identity_type').$type<'ID' | 'PASSPORT'>(),
+    identityEncrypted: text('identity_encrypted'),
+    identityHash: text('identity_hash').unique(),
+    profileComplete: boolean('profile_complete').notNull().default(true),
     firstName: text('first_name').notNull(),
     lastName: text('last_name').notNull(),
     roles: roleEnum('roles').array().notNull(),
@@ -172,6 +176,7 @@ export const loanOffers = pgTable(
     lenderId: text('lender_id').notNull().references(() => lenderOrgs.id),
     name: text('name').notNull(),
     description: text('description'),
+    productType: text('product_type').$type<'BNPL' | 'PERSONAL'>().notNull().default('BNPL'),
     active: boolean('active').notNull().default(true),
     monthlyInterestRateBps: integer('monthly_interest_rate_bps').notNull(),
     termMonths: integer('term_months').notNull(),
@@ -193,6 +198,45 @@ export const loanOffers = pgTable(
 );
 
 // ---------------------------------------------------------------- cards & transactions
+export const personalVerifications = pgTable('personal_verifications', {
+  id: id(), userId: text('user_id').notNull().unique().references(() => users.id),
+  identityType: text('identity_type').$type<'ID' | 'PASSPORT'>().notNull(),
+  identityNumber: text('identity_number').notNull(), mobile: text('mobile').notNull(),
+  address: text('address').notNull(), identityFileKey: text('identity_file_key').notNull(),
+  addressFileKey: text('address_file_key').notNull(),
+  status: text('status').$type<'PENDING' | 'VERIFIED' | 'REJECTED'>().notNull().default('PENDING'),
+  reason: text('reason'), reviewedById: text('reviewed_by_id').references(() => users.id),
+  consentAt: ts('consent_at').notNull(), createdAt: createdAt(),
+});
+
+export const loginIdentities = pgTable('login_identities', {
+  id: id(), userId: text('user_id').notNull().references(() => users.id),
+  provider: text('provider').notNull(), subject: text('subject').notNull(), createdAt: createdAt(),
+}, t => [uniqueIndex('login_provider_subject').on(t.provider, t.subject)]);
+export const authChallenges = pgTable('auth_challenges', {
+  id: id(), provider: text('provider').notNull(), secretHash: text('secret_hash').notNull().unique(),
+  bindingHash: text('binding_hash').notNull(), payload: text('payload').notNull(),
+  attempts: integer('attempts').notNull().default(0), expiresAt: ts('expires_at').notNull(),
+  consumedAt: ts('consumed_at'), createdAt: createdAt(),
+});
+
+export const personalLoanApplications = pgTable('personal_loan_applications', {
+  id: id(), userId: text('user_id').notNull().references(() => users.id),
+  amountCents: integer('amount_cents').notNull(), termMonths: integer('term_months').notNull(),
+  purpose: text('purpose').notNull(), monthlyIncomeCents: integer('monthly_income_cents').notNull(),
+  monthlyExpensesCents: integer('monthly_expenses_cents').notNull(),
+  status: text('status').$type<'SUBMITTED' | 'REFERRED' | 'UNDER_REVIEW' | 'DECLINED'>().notNull().default('SUBMITTED'),
+  reviewNotes: text('review_notes'), reviewedAt: ts('reviewed_at'),
+  lenderId: text('lender_id').references(() => lenderOrgs.id), offerId: text('offer_id').references(() => loanOffers.id),
+  idempotencyKey: text('idempotency_key').notNull(), consentAt: ts('consent_at').notNull(), createdAt: createdAt(),
+}, (t) => [uniqueIndex('personal_application_idempotency').on(t.userId, t.idempotencyKey), index('personal_application_lender').on(t.lenderId), index('personal_application_user').on(t.userId)]);
+
+export const offerAssistantGenerations = pgTable('offer_assistant_generations', {
+  id: id(), lenderId: text('lender_id').notNull().references(() => lenderOrgs.id),
+  model: text('model').notNull(), response: jsonb('response').notNull(),
+  inputTokens: integer('input_tokens').notNull(), outputTokens: integer('output_tokens').notNull(), createdAt: createdAt(),
+});
+
 export const cards = pgTable('cards', {
   id: id(),
   userId: text('user_id').notNull().references(() => users.id),

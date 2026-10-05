@@ -8,7 +8,7 @@ export function paginated<T>(items: T[], total: number, page: number, pageSize: 
   return { items, total, page, pageSize };
 }
 
-export function sanitizeUser<T extends { passwordHash?: string }>(u: T): Omit<T, 'passwordHash'> {
-  const { passwordHash: _omit, ...rest } = u;
-  return rest;
+export function sanitizeUser<T extends { passwordHash?: string | null; email?: string | null; phone?: string | null; identityEncrypted?: string | null; identityHash?: string | null }>(u: T) {
+  const { passwordHash: _omit, identityEncrypted: _identity, identityHash: _hash, ...rest } = u;
+  return { ...rest, email: u.email ?? '', phone: u.phone ?? '' };
 }
