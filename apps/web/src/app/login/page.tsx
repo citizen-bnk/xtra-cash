@@ -2,7 +2,8 @@
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Alert, Button, Card, DemoAccounts, Field, Input, Logo, useAction, useAuth } from '@xtra/ui';
+import { Alert, Button, Card, DemoAccounts, Field, Input, useAction, useAuth } from '@xtra/ui';
+import { AuthPageShell } from '@/components/AuthPageShell';
 import { ADMIN_URL, homeFor } from '@/lib/config';
 
 function LoginForm() {
@@ -62,14 +63,11 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 py-10">
-      <Link href="/">
-        <Logo size={44} className="text-2xl" />
-      </Link>
+    <AuthPageShell currentPath="/login">
       <Suspense>
         <LoginArea />
       </Suspense>
-    </div>
+    </AuthPageShell>
   );
 }
 

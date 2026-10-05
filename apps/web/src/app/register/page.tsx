@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Landmark, ShoppingBag, Users } from 'lucide-react';
-import { Alert, Button, Card, cx, Field, Input, Logo, useAction, useAuth } from '@xtra/ui';
+import { Alert, Button, Card, cx, Field, Input, useAction, useAuth } from '@xtra/ui';
+import { AuthPageShell } from '@/components/AuthPageShell';
 import { homeFor } from '@/lib/config';
 
 type AccountType = 'CONSUMER' | 'LENDER' | 'AFFILIATE';
@@ -112,13 +113,10 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 py-10">
-      <Link href="/">
-        <Logo size={44} className="text-2xl" />
-      </Link>
+    <AuthPageShell currentPath="/register">
       <Suspense>
         <RegisterForm />
       </Suspense>
-    </div>
+    </AuthPageShell>
   );
 }
