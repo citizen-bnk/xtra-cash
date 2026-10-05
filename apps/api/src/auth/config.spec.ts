@@ -1,5 +1,18 @@
 import { JwtService } from '@nestjs/jwt';
-import { accessTokenTtl } from './config';
+import { accessTokenTtl, refreshTokenDays } from './config';
+
+describe('refresh token lifetime', () => {
+  it('defaults blank configuration to thirty days', () => {
+    expect(refreshTokenDays('')).toBe(30);
+    expect(refreshTokenDays(' \n')).toBe(30);
+    expect(refreshTokenDays(' 30\n')).toBe(30);
+  });
+  it('rejects expired, non-finite and unbounded lifetimes', () => {
+    for (const value of ['0', '-1', 'NaN', 'Infinity', 'invalid', '0.5', '91']) {
+      expect(() => refreshTokenDays(value)).toThrow('REFRESH_TTL_DAYS');
+    }
+  });
+});
 
 describe('access token expiry', () => {
   it('defaults empty configuration to fifteen minutes', () => {

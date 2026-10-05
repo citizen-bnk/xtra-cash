@@ -3,7 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { DemoService } from './demo.service';
-import { accessTokenTtl } from './config';
+import { accessTokenTtl, refreshTokenDays } from './config';
 import { PasswordlessController } from './passwordless.controller';
 import { PasswordlessService } from './passwordless.service';
 import { PasskeysController, SessionsController } from './passkeys.controller';
@@ -14,6 +14,7 @@ import { PasskeysController, SessionsController } from './passkeys.controller';
     JwtModule.registerAsync({
       global: true,
       useFactory: () => {
+        refreshTokenDays();
         const secret = process.env.JWT_SECRET;
         if (!secret || (process.env.NODE_ENV === 'production' && secret.length < 32)) {
           throw new Error('JWT_SECRET must be set (32+ chars in production)');
