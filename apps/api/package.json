@@ -2,6 +2,7 @@
   "name": "@xtra/api",
   "version": "0.1.0",
   "private": true,
+  "engines": { "node": "22.x" },
   "scripts": {
     "build": "pnpm --filter @xtra/shared build && tsc -p tsconfig.build.json",
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
@@ -13,6 +14,7 @@
     "seed": "ts-node --transpile-only src/db/seed.ts",
     "test": "jest --runInBand",
     "test:personal": "node test/personal-flow.cjs",
+    "test:esm": "node --no-experimental-require-module test/esm-load.cjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
