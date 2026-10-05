@@ -65,7 +65,7 @@ Use employmentStatuses=[] and provinces=[] unless the lender explicitly requests
     } catch (error) {
       const failure = error as { name?: string; code?: string; statusCode?: number; message?: string };
       const detail = (failure.message ?? '').replace(/Bearer\s+\S+|eyJ[\w.-]+|sk-[\w-]+/gi, '[redacted]').replace(/https?:\/\/\S+/g, '[url]').slice(0, 240);
-      this.logger.warn(`Offer assistant unavailable (${stage}, ${failure.name ?? 'unknown'}, ${failure.code ?? 'unknown'}, status ${failure.statusCode ?? 'unknown'}): ${detail}`);
+      this.logger.warn(`Offer assistant unavailable (${process.version}, ${stage}, ${failure.name ?? 'unknown'}, ${failure.code ?? 'unknown'}, status ${failure.statusCode ?? 'unknown'}): ${detail}`);
       throw new ServiceUnavailableException('The AI assistant is unavailable right now. Try again or use the offer form.');
     }
     const output = result.output;

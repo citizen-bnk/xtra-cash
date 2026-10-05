@@ -38,3 +38,5 @@ A real bureau integration, income verification, final lending decision, credit a
 `pnpm --filter @xtra/api build` followed by `pnpm --filter @xtra/api test:personal` runs the real HTTP journey against PGlite, an isolated PostgreSQL runtime. It never uses a deployed DATABASE_URL. It checks pre-verification privacy, consent, valid file formats, document ownership, duplicate retries, lender isolation, review updates, no fabricated bureau score, no disbursement, provider-unavailable responses, OTP attempt/replay controls, first-use profile gating and encryption integrity.
 
 Production migrations are additive and run in the API release step. Preview builds do not migrate the production database. Consumer history shows the latest 30 applications; staff and lender inboxes show the latest 100, with that limit stated in the UI.
+
+The API pins Node 22 in its package engines so its CommonJS build can load the ESM-only AI SDK and JOSE packages. Keep this runtime pin when changing deployment settings.

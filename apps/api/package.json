@@ -2,6 +2,7 @@
   "name": "@xtra/api",
   "version": "0.1.0",
   "private": true,
+  "engines": { "node": "22.x" },
   "scripts": {
     "build": "pnpm --filter @xtra/shared build && tsc -p tsconfig.build.json",
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
