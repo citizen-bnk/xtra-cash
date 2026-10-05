@@ -90,24 +90,29 @@ export function useApi<T>(fn: (c: XtraClient) => Promise<T>, deps: unknown[] = [
   const [loading, setLoading] = useState(true);
   const fnRef = useRef(fn);
   fnRef.current = fn;
+  const requestVersion = useRef(0);
 
   const reload = useCallback(async () => {
+    const version = ++requestVersion.current;
     setLoading(true);
     try {
       const d = await fnRef.current(client);
-      setData(d);
-      setError(null);
+      if (version === requestVersion.current) {
+        setData(d);
+        setError(null);
+      }
       return d;
     } catch (e) {
-      setError(errorMessage(e));
+      if (version === requestVersion.current) setError(errorMessage(e));
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, ...deps]);
 
   useEffect(() => {
     reload();
+    return () => { requestVersion.current++; };
   }, [reload]);
 
   return { data, error, loading, reload, setData };
