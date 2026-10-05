@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { ArrowRight, Plus, ShieldCheck, Sparkles, Wallet, Zap } from 'lucide-react';
 import { bpsToPercent, formatZAR } from '@xtra/shared';
-import { Alert, Badge, Button, Card, Loading, StatusBadge, useApi, useAuth } from '@xtra/ui';
+import { Alert, Badge, Button, Card, Loading, Stat, StatusBadge, useApi, useAuth } from '@xtra/ui';
 import { PayModal, TopUpModal } from '@/components/PayModal';
 
 export default function ConsumerHome() {
@@ -11,6 +11,7 @@ export default function ConsumerHome() {
   const balance = useApi((c) => c.consumer.balance());
   const cards = useApi((c) => c.consumer.cards());
   const loans = useApi((c) => c.consumer.loans());
+  const applications = useApi(c => c.consumer.personalApplications());
   const [pay, setPay] = useState(false);
   const [topUp, setTopUp] = useState(false);
 
@@ -50,6 +51,11 @@ export default function ConsumerHome() {
         </Alert>
       )}
 
+      <section className="relative overflow-hidden rounded-3xl bg-brand-gradient p-6 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-5"><div><span className="text-xs font-bold uppercase tracking-widest text-white/75">Beyond BNPL</span><h2 className="mt-2 text-2xl font-black">Need a personal loan?</h2><p className="mt-2 max-w-lg text-sm text-white/80">Apply one question at a time. View your progress and see matched lenders after KYC and FICA review.</p></div><Link href="/app/personal-loan"><Button variant="secondary" size="lg">Apply for a loan <ArrowRight className="h-4 w-4" /></Button></Link></div>
+      </section>
+      <div className="grid gap-3 sm:grid-cols-3"><Stat href="/app/personal-loan" label="Loan applications" value={applications.data?.length ?? '…'} sub="Latest personal-loan requests" /><Stat href="/app/loans" label="Open advances" value={openLoans.length} sub="View repayment details" /><Stat href="#matched-offers" label="BNPL matches" value={b?.offers.length ?? 0} sub="View matched card-credit offers" /></div>
+
       {b && (
         <div className="relative overflow-hidden rounded-3xl bg-ink p-6 text-white">
           <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand/40 blur-3xl" />
@@ -57,7 +63,7 @@ export default function ConsumerHome() {
           <div className="relative flex flex-wrap items-end justify-between gap-6">
             <div>
               <div className="text-sm text-white/60">Available to spend now</div>
-              <div className="mt-1 text-4xl font-black tabular-nums tracking-tight sm:text-5xl">{formatZAR(b.xtraBalanceCents)}</div>
+              <Link href="/app/activity" aria-label="View balance activity" className="mt-1 block rounded-lg text-4xl font-black tabular-nums tracking-tight hover:underline focus-visible:ring-2 sm:text-5xl">{formatZAR(b.xtraBalanceCents)}</Link>
               <div className="mt-3 flex flex-wrap gap-4 text-sm">
                 <span className="inline-flex items-center gap-1.5">
                   <Wallet className="h-4 w-4 text-white/60" /> Wallet {formatZAR(b.walletCents)}
@@ -83,7 +89,7 @@ export default function ConsumerHome() {
       <div className="grid gap-6 md:grid-cols-5">
         <div className="space-y-3 md:col-span-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-bold">Your matched lender offers</h2>
+            <h2 id="matched-offers" className="scroll-mt-20 font-bold">Your matched lender offers</h2>
             <Badge tone="brand">
               <Sparkles className="mr-1 h-3 w-3" /> {b?.offers.length ?? 0} match{b?.offers.length === 1 ? '' : 'es'}
             </Badge>

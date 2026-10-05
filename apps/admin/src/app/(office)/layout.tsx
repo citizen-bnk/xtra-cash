@@ -38,6 +38,8 @@ export default function OfficeLayout({ children }: { children: React.ReactNode }
     { href: '/funding', label: 'Lender funding', icon: Banknote, badge: s?.fundingPending },
     { href: '/offers', label: 'Loan offers', icon: Tags },
     { href: '/loans', label: 'Loan book', icon: FileStack },
+    { href: '/applications', label: 'Loan applications', icon: FileStack },
+    { href: '/reports', label: 'Revenue & ledger', icon: ScrollText },
     { href: '/transactions', label: 'Card transactions', icon: Activity },
     { href: '/affiliates', label: 'Affiliates', icon: HandCoins, badge: (s?.commissionsPending ?? 0) + (s?.payoutsPending ?? 0) },
     { href: '/audit', label: 'Audit log', icon: ScrollText },

@@ -63,10 +63,10 @@ export default function LenderDetail({ params }: { params: Promise<{ id: string 
       )}
       {l.reviewNotes && <Alert tone="blue" title="Review notes">{l.reviewNotes}</Alert>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Available" value={formatZAR(l.stats.availableCents)} sub={`${formatZAR(l.stats.totalLoadedCents)} loaded`} />
-        <Stat label="Outstanding" value={formatZAR(l.stats.outstandingCents)} sub={`${l.stats.activeLoans} active loans`} />
-        <Stat label="In arrears" value={l.stats.loansInArrears} />
-        <Stat label="Repaid to lender" value={formatZAR(l.stats.totalRepaidCents)} />
+        <Stat href="/funding" label="Available" value={formatZAR(l.stats.availableCents)} sub={`${formatZAR(l.stats.totalLoadedCents)} loaded`} />
+        <Stat href="/loans" label="Outstanding" value={formatZAR(l.stats.outstandingCents)} sub={`${l.stats.activeLoans} active loans`} />
+        <Stat href="/loans" label="In arrears" value={l.stats.loansInArrears} />
+        <Stat href="/loans" label="Repaid to lender" value={formatZAR(l.stats.totalRepaidCents)} />
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

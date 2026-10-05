@@ -65,6 +65,9 @@ export default function Landing() {
             Money trouble spreads fast. XTRA-CASH stops it at the till, in seconds.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
+            <Link href="/personal-loan?start=amount">
+              <Button size="lg" variant="accent">Apply for a personal loan <ArrowRight className="h-4 w-4" /></Button>
+            </Link>
             <Link href="/register?type=CONSUMER">
               <Button size="lg" variant="accent">
                 Get my card <ArrowRight className="h-4 w-4" />
@@ -77,6 +80,7 @@ export default function Landing() {
             </Link>
           </div>
           <p className="mt-5 max-w-xl text-xs text-white/60">
+            <Link href="/personal-loan?start=identity" className="mb-2 block font-semibold text-white underline">Start with your ID or passport instead →</Link>
             Affordability-checked. You see the full cost before you pay. Credit from NCR-registered lenders.
           </p>
         </div>

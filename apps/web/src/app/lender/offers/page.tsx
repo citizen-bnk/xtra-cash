@@ -3,8 +3,10 @@ import { useEffect, useState } from 'react';
 import { Pencil, Plus, Users } from 'lucide-react';
 import { bpsToPercent, EMPLOYMENT_LABELS, EmploymentStatus, formatZAR, PROVINCES, quoteLoan, type LoanOffer, type OfferInput } from '@xtra/shared';
 import { Alert, Badge, Button, Card, cx, Empty, Field, Input, Loading, Modal, MoneyInput, PageHeader, Textarea, useAction, useApi, useAuth, useToast } from '@xtra/ui';
+import { OfferAssistant } from '@/components/OfferAssistant';
 
 const blank: OfferInput = {
+  productType: 'BNPL',
   name: '',
   description: '',
   monthlyInterestRateBps: 300,
@@ -28,6 +30,7 @@ export default function OffersPage() {
   const offers = useApi((c) => c.lender.offers());
   const org = useApi((c) => c.lender.org());
   const [editing, setEditing] = useState<LoanOffer | 'new' | null>(null);
+  const [draft, setDraft] = useState<OfferInput | null>(null);
 
   if (!offers.data) return <Loading />;
   const live = org.data?.accreditationStatus === 'ACCREDITED';
@@ -37,9 +40,11 @@ export default function OffersPage() {
       <PageHeader
         title="Offers & lending criteria"
         subtitle="Each offer is a product in your stall. Shoppers who meet every criterion see it in their XTRA-Balance."
-        actions={<Button onClick={() => setEditing('new')}><Plus className="h-4 w-4" /> New offer</Button>}
+        actions={<Button variant="secondary" onClick={() => { setDraft(null); setEditing('new'); }}><Plus className="h-4 w-4" /> Open offer form</Button>}
       />
       {!live && <div className="mb-4"><Alert tone="amber">Offers go live for shoppers once your stall is accredited.</Alert></div>}
+      <OfferAssistant onManual={() => { setDraft(null); setEditing('new'); }} onReview={d => { setDraft(d); setEditing('new'); }} />
+      <h2 className="mb-4 text-lg font-bold">Your offers</h2>
       {offers.data.length === 0 ? (
         <Empty title="No offers yet">Create your first offer: set pricing and who you want to lend to.</Empty>
       ) : (
@@ -50,10 +55,11 @@ export default function OffersPage() {
                 <div>
                   <div className="flex items-center gap-2 font-bold">
                     {o.name} <Badge tone={o.active ? 'green' : 'gray'}>{o.active ? 'Active' : 'Paused'}</Badge>
+                    <Badge tone="blue">{o.productType === 'PERSONAL' ? 'Personal loan' : 'BNPL'}</Badge>
                   </div>
                   {o.description && <p className="mt-1 text-sm text-muted">{o.description}</p>}
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => setEditing(o)}><Pencil className="h-4 w-4" /></Button>
+                <Button aria-label={`Edit ${o.name}`} size="sm" variant="ghost" onClick={() => { setDraft(null); setEditing(o); }}><Pencil className="h-4 w-4" /></Button>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                 <Kv k="Interest" v={`${bpsToPercent(o.monthlyInterestRateBps)} / month`} />
@@ -89,6 +95,7 @@ export default function OffersPage() {
       {editing && (
         <OfferEditor
           offer={editing === 'new' ? null : editing}
+          draft={draft}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -110,10 +117,10 @@ function Kv({ k, v }: { k: string; v: React.ReactNode }) {
   );
 }
 
-function OfferEditor({ offer, onClose, onSaved }: { offer: LoanOffer | null; onClose: () => void; onSaved: () => void }) {
+function OfferEditor({ offer, draft, onClose, onSaved }: { offer: LoanOffer | null; draft: OfferInput | null; onClose: () => void; onSaved: () => void }) {
   const { client } = useAuth();
   const caps = useApi((c) => c.lender.fundingInstructions());
-  const [f, setF] = useState<OfferInput>(() => (offer ? { ...blank, ...offer, description: offer.description ?? '' } : blank));
+  const [f, setF] = useState<OfferInput>(() => offer ? { ...blank, ...offer, description: offer.description ?? '' } : draft ? { ...blank, ...draft } : { ...blank });
   const [reach, setReach] = useState<{ eligibleConsumers: number; totalConsumers: number } | null>(null);
   const num = (k: keyof OfferInput) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: Number(e.target.value) });
   const toggle = <T extends string>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -152,6 +159,7 @@ function OfferEditor({ offer, onClose, onSaved }: { offer: LoanOffer | null; onC
   return (
     <Modal open onClose={onClose} title={offer ? 'Edit offer' : 'New offer'}>
       <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
+        <Field label="Product"><select className="h-10 w-full rounded-xl border border-line px-3 text-sm" value={f.productType} onChange={e => setF({ ...f, productType: e.target.value as 'BNPL' | 'PERSONAL' })}><option value="BNPL">BNPL · card purchases</option><option value="PERSONAL">Personal loan · application & review</option></select></Field>
         <Field label="Offer name"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Everyday Xtra" /></Field>
         <Field label="Description (shown to shoppers)"><Textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
         <div className="text-xs font-bold uppercase tracking-wide text-muted">Pricing</div>
@@ -199,6 +207,7 @@ function OfferEditor({ offer, onClose, onSaved }: { offer: LoanOffer | null; onC
           </div>
         )}
         {save.error && <Alert tone="red">{save.error}</Alert>}
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.active ?? true} onChange={e => setF({ ...f, active: e.target.checked })} /> Make this offer active when saved</label>
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>

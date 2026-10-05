@@ -6,11 +6,27 @@ import { LoansService } from '../consumer/loans.service';
 import { LenderService } from './lender.service';
 import { SettingsService } from '../common/settings.service';
 import { CriteriaDto, DocumentDto, FundingDto, LenderOrgDto, OfferDto, SubmitAccreditationDto, UpdateOfferDto } from './lender.dto';
+import { OfferAssistantService } from './offer-assistant.service';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { Throttle } from '@nestjs/throttler';
+class AssistantMessageDto {
+  @IsIn(['user', 'assistant']) role: 'user' | 'assistant';
+  @IsString() @MinLength(1) @MaxLength(2000) content: string;
+}
+class AssistantDto {
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(12) @ValidateNested({ each: true }) @Type(() => AssistantMessageDto) messages: AssistantMessageDto[];
+}
 
 @Roles('LENDER')
 @Controller('lender')
 export class LenderController {
-  constructor(private lender: LenderService, private loans: LoansService, private settings: SettingsService) {}
+  constructor(private lender: LenderService, private loans: LoansService, private settings: SettingsService, private assistant: OfferAssistantService) {}
+
+  @Post('offers/assistant')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
+  assist(@CurrentUser() u: AuthUser, @Body() dto: AssistantDto) { return this.assistant.reply(u, dto.messages); }
 
   /** Where lenders send EFTs to load their stall, plus the current regulatory caps for offers. */
   @Get('funding-instructions')

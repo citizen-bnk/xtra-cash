@@ -13,16 +13,18 @@ type LoanRow = typeof loans.$inferSelect & {
   lender: { name: string };
   offer: { name: string };
   installments: (typeof installments.$inferSelect)[];
-  user?: { id: string; firstName: string; lastName: string; email: string };
+  repayments?: { lenderShareCents: number }[];
+  user?: { id: string; firstName: string; lastName: string; email: string | null };
 };
 
 export function presentLoan(l: LoanRow, withSchedule = false) {
-  const { lender, offer, installments: inst, ...rest } = l;
+  const { lender, offer, installments: inst, repayments: paid, ...rest } = l;
   const sorted = [...inst].sort((a, b) => a.seq - b.seq);
   return {
     ...rest,
     lenderName: lender.name,
     offerName: offer.name,
+    lenderRepaidCents: paid?.reduce((sum, r) => sum + r.lenderShareCents, 0) ?? 0,
     nextDue: sorted.find((i) => i.status !== 'PAID') ?? null,
     ...(withSchedule ? { installments: sorted } : {}),
   };
@@ -32,6 +34,7 @@ const loanWith = {
   lender: { columns: { name: true } },
   offer: { columns: { name: true } },
   installments: true,
+  repayments: { columns: { lenderShareCents: true } },
 } as const;
 
 @Injectable()

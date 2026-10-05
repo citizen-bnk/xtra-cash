@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Landmark, ShoppingBag, Users } from 'lucide-react';
 import { Alert, Button, Card, cx, Field, Input, useAction, useAuth } from '@xtra/ui';
 import { AuthPageShell } from '@/components/AuthPageShell';
+import { QuickRegistration } from '@/components/QuickRegistration';
 import { homeFor } from '@/lib/config';
 
 type AccountType = 'CONSUMER' | 'LENDER' | 'AFFILIATE';
@@ -33,7 +34,7 @@ function RegisterForm() {
     });
     const me = await refreshMe();
     const home = homeFor(me ?? r.user);
-    router.replace(type === 'CONSUMER' ? '/app/kyc' : home);
+    router.replace(type === 'CONSUMER' ? (params.get('next') === '/app/personal-loan' ? '/app/personal-loan' : '/app/kyc') : home);
   });
 
   return (
@@ -56,6 +57,7 @@ function RegisterForm() {
           </button>
         ))}
       </div>
+      <div className="mt-5"><QuickRegistration accountType={type} /></div>
       <form
         className="mt-5 grid gap-4 sm:grid-cols-2"
         onSubmit={(e) => {

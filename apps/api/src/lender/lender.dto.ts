@@ -47,6 +47,7 @@ export class CriteriaDto {
 }
 
 export class OfferDto extends CriteriaDto {
+  @IsOptional() @IsIn(['BNPL', 'PERSONAL']) productType?: 'BNPL' | 'PERSONAL';
   @IsString() @MinLength(2) @MaxLength(80) name: string;
   @IsOptional() @IsString() @MaxLength(500) description?: string;
   @IsOptional() @IsBoolean() active?: boolean;

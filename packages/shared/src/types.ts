@@ -36,6 +36,7 @@ export interface DemoPersona {
 }
 
 export interface User {
+  profileComplete?: boolean;
   id: string;
   email: string;
   phone: string;
@@ -78,6 +79,7 @@ export interface OfferCriteria {
 }
 
 export interface LoanOffer extends OfferCriteria {
+  productType?: 'BNPL' | 'PERSONAL';
   id: string;
   lenderId: string;
   name: string;
@@ -91,6 +93,38 @@ export interface LoanOffer extends OfferCriteria {
   maxAmountPerUserCents: number;
   createdAt: string;
   lender?: { id: string; name: string };
+}
+
+export interface PersonalLoanInput {
+  amountCents: number;
+  termMonths: number;
+  purpose: string;
+  monthlyIncomeCents: number;
+  monthlyExpensesCents: number;
+  consent: boolean;
+  idempotencyKey: string;
+  offerId?: string;
+}
+
+export interface PersonalLoanMatch {
+  offerId: string; lenderName: string; offerName: string; termMonths: number;
+  monthlyInstallmentCents: number; totalRepayableCents: number; costOfCreditCents: number;
+}
+export interface PersonalLoanApplication extends PersonalLoanInput {
+  id: string; userId: string; status: 'SUBMITTED' | 'REFERRED' | 'UNDER_REVIEW' | 'DECLINED'; createdAt: string;
+  reviewNotes?: string | null;
+  lenderId: string | null; firstName?: string; lastName?: string;
+}
+export interface PersonalVerification {
+  status: 'NOT_STARTED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+  identityType?: 'ID' | 'PASSPORT'; maskedIdentity?: string; mobile?: string;
+  reason?: string | null; userId?: string; firstName?: string; lastName?: string;
+  address?: string; createdAt?: string;
+}
+export interface OfferAssistantResponse {
+  id: string; message: string; draft: import('./client').OfferInput | null;
+  model: string; eligibleConsumers?: number; totalConsumers?: number;
+  example?: { principalCents: number; monthlyInstallmentCents: number; totalRepayableCents: number; costOfCreditCents: number; lenderRevenueCents: number };
 }
 
 export interface MatchedOffer {
@@ -156,6 +190,7 @@ export interface Installment {
 }
 
 export interface Loan {
+  lenderRepaidCents?: number;
   id: string;
   userId: string;
   offerId: string;
@@ -279,6 +314,7 @@ export interface Paginated<T> {
 }
 
 export interface AdminStats {
+  personalApplications?: number;
   users: { total: number; consumers: number; lenders: number; affiliates: number; newLast7Days: number };
   kycPending: number;
   lendersPendingReview: number;

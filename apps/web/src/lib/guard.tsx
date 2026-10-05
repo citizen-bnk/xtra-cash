@@ -12,8 +12,9 @@ export function RequireRole({ roles, children, fallback = '/app' }: { roles: Rol
   useEffect(() => {
     if (loading) return;
     if (!me) router.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+    else if (me.profileComplete === false) router.replace('/welcome');
     else if (!allowed) router.replace(fallback);
   }, [loading, me, allowed, router, fallback]);
-  if (loading || !allowed) return <Loading />;
+  if (loading || !allowed || me?.profileComplete === false) return <Loading />;
   return <>{children}</>;
 }

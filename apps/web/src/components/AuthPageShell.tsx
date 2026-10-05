@@ -9,7 +9,7 @@ const LINKS = [
   { href: '/register', label: 'Create account' },
 ];
 
-export function AuthPageShell({ children, currentPath }: { children: ReactNode; currentPath: '/login' | '/register' }) {
+export function AuthPageShell({ children, currentPath }: { children: ReactNode; currentPath: '/login' | '/register' | '/personal-loan' }) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-line bg-white">

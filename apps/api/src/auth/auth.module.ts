@@ -4,6 +4,8 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { DemoService } from './demo.service';
 import { accessTokenTtl } from './config';
+import { PasswordlessController } from './passwordless.controller';
+import { PasswordlessService } from './passwordless.service';
 
 @Global()
 @Module({
@@ -19,8 +21,8 @@ import { accessTokenTtl } from './config';
       },
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, DemoService],
+  controllers: [AuthController, PasswordlessController],
+  providers: [AuthService, DemoService, PasswordlessService],
   exports: [AuthService],
 })
 export class AuthModule {}
