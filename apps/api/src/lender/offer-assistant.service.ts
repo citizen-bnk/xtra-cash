@@ -29,6 +29,11 @@ export function assistantSchema(s: PlatformSettings) {
   });
 }
 
+/** Pricing and criteria are displayed from validated fields, never AI prose. */
+export function qualitativePlanningMessage(message: string) {
+  return message.split(/(?<=[.!?])\s+/).filter(sentence => !/\d/.test(sentence)).join(' ').trim();
+}
+
 @Injectable()
 export class OfferAssistantService {
   private logger = new Logger(OfferAssistantService.name);
@@ -60,6 +65,7 @@ Return ONLY a JSON object matching this schema, with every required field and no
 Use draft:null when asking a follow-up question. Otherwise include every draft field; employmentStatuses and provinces are arrays, not prose.
 Complete response format example: ${JSON.stringify(template)}. Replace example terms with your proposal and the requested product type. Include EVERY key, especially minCreditScore, minAge, maxAge, employmentStatuses and provinces.
 Help improve sustainable returns and loan-book quality, balancing collections, affordability, liquidity and customer cost.
+Keep message qualitative: do not include numeric prices, rates, fees, scores, ages or income thresholds. The interface displays definitive numbers from validated draft fields and platform calculations.
 Ask ONE short question if goals or product type are missing; otherwise provide a complete draft and explain trade-offs in under 180 words.
 Never guarantee profit, invent default probabilities or claim regulatory approval. Use only supplied aggregate figures; no applicant-level decisions or personal data.
 Distinguish observed arrears (not a default probability) from hypothetical losses. Small loan books cannot establish reliable trends.
@@ -93,8 +99,9 @@ Use employmentStatuses=[] and provinces=[] unless the lender explicitly requests
     const reach = draft ? await this.lenders.previewReach(draft) : null;
     const q = draft ? quoteLoan(Math.max(draft.minAmountCents, Math.min(100000, draft.maxAmountPerUserCents)), draft) : null;
     const example = q ? { principalCents: q.principalCents, monthlyInstallmentCents: q.monthlyInstallmentCents, totalRepayableCents: q.totalRepayableCents, costOfCreditCents: q.costOfCreditCents, lenderRevenueCents: q.totalRepayableCents - Math.floor(q.totalRepayableCents * caps.platformShareBps / 10000) - q.principalCents } : undefined;
-    const [generation] = await this.db.insert(offerAssistantGenerations).values({ lenderId: org.id, model, response: { message: output.message, draft, example, reach }, inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }).returning({ id: offerAssistantGenerations.id });
+    const message = draft ? `Your draft is ready for review. Use the draft panel for pricing and criteria. ${qualitativePlanningMessage(output.message)}`.trim() : output.message;
+    const [generation] = await this.db.insert(offerAssistantGenerations).values({ lenderId: org.id, model, response: { message, draft, example, reach }, inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }).returning({ id: offerAssistantGenerations.id });
     await this.audit.log(user, 'offer.assistant_draft', 'offer_assistant_generation', generation.id, { model, inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens });
-    return { id: generation.id, model, message: output.message, draft, example, ...reach };
+    return { id: generation.id, model, message, draft, example, ...reach };
   }
 }
