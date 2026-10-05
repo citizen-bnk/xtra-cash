@@ -12,6 +12,7 @@ import { sanitizeUser } from '../common/pagination';
 import { AuditService } from '../common/audit.service';
 import { QuickRegisterDto, RegisterDto } from './auth.dto';
 import { isEmail } from 'class-validator';
+import { refreshTokenDays } from './config';
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 const REF_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -126,7 +127,7 @@ export class AuthService {
 
   async issueTokens(user: { id: string; email: string | null; roles: Role[] }, authenticatedAt = new Date(), conn: DbOrTx = this.db) {
     const refreshToken = randomBytes(48).toString('base64url');
-    const days = Number(process.env.REFRESH_TTL_DAYS ?? 30);
+    const days = refreshTokenDays();
     const [session] = await conn.insert(refreshTokens).values({
       userId: user.id,
       tokenHash: sha256(refreshToken),
