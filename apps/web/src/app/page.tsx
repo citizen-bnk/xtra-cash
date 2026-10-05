@@ -37,8 +37,7 @@ export default function Landing() {
           poster="/brand/fire-poster.jpg"
           aria-hidden="true"
         >
-          <source src="/brand/fire.webm" type="video/webm" />
-          <source src="/brand/fire.mp4" type="video/mp4" />
+          <source src="/brand/xtra-cash-wallet-burning.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-ink via-ink/70 to-ink/30" />
 
