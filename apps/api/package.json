@@ -14,6 +14,7 @@
     "seed": "ts-node --transpile-only src/db/seed.ts",
     "test": "jest --runInBand",
     "test:personal": "node test/personal-flow.cjs",
+    "test:esm": "node --no-experimental-require-module test/esm-load.cjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

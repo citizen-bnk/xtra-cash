@@ -11,6 +11,7 @@ import { LenderService } from './lender.service';
 import { OfferDto } from './lender.dto';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { loadAiSdk } from '../common/esm';
 
 export function assistantSchema(s: PlatformSettings) {
   return z.object({
@@ -41,7 +42,7 @@ export class OfferAssistantService {
     let result;
     let stage = 'load-sdk';
     try {
-      const { generateText, Output, gateway } = await import('ai');
+      const { generateText, Output, gateway } = await loadAiSdk();
       stage = 'generate-draft';
       result = await generateText({
         model: gateway(model),
@@ -62,6 +63,8 @@ Employment values: EMPLOYED_FULL_TIME, EMPLOYED_PART_TIME, SELF_EMPLOYED, GIG_WO
 Use employmentStatuses=[] and provinces=[] unless the lender explicitly requests restrictions. Default age 18–100.`,
         messages, maxOutputTokens: 2400, maxRetries: 0, abortSignal: AbortSignal.timeout(45000),
       });
+      // Accessing structured output can itself reject malformed model responses.
+      if (!result.output) throw new Error('No structured offer response');
     } catch (error) {
       const failure = error as { name?: string; code?: string; statusCode?: number; message?: string };
       const detail = (failure.message ?? '').replace(/Bearer\s+\S+|eyJ[\w.-]+|sk-[\w-]+/gi, '[redacted]').replace(/https?:\/\/\S+/g, '[url]').slice(0, 240);

@@ -39,4 +39,4 @@ A real bureau integration, income verification, final lending decision, credit a
 
 Production migrations are additive and run in the API release step. Preview builds do not migrate the production database. Consumer history shows the latest 30 applications; staff and lender inboxes show the latest 100, with that limit stated in the UI.
 
-The API pins Node 22 in its package engines so its CommonJS build can load the ESM-only AI SDK and JOSE packages. Keep this runtime pin when changing deployment settings.
+The API pins Node 22 in its package engines. The native-import bridge in `src/common/esm.ts` loads AI SDK and JOSE even when Vercel disables CommonJS require(ESM). Literal package resolution keeps both dependencies visible to deployment tracing. `pnpm --filter @xtra/api test:esm` verifies this with require(ESM) disabled.

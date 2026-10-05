@@ -6,6 +6,7 @@ import { InjectDb } from '../common/db.module';
 import { Db } from '../db/client';
 import { affiliateProfiles, authChallenges, lenderOrgs, loginIdentities, users } from '../db/schema';
 import { AuditService } from '../common/audit.service';
+import { loadJose } from '../common/esm';
 import type { AuthUser } from '../common/auth';
 import { sanitizeUser } from '../common/pagination';
 import { validateIdentity } from '../personal-loans/personal.service';
@@ -63,7 +64,7 @@ export class PasswordlessService {
     if (!response.ok) throw new UnauthorizedException('The identity provider could not complete sign-in. Please start again.');
     const token = await response.json() as { id_token?: string };
     if (!token.id_token) throw new UnauthorizedException();
-    const { createRemoteJWKSet, jwtVerify } = await import('jose');
+    const { createRemoteJWKSet, jwtVerify } = await loadJose();
     const { payload: claims } = await jwtVerify(token.id_token, createRemoteJWKSet(new URL(google ? 'https://www.googleapis.com/oauth2/v3/certs' : 'https://appleid.apple.com/auth/keys')), { issuer: google ? ['https://accounts.google.com', 'accounts.google.com'] : 'https://appleid.apple.com', audience: clientId, algorithms: ['RS256'] });
     if (claims.nonce !== payload.oidcNonce || !claims.sub) throw new UnauthorizedException('Invalid sign-in response');
     const consumed = await this.db.update(authChallenges).set({ consumedAt: new Date() }).where(and(eq(authChallenges.id, challenge.id), isNull(authChallenges.consumedAt))).returning({ id: authChallenges.id });
