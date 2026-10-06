@@ -29,8 +29,7 @@ const PERSONAS: PersonaDef[] = [
 ];
 
 /**
- * One-click demo sign-in. On by default while XTRA-CASH is in its demo phase; set ENABLE_DEMO_LOGIN=false
- * to switch it off (do this before real customers sign up: the demo staff tiles have back-office access).
+ * Hosted demos require explicit opt-in. Public staff sign-in is never offered in production.
  */
 @Injectable()
 export class DemoService {
@@ -40,21 +39,26 @@ export class DemoService {
   constructor(@InjectDb() private db: Db, private auth: AuthService, private audit: AuditService, private moduleRef: ModuleRef) {}
 
   get enabled() {
-    if (process.env.NODE_ENV === 'production') return false;
-    return (process.env.ENABLE_DEMO_LOGIN ?? 'true').trim().toLowerCase() !== 'false';
+    const flag = process.env.ENABLE_DEMO_LOGIN?.trim().toLowerCase();
+    return process.env.NODE_ENV === 'production' ? flag === 'true' : (flag ?? 'true') !== 'false';
+  }
+
+  private get availablePersonas() {
+    return process.env.NODE_ENV === 'production' ? PERSONAS.filter(p => p.app === 'web') : PERSONAS;
   }
 
   personas(): { enabled: boolean; personas: DemoPersona[] } {
     if (!this.enabled) return { enabled: false, personas: [] };
-    return { enabled: true, personas: PERSONAS.map(({ emails, ...p }) => p) };
+    return { enabled: true, personas: this.availablePersonas.map(({ emails, ...p }) => p) };
   }
 
   async login(key: string) {
     if (!this.enabled) throw new NotFoundException('Demo sign-in is switched off');
-    const persona = PERSONAS.find((p) => p.key === key);
+    const persona = this.availablePersonas.find((p) => p.key === key);
     if (!persona) throw new NotFoundException('Unknown demo account');
 
     let user = await this.findUser(persona);
+    if (!user && process.env.NODE_ENV === 'production') throw new NotFoundException('This sample account is unavailable. Please use normal sign-in.');
     if (!user) {
       try {
         await this.ensureDemoData();
@@ -68,6 +72,10 @@ export class DemoService {
     }
     if (!user) throw new ServiceUnavailableException('The demo account is not available. Please try again shortly.');
     if (user.status === 'SUSPENDED') throw new UnauthorizedException('This demo account has been suspended in the back office.');
+    if (process.env.NODE_ENV === 'production') {
+      const expectedRole = persona.group === 'Micro-lenders' ? 'LENDER' : persona.group === 'Affiliates' ? 'AFFILIATE' : 'CONSUMER';
+      if (!user.roles.includes(expectedRole) || user.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN')) throw new UnauthorizedException('This account requires normal sign-in.');
+    }
 
     await this.audit.log({ id: user.id, email: user.email, roles: user.roles }, 'auth.demo_login', 'user', user.id, { persona: key });
     return { user: sanitizeUser(user), ...(await this.auth.issueTokens(user)) };
