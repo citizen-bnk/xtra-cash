@@ -10,7 +10,7 @@ import { DemoLoginDto, LoginDto, QuickRegisterDto, RefreshDto, RegisterDto } fro
 export class AuthController {
   constructor(private auth: AuthService, private demo: DemoService) {}
 
-  /** Demo accounts shown on the sign-in pages (empty when ENABLE_DEMO_LOGIN=false). */
+  /** Hosted sample accounts require ENABLE_DEMO_LOGIN=true; staff require normal sign-in. */
   @Get('demo')
   demoPersonas() {
     return this.demo.personas();

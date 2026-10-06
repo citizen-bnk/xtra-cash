@@ -1,6 +1,6 @@
 /**
- * One-click demo sign-in, end to end: from an empty database, the first click builds the demo world
- * and every persona signs in to the right account. Requires Postgres — uses TEST_DATABASE_URL.
+ * Hosted demo sign-in against explicitly seeded local fixtures.
+ * Requires an isolated Postgres test database — uses TEST_DATABASE_URL.
  */
 import 'reflect-metadata';
 import path from 'path';
@@ -14,15 +14,16 @@ process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgresql://postgr
 process.env.JWT_SECRET = 'test-secret-test-secret-test-secret';
 process.env.CARD_NETWORK_SECRET = 'net-secret';
 process.env.RATE_LIMIT_PER_MIN = '100000';
-// Like the live site: production mode, no simulation, demo flag left unset (on by default).
+// Hosted demo access requires explicit opt-in and pre-existing sample fixtures.
 process.env.NODE_ENV = 'production';
 delete process.env.ENABLE_SIMULATION;
-delete process.env.ENABLE_DEMO_LOGIN;
+process.env.ENABLE_DEMO_LOGIN = 'true';
 
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/setup';
 import { DB } from '../src/common/db.module';
 import type { Db } from '../src/db/client';
+import { buildDemoData, DEMO_LOGIN_STAFF } from '../src/db/demo-data';
 
 let app: INestApplication;
 const http = () => request(app.getHttpServer());
@@ -36,8 +37,6 @@ const EXPECTED: Record<string, string> = {
   'lender-assisted': 'bongani@ubuntucredit.co.za',
   'lender-pending': 'fatima@mzansiquick.co.za',
   affiliate: 'thabo.affiliate@example.com',
-  'staff-superadmin': 'demo.superadmin@xtracash.co.za',
-  'staff-ops': 'demo.ops@xtracash.co.za',
 };
 
 beforeAll(async () => {
@@ -49,7 +48,8 @@ beforeAll(async () => {
   await migrate(db, { migrationsFolder: path.join(__dirname, '../drizzle') });
   const t = await db.execute<{ tablename: string }>(sql`select tablename from pg_tables where schemaname='public'`);
   await db.execute(sql.raw(`TRUNCATE ${t.rows.map((r) => `"${r.tablename}"`).join(', ')} CASCADE`));
-}, 60_000);
+  await buildDemoData(app, DEMO_LOGIN_STAFF);
+}, 120_000);
 
 afterAll(async () => {
   delete process.env.ENABLE_DEMO_LOGIN;
@@ -62,22 +62,22 @@ describe('one-click demo sign-in', () => {
     expect(r.body.enabled).toBe(true);
     expect(r.body.personas.map((p: any) => p.key).sort()).toEqual(Object.keys(EXPECTED).sort());
     expect(JSON.stringify(r.body)).not.toMatch(/@|Passw0rd|Admin@/);
-    expect(r.body.personas.filter((p: any) => p.app === 'admin')).toHaveLength(2);
+    expect(r.body.personas.filter((p: any) => p.app === 'admin')).toHaveLength(0);
   });
 
-  it('builds the demo world on the first click, even with simultaneous clicks', async () => {
+  it('signs into existing sample accounts with simultaneous clicks', async () => {
     const [a, b] = await Promise.all([
-      http().post('/auth/demo/login').send({ persona: 'staff-superadmin' }),
+      http().post('/auth/demo/login').send({ persona: 'lender-accredited' }),
       http().post('/auth/demo/login').send({ persona: 'shopper-salaried' }),
     ]);
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
-    expect(a.body.user.email).toBe('demo.superadmin@xtracash.co.za');
-    expect(a.body.user.roles).toContain('SUPER_ADMIN');
+    expect(a.body.user.email).toBe('lindiwe@kasicapital.co.za');
+    expect(a.body.user.roles).toContain('LENDER');
     expect(a.body.user.passwordHash).toBeUndefined();
 
-    // The tokens work: the super-admin sees the back-office dashboard, the shopper her balance.
-    await http().get('/admin/stats').set({ Authorization: `Bearer ${a.body.accessToken}` }).expect(200);
+    // A public sample session must not grant access to the back-office dashboard.
+    await http().get('/admin/stats').set({ Authorization: `Bearer ${a.body.accessToken}` }).expect(403);
     const bal = await http().get('/me/balance').set({ Authorization: `Bearer ${b.body.accessToken}` }).expect(200);
     expect(bal.body).toBeDefined();
   }, 120_000);
@@ -91,6 +91,7 @@ describe('one-click demo sign-in', () => {
 
   it('rejects unknown roles and stays off when switched off', async () => {
     await http().post('/auth/demo/login').send({ persona: 'nope' }).expect(404);
+    await http().post('/auth/demo/login').send({ persona: 'staff-superadmin' }).expect(404);
     await http().post('/auth/demo/login').send({}).expect(400);
     process.env.ENABLE_DEMO_LOGIN = 'false';
     const r = await http().get('/auth/demo').expect(200);
