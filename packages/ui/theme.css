@@ -42,3 +42,58 @@ body {
   background-clip: text;
   color: transparent;
 }
+
+/* ---- App feel on phones and when installed as an app (PWA) ---- */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+/* Room for the notch / status bar and the home indicator (needs viewport-fit=cover). */
+@utility safe-pt {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+@utility safe-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility safe-mb {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* Native-feeling press feedback for tappable things. */
+@utility pressable {
+  transition: transform 120ms ease, opacity 120ms ease;
+  &:active {
+    transform: scale(0.97);
+  }
+}
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+@keyframes xc-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes xc-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@utility animate-sheet-up {
+  animation: xc-sheet-up 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@utility animate-fade-in {
+  animation: xc-fade-in 200ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-up,
+  .animate-fade-in {
+    animation: none;
+  }
+}

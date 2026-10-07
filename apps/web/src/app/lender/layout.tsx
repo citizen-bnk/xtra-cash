@@ -6,11 +6,11 @@ import { PortalShell } from '@/components/PortalShell';
 
 const NAV = [
   { href: '/lender', label: 'Overview', icon: LayoutDashboard, exact: true },
-  { href: '/lender/accreditation', label: 'Accreditation', icon: BadgeCheck },
+  { href: '/lender/accreditation', label: 'Accreditation', short: 'Accredit', icon: BadgeCheck },
   { href: '/lender/funds', label: 'Funds', icon: Banknote },
-  { href: '/lender/offers', label: 'Offers & criteria', icon: Tags },
-  { href: '/lender/loans', label: 'Loan book', icon: FileStack },
-  { href: '/lender/applications', label: 'Loan applications', icon: FileStack },
+  { href: '/lender/offers', label: 'Offers & criteria', short: 'Offers', icon: Tags },
+  { href: '/lender/loans', label: 'Loan book', short: 'Loans', icon: FileStack },
+  { href: '/lender/applications', label: 'Loan applications', short: 'Applications', icon: FileStack },
 ];
 
 export default function LenderLayout({ children }: { children: React.ReactNode }) {

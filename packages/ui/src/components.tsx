@@ -265,8 +265,10 @@ export function Modal({ open, onClose, title, children, footer }: { open: boolea
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
-      <div role="dialog" aria-modal className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 animate-fade-in sm:items-center sm:p-4" onClick={onClose}>
+      {/* Phones: a bottom sheet with a grab handle that clears the home indicator. */}
+      <div role="dialog" aria-modal className="max-h-[92dvh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-[24px] bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] shadow-xl animate-sheet-up sm:rounded-2xl sm:pb-5" onClick={(e) => e.stopPropagation()}>
+        <div className="mx-auto -mt-2 mb-3 h-1.5 w-10 rounded-full bg-line sm:hidden" />
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">{title}</h2>
           <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface" aria-label="Close">

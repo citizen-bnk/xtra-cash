@@ -1,4 +1,4 @@
-# XTRA-CASH — MVP build status (4 Oct 2026)
+# XTRA-CASH — MVP build status (7 Oct 2026)
 
 ## ▶ NEXT SESSION: do this first
 1. **Vercel is working again** (account block cleared 28 Sep). `main` deploys web, admin and api automatically; PRs get preview deployments.
@@ -6,6 +6,14 @@
 3. **Brand follow-ups:** replace the fire video with a clean export without the Veo mark when available; add the Mastercard logo only after an issuing agreement (the untouched card artwork with the logo is `brand/xtra-cash-card-front-original.jpg`; crop it the same way into `card.jpg` for web and mobile). Messaging rules are in `docs/MESSAGING.md`.
 4. This file (`docs/BUILD-STATUS.md`) is the build status; keep it updated in the repo. Always start sessions with `citizen-bnk/xtra-cash` attached as a source. Commit and push every change; no more zips or bundles.
 5. **On the `xtra-cash-api` Vercel project, add `CRON_SECRET`** (any random string) so the nightly arrears job runs, and check `DATABASE_URL`, `JWT_SECRET` (32+ chars), `ADMIN_EMAIL`/`ADMIN_PASSWORD` are set. Then check `<API_URL>/health` and `<API_URL>/auth/demo`. Demo sign-in is on by default; set `ENABLE_DEMO_LOGIN=false` before real customers sign up (the demo staff tiles have back-office access).
+
+## Done 7 Oct 2026 — installable mobile app (PWA) and app-style phone UI
+- **Installable app:** `apps/web/src/app/manifest.ts` (start URL `/app`, shortcuts Pay / Card / Repayments), icons in `apps/web/public/icons/` (standard + maskable), service worker `apps/web/public/sw.js` (caches build files and images only; pages and `/api` always live; `offline.html` when there is no connection), iPhone home-screen meta tags. Chrome reports no installability errors.
+- **Phones visiting `/`** get a full-screen app welcome (`MobileWelcome`) with **Install the app**: one-tap install where the browser supports it (Android Chrome/Edge/Samsung), illustrated Share → Add to Home Screen steps on iPhone, menu steps on other Android browsers, "open in your browser" inside Facebook/WhatsApp browsers (`components/pwa.tsx`, `components/InstallApp.tsx`). The installed app skips the website. A dismissible "Get the app" card appears in the shopper app on phone browsers (hidden for 7 days after dismissing).
+- **Shopper app on phones:** header with greeting and avatar; bottom tab bar Home · Card · **Pay** (raised, opens the payment sheet from any tab) · Repay · Me; balance and quick actions (Pay, Top up, Activity, Loan) first; dialogs are bottom sheets; toasts at the top; safe areas for notch and home indicator. Desktop layout unchanged.
+- **Lender, affiliate and back office on phones** (`packages/ui/src/shell.tsx`): bottom tab bar (first four sections + More with combined badge counts) and an account sheet with sign-out, replacing the hamburger drawer. `NavItem.short` gives short tab labels.
+- **Fixed demo accounts:** since #16 KYC only auto-approves with `DEMO_MODE=true`, so building the demo world crashed (no card for Naledi) and demo sign-in failed everywhere. The demo builder now approves its sample shoppers explicitly (`kyc.submit(..., { autoVerify: true })`), without changing the setting for real users.
+- **Known failing (not from this change):** 8 tests in `test/app.e2e.spec.ts` fail on `main` since #17 (e.g. a used refresh token is accepted again instead of rejected). Decide whether that is intended and update the code or the tests. `apps/api/src/auth/demo.service.spec.ts` also has a type error.
 
 ## Done 4 Oct 2026 — API moved fully to Vercel
 - **Render removed:** `render.yaml` deleted; `DEPLOY.md` rewritten for the three Vercel projects.

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight, FireExtinguisher, Flame, Landmark, ShieldCheck, Siren, Snowflake, Store, Users, Zap } from 'lucide-react';
 import { Button, Logo, useAuth, XtraCard } from '@xtra/ui';
 import { homeFor } from '@/lib/config';
+import { MobileWelcome } from '@/components/MobileWelcome';
+import { usePwa } from '@/components/pwa';
 
 /** The four beats of the "Put out the fire" story (docs/MESSAGING.md). */
 const BEATS = [
@@ -15,15 +17,20 @@ const BEATS = [
 ];
 
 export default function Landing() {
-  const { me } = useAuth();
+  const { me, loading } = useAuth();
   const router = useRouter();
+  const pwa = usePwa();
   useEffect(() => {
     if (me) router.replace(homeFor(me));
-  }, [me, router]);
+    // Opened from the home-screen icon: go straight into the app (sign-in if needed).
+    else if (!loading && pwa.ready && pwa.installed) router.replace('/login');
+  }, [me, loading, pwa.ready, pwa.installed, router]);
 
   return (
     <div className="overflow-x-clip bg-white">
-      <section className="relative isolate flex min-h-[88svh] flex-col overflow-hidden bg-ink text-white">
+      {/* Phones get an app-style welcome with an install button; tablets and computers get the website hero. */}
+      <MobileWelcome />
+      <section className="relative isolate hidden min-h-[88svh] flex-col overflow-hidden bg-ink text-white md:flex">
         {/* Fallback glow shows if the video is missing, still loading or reduced motion is on. */}
         <div className="absolute -right-24 -top-24 -z-20 h-96 w-96 rounded-full bg-brand/40 blur-3xl" />
         <div className="absolute -bottom-32 left-1/4 -z-20 h-96 w-96 rounded-full bg-brand-orange/30 blur-3xl" />
@@ -118,7 +125,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="bg-surface py-16 md:py-20">
+      <section id="how-it-works" className="scroll-mt-4 bg-surface py-16 md:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <h2 className="text-2xl font-bold">How XTRA-CASH puts out the fire</h2>
           <ol className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

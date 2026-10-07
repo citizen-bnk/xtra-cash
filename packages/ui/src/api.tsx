@@ -158,11 +158,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 left-1/2 z-[60] flex -translate-x-1/2 flex-col gap-2">
+      <div className="pointer-events-none fixed left-1/2 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-[80] flex w-[min(92vw,26rem)] -translate-x-1/2 flex-col items-center gap-2 sm:bottom-4 sm:top-auto">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto rounded-xl px-4 py-2.5 text-sm font-medium shadow-lg ${t.tone === 'ok' ? 'bg-ink text-white' : 'bg-red-600 text-white'}`}
+            className={`pointer-events-auto animate-fade-in rounded-xl px-4 py-2.5 text-center text-sm font-medium shadow-lg ${t.tone === 'ok' ? 'bg-ink text-white' : 'bg-red-600 text-white'}`}
           >
             {t.text}
           </div>

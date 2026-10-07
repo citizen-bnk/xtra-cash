@@ -23,7 +23,11 @@ export class KycService {
     private audit: AuditService,
   ) {}
 
-  async submit(userId: string, dto: KycDto) {
+  /**
+   * @param opts.autoVerify approve immediately (the built-in demo accounts only). Otherwise KYC is
+   *   approved automatically only when DEMO_MODE=true, and goes to manual review in production.
+   */
+  async submit(userId: string, dto: KycDto, opts: { autoVerify?: boolean } = {}) {
     if (!dto.consentCreditCheck) throw new BadRequestException('Consent to a credit check is required to receive credit offers');
     if (!(PROVINCES as readonly string[]).includes(dto.province)) throw new BadRequestException('Unknown province');
     const id = parseSaId(dto.idNumber);
@@ -39,7 +43,7 @@ export class KycService {
     const taken = await this.db.query.kycProfiles.findFirst({ where: and(eq(kycProfiles.idNumber, dto.idNumber), ne(kycProfiles.userId, userId)) });
     if (taken) throw new ConflictException('This ID number is already linked to another account');
 
-    const demo = process.env.DEMO_MODE === 'true';
+    const demo = opts.autoVerify ?? process.env.DEMO_MODE === 'true';
     const bureau = demo ? await this.bureau.fetchScore({ idNumber: dto.idNumber, firstName: user.firstName, lastName: user.lastName }) : { score: null, reference: null };
     const age = ageOn(id.dateOfBirth!);
 

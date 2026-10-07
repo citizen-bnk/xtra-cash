@@ -262,7 +262,7 @@ export async function buildDemoData(app: Resolver, staffAccounts = SEED_STAFF) {
       monthlyIncomeCents: k.income,
       monthlyExpensesCents: k.expenses,
       consentCreditCheck: true,
-    });
+    }, { autoVerify: true }); // sample shoppers are approved instantly (Kagiso stays in review via AUTO_KYC=false)
     return r.user;
   };
 
