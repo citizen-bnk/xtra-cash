@@ -6,8 +6,9 @@ export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Bool
 
 type Variant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'danger';
 const variants: Record<Variant, string> = {
-  primary: 'bg-ink text-white hover:bg-ink-2',
-  accent: 'bg-brand text-white hover:bg-brand-dark',
+  primary: 'bg-brand-purple text-white hover:bg-brand-violet',
+  // Orange is reserved for calls to action. Ink text keeps it above 4.5:1 contrast.
+  accent: 'bg-brand-orange text-ink shadow-sm hover:bg-brand-orange-dark',
   secondary: 'bg-white text-ink border border-line hover:bg-surface',
   ghost: 'text-ink hover:bg-black/5',
   danger: 'bg-red-600 text-white hover:bg-red-700',
@@ -27,7 +28,7 @@ export function Button({
       {...rest}
       disabled={disabled || loading}
       className={cx(
-        'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60',
+        'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple/60',
         size === 'sm' ? 'h-8 px-3 text-sm' : size === 'lg' ? 'h-12 px-6 text-base' : 'h-10 px-4 text-sm',
         variants[variant],
         className,
@@ -41,7 +42,7 @@ export function Button({
 
 export function Card({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div {...rest} className={cx('rounded-2xl border border-line bg-white p-5 shadow-[0_1px_2px_rgba(11,27,51,0.04)]', className)}>
+    <div {...rest} className={cx('rounded-2xl border border-line bg-white p-5 shadow-[0_2px_10px_rgba(92,35,148,0.08)]', className)}>
       {children}
     </div>
   );
@@ -59,7 +60,7 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
 }
 
 const inputCls =
-  'w-full rounded-xl border border-line bg-white px-3 h-10 text-sm text-ink placeholder:text-muted/70 focus:border-ink focus:outline-none focus:ring-2 focus:ring-brand/30';
+  'w-full rounded-xl border border-line bg-white px-3 h-10 text-sm text-ink placeholder:text-muted/70 focus:border-brand-purple focus:outline-none focus:ring-2 focus:ring-brand-purple/25';
 
 export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className, ...rest },
@@ -159,11 +160,11 @@ export function Stat({ label, value, sub, icon, href }: { label: string; value: 
         <span>{label}</span>
         <span className="flex items-center gap-2">{icon}{href && <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />}</span>
       </div>
-      <div className="mt-1.5 text-2xl font-bold tracking-tight tabular-nums">{value}</div>
+      <div className="font-display mt-1.5 text-2xl font-bold tracking-tight tabular-nums">{value}</div>
       {sub && <div className="mt-0.5 text-xs text-muted">{sub}</div>}
     </Card>
   );
-  return href ? <a href={href} aria-label={`View ${label.toLowerCase()} details`} className="block rounded-2xl transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{content}</a> : content;
+  return href ? <a href={href} aria-label={`View ${label.toLowerCase()} details`} className="block rounded-2xl transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-purple">{content}</a> : content;
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: React.ReactNode; actions?: React.ReactNode }) {
@@ -315,7 +316,7 @@ export function XtraCard({ name, maskedPan, expiry, frozen }: { name: string; ma
       style={{
         backgroundImage: frozen
           ? 'url(/brand/card-frozen.jpg), linear-gradient(135deg, #bfe3f5 0%, #6fb3d9 100%)'
-          : 'url(/brand/card.jpg), linear-gradient(135deg, #fb9320 0%, #e5476a 42%, #a617d3 76%, #5c2394 100%)',
+          : 'url(/brand/card.jpg), linear-gradient(135deg, #fb9320 0%, #e55b51 30%, #b51d8a 60%, #5c2394 100%)',
       }}
       role="img"
       aria-label={`XTRA-CASH card ${maskedPan}${frozen ? ', frozen' : ''}`}

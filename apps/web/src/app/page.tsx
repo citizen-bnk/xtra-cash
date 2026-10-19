@@ -32,7 +32,7 @@ export default function Landing() {
       <MobileWelcome />
       <section className="relative isolate hidden min-h-[88svh] flex-col overflow-hidden bg-ink text-white md:flex">
         {/* Fallback glow shows if the video is missing, still loading or reduced motion is on. */}
-        <div className="absolute -right-24 -top-24 -z-20 h-96 w-96 rounded-full bg-brand/40 blur-3xl" />
+        <div className="absolute -right-24 -top-24 -z-20 h-96 w-96 rounded-full bg-brand-purple/50 blur-3xl" />
         <div className="absolute -bottom-32 left-1/4 -z-20 h-96 w-96 rounded-full bg-brand-orange/30 blur-3xl" />
         <video
           className="absolute inset-0 -z-10 h-full w-full object-cover motion-reduce:hidden"
@@ -64,7 +64,7 @@ export default function Landing() {
           <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold backdrop-blur">
             <Zap className="h-3.5 w-3.5 text-brand-orange" /> Credit at the point of payment
           </span>
-          <h1 className="mt-5 text-5xl font-black uppercase leading-[0.95] tracking-tight sm:text-7xl">
+          <h1 className="mt-5 text-5xl font-bold uppercase leading-[0.95] sm:text-7xl">
             Put out <br className="sm:hidden" />
             the <span className="text-brand-gradient-light">fire.</span>
           </h1>
@@ -95,7 +95,7 @@ export default function Landing() {
 
       <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:px-6 md:grid-cols-2 md:py-24">
         <div>
-          <h2 className="text-3xl font-black tracking-tight sm:text-4xl">
+          <h2 className="text-3xl font-bold sm:text-4xl">
             Tap. Covered. <span className="text-brand-gradient">Fire out.</span>
           </h2>
           <p className="mt-4 max-w-md text-lg text-muted">
@@ -132,11 +132,11 @@ export default function Landing() {
             {BEATS.map((s, i) => (
               <li key={s.title} className="rounded-2xl bg-white p-6">
                 <div className="flex items-center gap-2">
-                  <s.icon className="h-6 w-6 text-brand" />
+                  <s.icon className="h-6 w-6 text-brand-purple" />
                   <span className="text-xs font-bold uppercase tracking-wider text-muted">Step {i + 1}</span>
                 </div>
                 <div className="mt-3 font-bold">{s.title}</div>
-                <div className="text-sm font-semibold text-brand-dark">{s.line}</div>
+                <div className="text-sm font-semibold text-brand">{s.line}</div>
                 <p className="mt-2 text-sm text-muted">{s.text}</p>
               </li>
             ))}
@@ -171,7 +171,7 @@ export default function Landing() {
 
       <footer className="border-t border-line">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-          <div className="text-lg font-black tracking-tight">
+          <div className="font-display text-lg font-bold">
             XTRA-CASH. <span className="text-brand-gradient">Put out the fire.</span>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-4 text-xs text-muted">

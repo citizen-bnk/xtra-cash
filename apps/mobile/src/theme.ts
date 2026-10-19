@@ -1,13 +1,15 @@
-// XTRA-CASH brand colours (from the burning-wallet logo and the original website).
+// XTRA-CASH brand colours: Brand Guide 2026.
 export const colors = {
-  ink: '#1b1030',
-  ink2: '#2d1b4e',
-  brand: '#d91f63',
-  brandDark: '#b0154e',
-  purple: '#a617d3',
-  violet: '#5c2394',
+  ink: '#2a1640',
+  ink2: '#3f2660',
+  brand: '#b51d8a',
+  brandDark: '#891d95',
+  purple: '#5c2394',
+  violet: '#891d95',
+  coral: '#e55b51',
+  teal: '#2a9d8f',
   orange: '#fb9320',
-  brandSoft: '#fdeaf1',
+  brandSoft: '#f7e9f3',
   surface: '#faf8fc',
   line: '#ebe6f0',
   muted: '#6b6180',

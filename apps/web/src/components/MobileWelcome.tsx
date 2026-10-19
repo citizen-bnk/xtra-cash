@@ -22,7 +22,7 @@ export function MobileWelcome() {
 
   return (
     <section className="relative isolate flex min-h-[100svh] flex-col overflow-hidden bg-ink text-white md:hidden">
-      <div className="absolute -right-24 -top-24 -z-20 h-80 w-80 rounded-full bg-brand/40 blur-3xl" />
+      <div className="absolute -right-24 -top-24 -z-20 h-80 w-80 rounded-full bg-brand-purple/50 blur-3xl" />
       <div className="absolute -bottom-24 -left-16 -z-20 h-80 w-80 rounded-full bg-brand-orange/30 blur-3xl" />
       <video
         className="absolute inset-0 -z-10 h-full w-full object-cover opacity-80 motion-reduce:hidden"
@@ -105,7 +105,7 @@ export function MobileWelcome() {
             href="/register?type=CONSUMER"
             className={cx(
               'pressable flex h-14 w-full items-center justify-center rounded-2xl text-base font-bold',
-              showInstall ? 'bg-brand text-white' : 'bg-white text-ink',
+              showInstall ? 'bg-brand-orange text-ink' : 'bg-white text-ink',
             )}
           >
             Create a free account

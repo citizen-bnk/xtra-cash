@@ -2,9 +2,9 @@
 import { useState } from 'react';
 import { formatZAR } from '@xtra/shared';
 
-// Brand purple + a deepened brand orange. Validated with the dataviz palette checker (white surface):
-// both pass lightness, chroma, CVD, normal-vision and 3:1 contrast. The legend, hover values and totals row stay.
-const WALLET = '#a617d3';
+// Brand Guide 2026 chart colours: series 1 chart purple, series 2 chart orange. Labels stay in ink, not series colour.
+// The legend, hover values and totals row stay.
+const WALLET = '#7b3fb8';
 const CREDIT = '#e07a10';
 
 export function VolumeChart({ data }: { data: { date: string; walletCents: number; creditCents: number }[] }) {

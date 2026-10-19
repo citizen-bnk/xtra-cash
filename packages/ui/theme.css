@@ -1,17 +1,29 @@
 /* XTRA-CASH design tokens (Tailwind v4). Import after `@import "tailwindcss";`
- * Brand colours come from the XTRA-CASH logo (burning wallet) and the original website:
- * purple #5C2394 → magenta #B51D8A → pink #D91F63 → coral #E55B51 → orange #FB9320.
+ * Source of truth: XTRA-CASH Brand Guide 2026 (Google Drive: XTRA-CASH/Brand Kit 2026).
+ *   Wordmark gradient  #5C2394 #891D95 #B51D8A #E55B51 #FB9320  (wordmark and hero moments only)
+ *   Orange #FB9320 = calls to action     Deep purple #5C2394 = primary, headings
+ *   Violet #891D95 · Magenta #B51D8A = accent, highlights · Coral #E55B51 · Ink #2A1640 = text
+ *   Chart: purple #7B3FB8, orange #E07A10, magenta #B51D8A, teal #2A9D8F (positive)
+ *   Type: Fredoka for headings, big numbers and wordmark; Inter for body, tables, captions, UI.
  */
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --color-ink: #1b1030;
-  --color-ink-2: #2d1b4e;
-  --color-brand: #d91f63;
-  --color-brand-dark: #b0154e;
-  --color-brand-purple: #a617d3;
-  --color-brand-violet: #5c2394;
+  --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-fredoka), "Fredoka", ui-rounded, "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --color-ink: #2a1640;
+  --color-ink-2: #3f2660;
+  /* `brand` is the accent (magenta); calls to action use `brand-orange` (see Button `accent`). */
+  --color-brand: #b51d8a;
+  --color-brand-dark: #891d95;
+  --color-brand-purple: #5c2394;
+  --color-brand-violet: #891d95;
+  --color-brand-coral: #e55b51;
   --color-brand-orange: #fb9320;
-  --color-brand-soft: #fdeaf1;
+  --color-brand-orange-dark: #e07a10;
+  --color-brand-soft: #f7e9f3;
+  --color-chart-1: #7b3fb8;
+  --color-chart-2: #e07a10;
+  --color-chart-3: #b51d8a;
+  --color-chart-4: #2a9d8f;
   --color-surface: #faf8fc;
   --color-line: #ebe6f0;
   --color-muted: #6b6180;
@@ -20,24 +32,40 @@
 body {
   background: var(--color-surface);
   color: var(--color-ink);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+/* Fredoka for headings; deep purple on light surfaces, white wherever a section sets its own colour. */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  letter-spacing: 0;
+}
+h1, h2 {
+  color: var(--color-brand-purple);
+}
+.text-white h1, .text-white h2, h1.text-white, h2.text-white {
+  color: #fff;
+}
+.font-display {
+  font-family: var(--font-display);
 }
 
 /* Signature gradients (from the logo) */
 .bg-brand-gradient {
-  background-image: linear-gradient(135deg, #d91f63 0%, #a617d3 100%);
+  background-image: linear-gradient(135deg, #5c2394 0%, #b51d8a 100%);
 }
 .bg-brand-sunset {
-  background-image: linear-gradient(135deg, #5c2394 0%, #b51d8a 45%, #e55b51 75%, #fb9320 100%);
+  background-image: linear-gradient(135deg, #5c2394 0%, #891d95 25%, #b51d8a 50%, #e55b51 75%, #fb9320 100%);
 }
 .text-brand-gradient {
-  background-image: linear-gradient(90deg, #5c2394 0%, #b51d8a 45%, #e55b51 75%, #fb9320 100%);
+  background-image: linear-gradient(90deg, #5c2394 0%, #891d95 25%, #b51d8a 50%, #e55b51 75%, #fb9320 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 .text-brand-gradient-light {
-  background-image: linear-gradient(90deg, #d8a6ff 0%, #ff6fa8 50%, #ffb454 100%);
+  /* The same five stops, lifted so the wordmark stays legible on ink. */
+  background-image: linear-gradient(90deg, #c9a0f0 0%, #e08ae6 25%, #ff7cc8 50%, #ff8f85 75%, #ffb454 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

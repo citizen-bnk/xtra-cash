@@ -70,7 +70,7 @@ export function InstallSheet() {
       <button
         onClick={install}
         disabled={busy}
-        className="pressable flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-brand text-base font-bold text-white shadow-lg shadow-brand/30 disabled:opacity-60"
+        className="pressable flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-brand-orange text-base font-bold text-ink shadow-lg shadow-brand-orange/30 disabled:opacity-60"
       >
         <Download className="h-5 w-5" /> Install XTRA-CASH
       </button>
