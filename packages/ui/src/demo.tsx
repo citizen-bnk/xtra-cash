@@ -65,7 +65,7 @@ export function DemoAccounts({
   return (
     <Card className={cx('w-full p-5 sm:p-6', className)}>
       <div className="flex items-start gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-gradient text-white">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-purple text-white">
           <PlayCircle className="h-5 w-5" />
         </span>
         <div>

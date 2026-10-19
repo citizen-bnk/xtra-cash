@@ -66,7 +66,7 @@ export default function Landing() {
           </span>
           <h1 className="mt-5 text-5xl font-bold uppercase leading-[0.95] sm:text-7xl">
             Put out <br className="sm:hidden" />
-            the <span className="text-brand-gradient-light">fire.</span>
+            the <span className="text-white">fire.</span>
           </h1>
           <p className="mt-5 max-w-xl text-lg text-white/80 sm:text-xl">
             Money trouble spreads fast. XTRA-CASH stops it at the till, in seconds.
@@ -157,7 +157,7 @@ export default function Landing() {
             </Button>
           </Link>
         </div>
-        <div className="rounded-3xl bg-brand-sunset p-8 text-white">
+        <div className="rounded-3xl bg-brand-purple p-8 text-white">
           <Users className="h-7 w-7" />
           <h3 className="mt-4 text-2xl font-bold">Become a fire marshal</h3>
           <p className="mt-2 text-white/85">
@@ -172,7 +172,7 @@ export default function Landing() {
       <footer className="border-t border-line">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
           <div className="font-display text-lg font-bold">
-            XTRA-CASH. <span className="text-brand-gradient">Put out the fire.</span>
+            XTRA-CASH. <span className="text-brand-purple">Put out the fire.</span>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-4 text-xs text-muted">
             <div className="flex items-center gap-2">
