@@ -348,7 +348,7 @@ export function Logo({ light, mono, className, markOnly, size = 28 }: { light?: 
     <span className={cx('inline-flex max-w-full shrink-0 items-center', className)} role="img" aria-label="XTRA-CASH">
       <img src={markOnly ? '/brand/mark.png' : light || mono ? '/brand/lockup-white.png' : '/brand/lockup.png'} alt="" aria-hidden="true"
         width={markOnly ? size : 1920} height={markOnly ? size : 420}
-        style={{ width: markOnly ? size : 'auto', height: markOnly ? size : size + 12, maxWidth: '100%' }} className="object-contain" />
+        style={{ width: markOnly ? size : (size + 12) * 1920 / 420, height: markOnly ? size : 'auto', maxWidth: '100%' }} className="object-contain" />
     </span>
   );
 }
