@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/auth';
+import { NearbyLifecycle } from '../src/NearbyLifecycle';
 import { colors } from '../src/theme';
 
 export default function RootLayout() {
@@ -9,6 +10,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <StatusBar style="dark" />
+        <NearbyLifecycle />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }}>
           <Stack.Screen name="pay" options={{ presentation: 'modal', headerShown: true, title: 'Pay with XTRA-CASH' }} />
           <Stack.Screen name="kyc" options={{ headerShown: true, title: 'Verify your profile' }} />

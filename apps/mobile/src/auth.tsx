@@ -1,21 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import * as SecureStore from 'expo-secure-store';
-import { ApiError, XtraClient, type Me, type Tokens } from '@xtra/shared';
-
-const KEY = 'xtra.tokens';
-export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
-
-/** Tokens live in the device keychain / keystore, never in plain storage. */
-const store = {
-  async get(): Promise<Tokens | null> {
-    const raw = await SecureStore.getItemAsync(KEY);
-    return raw ? JSON.parse(raw) : null;
-  },
-  async set(t: Tokens | null) {
-    if (t) await SecureStore.setItemAsync(KEY, JSON.stringify(t));
-    else await SecureStore.deleteItemAsync(KEY);
-  },
-};
+import { ApiError, XtraClient, type Me } from '@xtra/shared';
+import { API_URL, tokenStore as store } from './session';
+export { API_URL } from './session';
 
 interface Ctx {
   client: XtraClient;
@@ -53,6 +39,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshMe]);
 
   const logout = useCallback(async () => {
+    const { unregisterNearbyDevice } = await import('./nearby');
+    await unregisterNearbyDevice().catch(() => {});
     await client.auth.logout();
     setMe(null);
   }, [client]);

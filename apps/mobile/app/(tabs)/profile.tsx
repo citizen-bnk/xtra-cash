@@ -10,6 +10,7 @@ export default function Profile() {
   return (
     <Screen>
       <H1>Profile</H1>
+      {me.roles.includes('CONSUMER') && <Button title="Offers near you & notification choices" variant="secondary" onPress={() => router.push('/nearby')} />}
       <Card>
         <Row k="Name" v={`${me.firstName} ${me.lastName}`} />
         <Row k="Email" v={me.email} />

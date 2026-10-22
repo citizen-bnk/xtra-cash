@@ -1,0 +1,9 @@
+{
+  "cli": { "appVersionSource": "remote" },
+  "build": {
+    "development": { "developmentClient": true, "distribution": "internal", "env": { "EXPO_PUBLIC_API_URL": "https://xtra-cash-api.vercel.app", "EXPO_PUBLIC_WEB_URL": "https://xtra-cash.vercel.app" } },
+    "preview": { "distribution": "internal", "env": { "EXPO_PUBLIC_API_URL": "https://xtra-cash-api.vercel.app", "EXPO_PUBLIC_WEB_URL": "https://xtra-cash.vercel.app" } },
+    "production": { "autoIncrement": true, "env": { "EXPO_PUBLIC_API_URL": "https://xtra-cash-api.vercel.app", "EXPO_PUBLIC_WEB_URL": "https://xtra-cash.vercel.app" } }
+  },
+  "submit": { "production": {} }
+}

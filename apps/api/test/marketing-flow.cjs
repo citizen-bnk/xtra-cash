@@ -1,0 +1,41 @@
+require('reflect-metadata');
+const assert=require('node:assert/strict'),path=require('node:path');
+const {PGlite}=require('@electric-sql/pglite'),{drizzle}=require('drizzle-orm/pglite'),{migrate}=require('drizzle-orm/pglite/migrator'),{eq}=require('drizzle-orm');
+const {Test}=require('@nestjs/testing'),request=require('supertest');
+process.env.JWT_SECRET='isolated-marketing-secret-more-than-32';process.env.RATE_LIMIT_PER_MIN='100000';process.env.DEMO_MODE='false';
+const RealDate=Date,fixed=+new RealDate('2026-10-22T10:00:00Z');global.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[fixed]));}static now(){return fixed;}};
+const schema=require('../dist/db/schema'),{AppModule}=require('../dist/app.module'),{configureApp}=require('../dist/setup'),{AuthService}=require('../dist/auth/auth.service'),{PushService}=require('../dist/marketing/push.service');
+(async()=>{const pg=new PGlite(),db=drizzle(pg,{schema});await migrate(db,{migrationsFolder:path.join(__dirname,'../drizzle')});let sends=0;
+ const module=await Test.createTestingModule({imports:[AppModule]}).overrideProvider('DB_BUNDLE').useValue({db,pool:{end:()=>pg.close()}}).overrideProvider(PushService).useValue({configuration:()=>({webPush:true,nativePush:true,vapidPublicKey:'test'}),send:async()=>{sends++;return {status:'ACCEPTED'};}}).compile();
+ const app=module.createNestApplication({logger:false});configureApp(app);await app.listen(0,'127.0.0.1');const http=()=>request(app.getHttpServer());
+ try{
+ const people=await db.insert(schema.users).values(['LENDER','LENDER','CONSUMER'].map((role,i)=>({email:`campaign${i}@example.test`,firstName:'Test',lastName:'Account',roles:[role],referralCode:`MC${i}`}))).returning();
+ const headers=await Promise.all(people.map(async u=>({Authorization:`Bearer ${(await app.get(AuthService).issueTokens(u)).accessToken}`})));
+ const orgs=await db.insert(schema.lenderOrgs).values(people.slice(0,2).map((u,i)=>({ownerUserId:u.id,name:`Private lender ${i}`,contactEmail:u.email,contactPhone:'+27820000000',accreditationStatus:'ACCREDITED'}))).returning();
+ const target={latitude:-26.034,longitude:28.046,radiusMeters:500,label:'Isolated test venue'};
+ const base={productType:'PERSONAL',name:'Test offer',description:'Test',monthlyInterestRateBps:200,termMonths:6,initiationFeeCents:0,monthlyServiceFeeCents:0,minAmountCents:50000,maxAmountPerUserCents:300000,minMonthlyIncomeCents:0,minCreditScore:0,minAge:18,maxAge:100,employmentStatuses:[],provinces:[],active:true,locationTarget:target};
+ await http().post('/lender/offers').set(headers[0]).send({...base,locationTarget:{...target,radiusMeters:501}}).expect(400);
+ await http().post('/lender/offers').set(headers[0]).send({...base,locationTarget:{...target,latitude:100}}).expect(400);
+ const offers=[];for(let i=0;i<3;i++)offers.push((await http().post('/lender/offers').set(headers[0]).send({...base,name:'Offer '+i}).expect(201)).body);
+ await http().get('/lender/marketing/campaigns').set(headers[2]).expect(403);
+ const campaigns=[];
+ for(const offer of [...offers,offers[0]]){const input={offerId:offer.id,title:'Test campaign',message:'A nearby offer is available.',startsAt:new Date().toISOString(),endsAt:new Date(fixed+86400000).toISOString()};await http().post('/lender/marketing/campaigns').set(headers[1]).send(input).expect(404);const c=(await http().post('/lender/marketing/campaigns').set(headers[0]).send(input).expect(201)).body;campaigns.push(c);await http().get('/campaigns/'+c.id).expect(404);await http().put(`/lender/marketing/campaigns/${c.id}/status`).set(headers[1]).send({status:'ACTIVE'}).expect(404);await http().put(`/lender/marketing/campaigns/${c.id}/status`).set(headers[0]).send({status:'ACTIVE'}).expect(200);const pub=(await http().get('/campaigns/'+c.id).expect(200)).body;assert(!JSON.stringify(pub).includes('Private lender'));}
+ const consumer=people[2],point={latitude:target.latitude,longitude:target.longitude,accuracy:5,capturedAt:new Date().toISOString()};
+ await http().post('/marketing/location').set(headers[2]).send(point).expect(403);
+ await http().put('/marketing/preferences').set(headers[2]).send({marketing:true,locationEnabled:true}).expect(200);
+ await http().post('/marketing/devices').set(headers[2]).send({platform:'WEB',payload:{endpoint:'http://127.0.0.1/internal',keys:{}}}).expect(400);
+ await http().post('/marketing/devices').set(headers[2]).send({platform:'EXPO',payload:{token:'ExpoPushToken[isolatedTestDevice12345]'}}).expect(201);
+ assert.equal((await http().post('/marketing/location').set(headers[2]).send(point).expect(201)).body.needsVerification,true);assert.equal(sends,0);
+ await db.insert(schema.kycProfiles).values({userId:consumer.id,idNumber:'TEST-ONLY-CONSUMER',dateOfBirth:new Date('1990-01-01'),province:'Gauteng',employmentStatus:'EMPLOYED_FULL_TIME',monthlyIncomeCents:1000000,monthlyExpensesCents:300000,status:'VERIFIED',consentAt:new Date()});
+ await db.insert(schema.personalVerifications).values({userId:consumer.id,identityType:'PASSPORT',identityNumber:'TEST0001',mobile:'+27820000001',address:'123 Isolated Test Road',identityFileKey:'isolated-id',addressFileKey:'isolated-address',status:'VERIFIED',consentAt:new Date()});
+ assert.equal((await http().post('/marketing/location').set(headers[2]).send({...point,accuracy:1000}).expect(201)).body.offers.length,0);assert.equal(sends,0);
+ await http().post('/marketing/location').set(headers[2]).send({...point,capturedAt:new Date(fixed-600000).toISOString()}).expect(400);
+ await Promise.all(Array.from({length:6},()=>http().post('/marketing/location').set(headers[2]).send(point).expect(201)));
+ assert.equal(sends,2);const deliveries=await db.query.marketingDeliveries.findMany();assert.equal(deliveries.length,2);assert.equal(new Set(deliveries.map(d=>d.offerId)).size,2);
+ const stored=await db.query.marketingMembers.findFirst();assert(!stored.locationEncrypted.includes(String(target.latitude)));
+ assert.equal((await http().get('/lender/marketing/campaigns').set(headers[1]).expect(200)).body.length,0);
+ await http().post(`/marketing/campaigns/${campaigns[0].id}/events`).set(headers[2]).send({kind:'SHARE'}).expect(201);await http().post(`/marketing/campaigns/${campaigns[0].id}/events`).set(headers[2]).send({kind:'SHARE'}).expect(201);assert.equal((await db.query.marketingEvents.findMany()).length,1);
+ await http().put('/marketing/preferences').set(headers[2]).send({marketing:false,locationEnabled:false}).expect(200);const withdrawn=await db.query.marketingMembers.findFirst();assert.equal(withdrawn.locationEncrypted,null);assert.equal((await db.query.marketingDevices.findFirst()).active,false);await http().post('/marketing/location').set(headers[2]).send(point).expect(403);
+ console.log('PASS: migrations, location validation, lender isolation, campaign activation, public privacy, consent gates, push SSRF prevention, verification gates, encrypted GPS, accuracy, stale readings, concurrent daily limits, per-offer dedupe, event dedupe and consent withdrawal. All dispatches isolated.');
+ }finally{await app.close();}
+})().catch(e=>{console.error(e.message);process.exitCode=1});

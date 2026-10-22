@@ -16,6 +16,7 @@ import { HealthController } from './health.controller';
 import { JobsService } from './common/jobs.service';
 import { JobsController } from './common/jobs.controller';
 import { PersonalLoanModule } from './personal-loans/personal.module';
+import { MarketingModule } from './marketing/marketing.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { PersonalLoanModule } from './personal-loans/personal.module';
     AdminModule,
     CardNetworkModule,
     PersonalLoanModule,
+    MarketingModule,
   ],
   controllers: [HealthController, JobsController],
   providers: [

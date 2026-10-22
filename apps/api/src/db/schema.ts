@@ -196,6 +196,7 @@ export const loanOffers = pgTable(
     lenderId: text('lender_id').notNull().references(() => lenderOrgs.id),
     name: text('name').notNull(),
     description: text('description'),
+    locationTarget: jsonb('location_target').$type<import('@xtra/shared').LocationTarget | null>(),
     productType: text('product_type').$type<'BNPL' | 'PERSONAL'>().notNull().default('BNPL'),
     active: boolean('active').notNull().default(true),
     monthlyInterestRateBps: integer('monthly_interest_rate_bps').notNull(),
@@ -499,3 +500,44 @@ export const storedFiles = pgTable('stored_files', {
   content: bytea('content').notNull(),
   createdAt: createdAt(),
 });
+
+// Consent is separate from lending/KYC. Keep only the latest encrypted location.
+export const marketingMembers = pgTable('marketing_members', {
+  userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  marketing: boolean('marketing').notNull().default(false),
+  locationEnabled: boolean('location_enabled').notNull().default(false),
+  locationEncrypted: text('location_encrypted'),
+  locatedAt: ts('located_at'),
+  consentAt: ts('consent_at'),
+});
+export const marketingDevices = pgTable('marketing_devices', {
+  id: id(), userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  deviceKey: text('device_key').notNull().unique(),
+  platform: text('platform').notNull(), payloadEncrypted: text('payload_encrypted').notNull(),
+  active: boolean('active').notNull().default(true), createdAt: createdAt(),
+});
+export const offerCampaigns = pgTable('offer_campaigns', {
+  id: id(), lenderId: text('lender_id').notNull().references(() => lenderOrgs.id),
+  offerId: text('offer_id').notNull().references(() => loanOffers.id),
+  title: text('title').notNull(), message: text('message').notNull(),
+  target: jsonb('target').$type<import('@xtra/shared').LocationTarget>().notNull(),
+  status: text('status').notNull().default('DRAFT'),
+  startsAt: ts('starts_at').notNull(), endsAt: ts('ends_at').notNull(), createdAt: createdAt(),
+}, t => [index('campaigns_lender_idx').on(t.lenderId), index('campaigns_status_idx').on(t.status)]);
+export const marketingDeliveries = pgTable('marketing_deliveries', {
+  id: id(), userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  campaignId: text('campaign_id').notNull().references(() => offerCampaigns.id),
+  offerId: text('offer_id').notNull().references(() => loanOffers.id),
+  day: text('day').notNull(), status: text('status').notNull().default('RESERVED'),
+  createdAt: createdAt(),
+}, t => [uniqueIndex('marketing_member_offer_day').on(t.userId, t.offerId, t.day), index('marketing_member_day').on(t.userId, t.day)]);
+export const marketingReceipts = pgTable('marketing_receipts', {
+  id: id(), deliveryId: text('delivery_id').notNull().references(() => marketingDeliveries.id),
+  deviceId: text('device_id').notNull().references(() => marketingDevices.id),
+  ticketId: text('ticket_id'), status: text('status').notNull(), createdAt: createdAt(),
+});
+export const marketingEvents = pgTable('marketing_events', {
+  id: id(), campaignId: text('campaign_id').notNull().references(() => offerCampaigns.id),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(), createdAt: createdAt(),
+}, t => [uniqueIndex('marketing_event_member_kind').on(t.campaignId, t.userId, t.kind)]);

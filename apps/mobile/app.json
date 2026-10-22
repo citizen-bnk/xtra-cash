@@ -30,7 +30,17 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Use your location to find nearby XTRA-CASH offers when you opt in.",
+          "locationAlwaysAndWhenInUsePermission": "With your permission, detect arrival near offer locations while XTRA-CASH is closed.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": false

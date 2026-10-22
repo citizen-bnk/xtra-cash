@@ -3,14 +3,14 @@ import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, ArrowRight, LockKeyhole } from 'lucide-react';
-import { formatZAR } from '@xtra/shared';
 import { Alert, Button, Card, Field, Input, Select, useAuth } from '@xtra/ui';
+import { LoanAmountSlider, LoanTermSlider } from '@/components/LoanSliders';
 import { AuthPageShell } from '@/components/AuthPageShell';
 
 function LoanStart() {
   const params = useSearchParams(), { client, me } = useAuth();
   const [mode, setMode] = useState(params.get('start') === 'identity' ? 'identity' : 'amount');
-  const [step, setStep] = useState(0), [amount, setAmount] = useState<number | null>(100000), [term, setTerm] = useState(6);
+  const [step, setStep] = useState(0), [amount, setAmount] = useState<number | null>(() => { const v = Number(params.get('amountCents')); return Number.isInteger(v) && v >= 50000 && v <= 10000000 ? v : 100000; }), [term, setTerm] = useState(() => { const v = Number(params.get('termMonths')); return Number.isInteger(v) && v >= 1 && v <= 24 ? v : 6; });
   const [type, setType] = useState<'ID' | 'PASSPORT'>('ID'), [number, setNumber] = useState(''), [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [result, setResult] = useState<string | null>(null);
   const showIdentity = mode === 'identity' || step === 1;
@@ -18,12 +18,13 @@ function LoanStart() {
     setError(null);
     if (!showIdentity) {
       if (!amount || amount < 50000 || amount > 10000000 || !Number.isInteger(term) || term < 1 || term > 24) { setError('Choose R500–R100,000 and a period from 1 to 24 months.'); return; }
+      sessionStorage.setItem('xtra-personal-request', JSON.stringify({ amountCents: amount, termMonths: term, selectedAt: Date.now() }));
       setStep(1); return;
     }
     setBusy(true);
     try {
       const r = await client.request<{ message: string }>('POST', '/personal-loans/precheck', { identityType: type, identityNumber: number, consent, ...(mode === 'amount' ? { amountCents: amount, termMonths: term } : {}) });
-      sessionStorage.setItem('xtra-personal-request', JSON.stringify({ amountCents: mode === 'amount' ? amount : 100000, termMonths: mode === 'amount' ? term : 6 }));
+      if (mode === 'amount') sessionStorage.setItem('xtra-personal-request', JSON.stringify({ amountCents: amount, termMonths: term, selectedAt: Date.now() }));
       setResult(r.message); setNumber('');
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not check product availability'); }
     finally { setBusy(false); }
@@ -34,7 +35,7 @@ function LoanStart() {
       {step === 0 && <div className="grid grid-cols-2 gap-2"><Button type="button" variant={mode === 'identity' ? 'primary' : 'secondary'} onClick={() => setMode('identity')}>Start with my ID</Button><Button type="button" variant={mode === 'amount' ? 'primary' : 'secondary'} onClick={() => setMode('amount')}>Choose amount first</Button></div>}
       <h2 className="text-xl font-bold">{showIdentity ? 'What is your ID or passport number?' : 'How much, and over how long?'}</h2>
       {showIdentity ? <><Field label="Document type"><Select value={type} onChange={e => { setType(e.target.value as 'ID' | 'PASSPORT'); setNumber(''); }}><option value="ID">South African ID</option><option value="PASSPORT">Passport</option></Select></Field><Field label={type === 'ID' ? 'ID number' : 'Passport number'} hint="Used for a format check, never sent to the AI assistant."><Input autoComplete="off" required value={number} maxLength={type === 'ID' ? 13 : 20} onChange={e => setNumber(e.target.value.replace(/\s/g, '').toUpperCase())} /></Field><label className="flex items-start gap-2 text-sm"><input className="mt-1" type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /><span>I consent to this document format check and product search. Identity verification will follow when I apply.</span></label></>
-      : <><Field label="Amount"><output className="block font-display text-3xl font-bold tabular-nums text-brand-purple">{formatZAR(amount ?? 100000, { decimals: false })}</output><input type="range" aria-label="Loan amount" aria-valuetext={formatZAR(amount ?? 100000, { decimals: false })} min={500} max={100000} step={100} value={(amount ?? 100000) / 100} onChange={e => setAmount(Number(e.target.value) * 100)} className="h-11 w-full cursor-pointer accent-brand-purple focus-visible:rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-purple" /><span aria-hidden="true" className="flex justify-between text-xs text-muted"><span>R500</span><span>R100,000</span></span></Field><Field label="Loan period in months"><output className="block font-display text-3xl font-bold tabular-nums text-brand-purple">{term} {term === 1 ? 'month' : 'months'}</output><input type="range" aria-label="Loan period in months" aria-valuetext={`${term} ${term === 1 ? 'month' : 'months'}`} min={1} max={24} step={1} value={term} onChange={e => setTerm(Number(e.target.value))} className="h-11 w-full cursor-pointer accent-brand-purple focus-visible:rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-purple" /><span aria-hidden="true" className="flex justify-between text-xs text-muted"><span>1 month</span><span>24 months</span></span></Field></>}
+      : <><LoanAmountSlider amount={amount} onChange={setAmount} /><LoanTermSlider term={term} onChange={setTerm} /></>}
       {error && <Alert tone="red">{error}</Alert>}<div className="flex items-center justify-between gap-2">{step > 0 ? <Button type="button" variant="ghost" onClick={() => setStep(0)}><ArrowLeft className="h-4 w-4" /> Back</Button> : <span />}<Button loading={busy} disabled={showIdentity && !consent}>{showIdentity ? 'Check availability' : 'Continue'}<ArrowRight className="h-4 w-4" /></Button></div>
     </form>}
     <p className="mt-5 flex items-center gap-1.5 text-xs text-muted"><LockKeyhole className="h-3.5 w-3.5" /> No lender names or approval promises before verification.</p>

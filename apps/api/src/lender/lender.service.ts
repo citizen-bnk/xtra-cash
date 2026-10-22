@@ -231,6 +231,8 @@ export class LenderService {
 
   // ---------------- offers ----------------
   private validateOffer(dto: Partial<Record<keyof OfferDto, unknown>> & Partial<Pick<OfferDto, "monthlyInterestRateBps" | "monthlyServiceFeeCents" | "minAmountCents" | "maxAmountPerUserCents" | "minAge" | "maxAge">>, s: PlatformSettings) {
+    const target = dto.locationTarget as OfferDto['locationTarget'];
+    if (target && target.radiusMeters % 50 !== 0) throw new BadRequestException('Choose a radius in 50-metre increments');
     if (dto.monthlyInterestRateBps !== undefined && dto.monthlyInterestRateBps > s.maxRateBps) {
       throw new BadRequestException(`Monthly interest may not exceed ${s.maxRateBps / 100}% (platform cap)`);
     }

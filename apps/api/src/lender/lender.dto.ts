@@ -12,7 +12,10 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { LocationTargetDto } from '../marketing/marketing.dto';
 import { DocumentType, EmploymentStatus, PROVINCES } from '@xtra/shared';
 
 export class LenderOrgDto {
@@ -47,6 +50,7 @@ export class CriteriaDto {
 }
 
 export class OfferDto extends CriteriaDto {
+  @IsOptional() @ValidateNested() @Type(() => LocationTargetDto) locationTarget?: LocationTargetDto | null;
   @IsOptional() @IsIn(['BNPL', 'PERSONAL']) productType?: 'BNPL' | 'PERSONAL';
   @IsString() @MinLength(2) @MaxLength(80) name: string;
   @IsOptional() @IsString() @MaxLength(500) description?: string;

@@ -9,6 +9,7 @@ const NAV = [
   { href: '/lender/accreditation', label: 'Accreditation', short: 'Accredit', icon: BadgeCheck },
   { href: '/lender/funds', label: 'Funds', icon: Banknote },
   { href: '/lender/offers', label: 'Offers & criteria', short: 'Offers', icon: Tags },
+  { href: '/lender/campaigns', label: 'Nearby campaigns', short: 'Campaigns', icon: Tags },
   { href: '/lender/loans', label: 'Loan book', short: 'Loans', icon: FileStack },
   { href: '/lender/applications', label: 'Loan applications', short: 'Applications', icon: FileStack },
 ];

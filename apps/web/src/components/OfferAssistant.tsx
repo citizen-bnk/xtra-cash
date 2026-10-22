@@ -4,6 +4,8 @@ import { ArrowUp, ArrowUpRight, Bot, FilePenLine, LockKeyhole, Sparkles } from '
 import { bpsToPercent, formatZAR, type OfferAssistantResponse, type OfferInput } from '@xtra/shared';
 import { Alert, Badge, Button, cx, useApi, useAuth } from '@xtra/ui';
 import { Message, MessageContent, MessageResponse } from './ai-elements/message';
+import { LocationTargetPicker } from './LocationTargetPicker';
+import type { LocationTarget } from '@xtra/shared';
 
 const goals = ['Improve my loan book', 'Grow sustainable returns', 'Create a personal loan offer'];
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
@@ -13,6 +15,8 @@ export function OfferAssistant({ onReview, onManual }: { onReview: (draft: Offer
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: 'assistant', content: 'Let’s build an offer that works for your business and your borrowers. What would you like to improve: returns, the quality of your loan book, or your reach? Tell me whether it’s for BNPL or personal loans.' }]);
   const [text, setText] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<OfferAssistantResponse | null>(null);
+  const [locationTarget, setLocationTarget] = useState<LocationTarget | null>(null);
+  const [suggestion, setSuggestion] = useState<{ query: string; radiusMeters: number } | null>(null);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: 'nearest' }); }, [messages, busy]);
   async function send(value = text) {
@@ -23,6 +27,7 @@ export function OfferAssistant({ onReview, onManual }: { onReview: (draft: Offer
       const r = await client.lender.assistOffer(next.slice(-12).map(m => ({ ...m, content: m.content.slice(0, 2000) })));
       setMessages([...next, { role: 'assistant', content: r.message }]);
       setDraft(r.draft ? r : null);
+      if (r.advertisingArea) setSuggestion(r.advertisingArea);
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not reach the assistant'); }
     finally { setBusy(false); }
   }
@@ -56,10 +61,11 @@ export function OfferAssistant({ onReview, onManual }: { onReview: (draft: Offer
           </div>
           {draft.example && <div className="mt-5 rounded-2xl border border-line bg-white p-4 text-sm"><p className="font-semibold">Example on {formatZAR(draft.example.principalCents)}</p><p className="mt-2">{draft.draft.termMonths} × {formatZAR(draft.example.monthlyInstallmentCents)}</p><p className="text-muted">Total repayment {formatZAR(draft.example.totalRepayableCents)}</p><div className="mt-3 border-t border-line pt-3"><p className="text-xs text-muted">Lender surplus after platform share</p><b>{formatZAR(draft.example.lenderRevenueCents)}</b><p className="mt-1 text-xs text-muted">Before funding, operating costs and credit losses. At a hypothetical 5% loss of principal: {formatZAR(draft.example.lenderRevenueCents - Math.round(draft.example.principalCents * .05))}.</p></div></div>}
           <p className="my-4 text-xs text-muted">{draft.eligibleConsumers} of {draft.totalConsumers} verified shoppers meet the criteria, before affordability. This is a scenario, not a profit forecast.</p>
-          <Button onClick={() => onReview(draft.draft!)} className="w-full">Review & save draft <ArrowUpRight className="h-4 w-4" /></Button>
+          <Button onClick={() => onReview({ ...draft.draft!, locationTarget })} className="w-full">Review & save draft <ArrowUpRight className="h-4 w-4" /></Button>
         </> : <><Badge tone="brand">Built around your book</Badge><h3 className="mt-3 text-lg font-bold">Better lending starts with a better plan.</h3><p className="mt-2 text-sm leading-relaxed text-muted">Explore pricing, loan periods and lending limits together. Your assistant explains the trade-offs, then prepares a draft for your review.</p><div className="mt-6 space-y-4"><Metric label="Available to lend" value={book.data ? formatZAR(book.data.availableCents) : '—'} /><Metric label="Active loans" value={book.data?.activeLoans ?? '—'} /><Metric label="Loans in arrears" value={book.data ? `${book.data.loansInArrears} of ${book.data.activeLoans}` : '—'} /></div><p className="mt-6 text-xs text-muted">Nothing is changed or published without you saving it.</p></>}
       </aside>
     </div>
+    <div className="border-t border-line p-5"><LocationTargetPicker value={locationTarget} onChange={setLocationTarget} suggestion={suggestion} /></div>
   </section>;
 }
 function Metric({ label, value }: { label: string; value: React.ReactNode }) { return <div><div className="text-xs text-muted">{label}</div><div className="mt-1 font-semibold">{value}</div></div>; }

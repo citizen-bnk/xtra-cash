@@ -5,6 +5,7 @@ import { CreditCard, Home, ListOrdered, ReceiptText, ScanLine, UserRound } from 
 import { cx, Logo, useAuth } from '@xtra/ui';
 import { RequireRole } from '@/lib/guard';
 import { PAY_EVENT } from '@/lib/pay-event';
+import { MarketingLocationObserver } from '@/components/MarketingLocationObserver';
 
 const NAV = [
   { href: '/app', label: 'Home', icon: Home, exact: true },
@@ -49,6 +50,7 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
 
   return (
     <RequireRole roles={['CONSUMER', 'AFFILIATE', 'LENDER']}>
+      <MarketingLocationObserver />
       <div className="min-h-[100dvh] pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:pb-0">
         <header className="safe-pt sticky top-0 z-30 border-b border-line/70 bg-white/90 backdrop-blur-md">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5 md:py-3">

@@ -19,7 +19,8 @@
     "test:lender": "node test/lender-performance.cjs",
     "test:access": "node test/access-flow.cjs && node test/browser-session.cjs",
     "test:esm": "node --no-experimental-require-module test/esm-load.cjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:marketing": "node test/marketing-flow.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",
@@ -43,7 +44,8 @@
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
@@ -60,7 +62,8 @@
     "ts-jest": "^29.4.14",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@types/web-push": "^3.6.4"
   },
   "jest": {
     "moduleFileExtensions": [

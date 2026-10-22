@@ -79,6 +79,7 @@ export interface OfferCriteria {
 }
 
 export interface LoanOffer extends OfferCriteria {
+  locationTarget?: LocationTarget | null;
   productType?: 'BNPL' | 'PERSONAL';
   id: string;
   lenderId: string;
@@ -94,6 +95,9 @@ export interface LoanOffer extends OfferCriteria {
   createdAt: string;
   lender?: { id: string; name: string };
 }
+
+export interface LocationTarget { latitude: number; longitude: number; radiusMeters: number; label: string; placeId?: string; }
+export interface NearbyCampaign { id: string; title: string; message: string; place: string; radiusMeters: number; offerId: string; productType: string; minAmountCents: number; maxAmountCents: number; termMonths: number; }
 
 export interface PersonalLoanInput {
   amountCents: number;
@@ -122,6 +126,7 @@ export interface PersonalVerification {
   address?: string; createdAt?: string;
 }
 export interface OfferAssistantResponse {
+  advertisingArea?: { query: string; radiusMeters: number } | null;
   id: string; message: string; draft: import('./client').OfferInput | null;
   model: string; eligibleConsumers?: number; totalConsumers?: number;
   example?: { principalCents: number; monthlyInstallmentCents: number; totalRepayableCents: number; costOfCreditCents: number; lenderRevenueCents: number };

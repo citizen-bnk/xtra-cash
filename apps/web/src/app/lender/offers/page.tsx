@@ -4,6 +4,7 @@ import { Pencil, Plus, Users } from 'lucide-react';
 import { bpsToPercent, EMPLOYMENT_LABELS, EmploymentStatus, formatZAR, PROVINCES, quoteLoan, type LoanOffer, type OfferInput } from '@xtra/shared';
 import { Alert, Badge, Button, Card, cx, Empty, Field, Input, Loading, Modal, MoneyInput, PageHeader, Textarea, useAction, useApi, useAuth, useToast } from '@xtra/ui';
 import { OfferAssistant } from '@/components/OfferAssistant';
+import { LocationTargetPicker } from '@/components/LocationTargetPicker';
 
 const blank: OfferInput = {
   productType: 'BNPL',
@@ -72,6 +73,7 @@ export default function OffersPage() {
                 <Kv k="Age" v={`${o.minAge}–${o.maxAge}`} />
               </div>
               <div className="mt-3 flex flex-wrap gap-1">
+                {o.locationTarget && <Badge tone="brand">{o.locationTarget.label} · {o.locationTarget.radiusMeters} m adverts</Badge>}
                 {(o.employmentStatuses.length ? o.employmentStatuses.map((e) => EMPLOYMENT_LABELS[e]) : ['Any employment']).map((x) => <Badge key={x}>{x}</Badge>)}
                 {(o.provinces.length ? o.provinces : ['All provinces']).map((x) => <Badge key={x} tone="blue">{x}</Badge>)}
               </div>
@@ -143,7 +145,7 @@ function OfferEditor({ offer, draft, onClose, onSaved }: { offer: LoanOffer | nu
   }, [client, f.minMonthlyIncomeCents, f.minCreditScore, f.minAge, f.maxAge, f.employmentStatuses, f.provinces]);
 
   const save = useAction(async () => {
-    const { id: _i, lenderId: _l, createdAt: _c, lender: _x, ...payload } = f as any;
+    const { id: _i, lenderId: _l, createdAt: _c, updatedAt: _u, lender: _x, ...payload } = f as any;
     if (offer) await client.lender.updateOffer(offer.id, payload);
     else await client.lender.createOffer(payload);
     onSaved();
@@ -162,6 +164,7 @@ function OfferEditor({ offer, draft, onClose, onSaved }: { offer: LoanOffer | nu
         <Field label="Product"><select className="h-10 w-full rounded-xl border border-line px-3 text-sm" value={f.productType} onChange={e => setF({ ...f, productType: e.target.value as 'BNPL' | 'PERSONAL' })}><option value="BNPL">BNPL · card purchases</option><option value="PERSONAL">Personal loan · application & review</option></select></Field>
         <Field label="Offer name"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Everyday Xtra" /></Field>
         <Field label="Description (shown to shoppers)"><Textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
+        <LocationTargetPicker value={f.locationTarget ?? null} onChange={locationTarget => setF({ ...f, locationTarget })} />
         <div className="text-xs font-bold uppercase tracking-wide text-muted">Pricing</div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Interest % per month" hint={caps.data ? `Max ${bpsToPercent(caps.data.maxRateBps)}` : undefined}>

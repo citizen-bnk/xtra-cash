@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, FileCheck, LockKeyhole } from 'lucide-react';
 import { ApiError, EMPLOYMENT_LABELS, EmploymentStatus, PROVINCES, formatZAR, parseSaId, type PersonalLoanApplication, type PersonalLoanInput, type PersonalLoanMatch } from '@xtra/shared';
 import { Alert, Button, Card, Field, Input, Loading, MoneyInput, Select, StatusBadge, useApi, useAuth } from '@xtra/ui';
+import { LoanAmountSlider, LoanTermSlider } from './LoanSliders';
 import { SavedLoanDetails } from './SavedLoanDetails';
 import { conversationalMoney, conversationalTerm } from '@/lib/loan-conversation';
-type Profile = { firstName: string; lastName: string; identityType: 'ID' | 'PASSPORT'; identityNumber: string; identityStatus: string; dateOfBirth: string; province: string; employment: EmploymentStatus | ''; mobile: string; address: string; income: number | null; expenses: number | null; financialUpdatedAt: string | null; draft: Partial<{ idempotencyKey: string; amount: number; term: number; purpose: string; income: number; expenses: number; identityType: 'ID' | 'PASSPORT'; identityNumber: string; dob: string; province: string; employment: EmploymentStatus; mobile: string; address: string }> };
+type Profile = { firstName: string; lastName: string; identityType: 'ID' | 'PASSPORT'; identityNumber: string; identityStatus: string; dateOfBirth: string; province: string; employment: EmploymentStatus | ''; mobile: string; address: string; income: number | null; expenses: number | null; financialUpdatedAt: string | null; draftUpdatedAt?: string | null; draft: Partial<{ idempotencyKey: string; amount: number; term: number; purpose: string; income: number; expenses: number; identityType: 'ID' | 'PASSPORT'; identityNumber: string; dob: string; province: string; employment: EmploymentStatus; mobile: string; address: string }> };
 
 const PURPOSES = ['Home & repairs', 'Education', 'Medical', 'Transport', 'Debt consolidation', 'Other'];
 type Step = 'amount' | 'term' | 'purpose' | 'income' | 'expenses' | 'identity' | 'dob' | 'province' | 'employment' | 'mobile' | 'address' | 'identityDoc' | 'addressDoc' | 'review';
@@ -50,7 +51,16 @@ export function PersonalLoanFlow() {
     setIdentityType(p.identityNumber ? p.identityType : d.identityType || 'ID'); setIdentityNumber(p.identityNumber || d.identityNumber || ''); setDob(p.dateOfBirth || d.dob || '');
     if (d.amount) setAmount(d.amount); if (d.term) setTerm(d.term); if (d.purpose) setPurpose(d.purpose);
     setKnownRequest({ amount: !!d.amount, term: !!d.term, purpose: !!d.purpose?.trim() });
-    try { const stored = JSON.parse(sessionStorage.getItem('xtra-personal-request') ?? 'null'); if (stored?.amountCents >= 50000 && stored.amountCents <= 10000000) { setAmount(stored.amountCents); setKnownRequest(s => ({ ...s, amount: true })); } if (stored?.termMonths >= 1 && stored.termMonths <= 24) { setTerm(stored.termMonths); setKnownRequest(s => ({ ...s, term: true })); } sessionStorage.removeItem('xtra-personal-request'); } catch { /* Start with defaults. */ }
+    try {
+      const raw = sessionStorage.getItem('xtra-personal-request'), stored = JSON.parse(raw ?? 'null');
+      const newer = !stored?.selectedAt || stored.selectedAt >= new Date(p.draftUpdatedAt || 0).getTime();
+      if (stored && newer && stored.amountCents >= 50000 && stored.amountCents <= 10000000 && Number.isInteger(stored.termMonths) && stored.termMonths >= 1 && stored.termMonths <= 24) {
+        setAmount(stored.amountCents); setTerm(stored.termMonths); setKnownRequest(s => ({ ...s, amount: true, term: true }));
+        // Save the handoff before the summary so a reload never loses the selection.
+        saves.current = client.request('PUT', '/me/service-profile/draft', { answers: { ...d, idempotencyKey: key.current, amount: stored.amountCents, term: stored.termMonths } }).then(() => { if (sessionStorage.getItem('xtra-personal-request') === raw) sessionStorage.removeItem('xtra-personal-request'); }).catch(() => setDraftError('Your selected amount and period have not saved yet. Keep this page open and retry.'));
+      } else if (stored && !newer) sessionStorage.removeItem('xtra-personal-request');
+    } catch { /* Keep the account draft if browser storage is unavailable. */ }
+
   }, [me, client, profile.data]);
   const answers = () => ({ idempotencyKey: key.current, amount, term, purpose, income, expenses, identityType, identityNumber, dob, province, employment, mobile, address });
   function persist(override: Record<string, unknown> = {}) {
@@ -144,8 +154,8 @@ export function PersonalLoanFlow() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   const fields = (current: Step) => <>
-            {current === 'amount' && <><Field label="Loan amount" hint="R500 to R100,000"><MoneyInput cents={amount} onCents={setAmount} autoFocus /></Field><div className="mt-3 flex flex-wrap gap-2">{[100000, 300000, 500000, 1000000].map(v => <Button key={v} type="button" variant="secondary" size="sm" onClick={() => { setAmount(v); record(formatZAR(v)); persist({ amount: v }); if (mode === 'chat') setStep(s => s + 1); }}>{formatZAR(v, { decimals: false })}</Button>)}</div></>}
-            {current === 'term' && <><div className="flex flex-wrap gap-2">{[1, 3, 6, 12, 24].map(v => <Button key={v} type="button" variant={term === v ? 'primary' : 'secondary'} onClick={() => { setTerm(v); record(`${v} months`); persist({ term: v }); if (mode === 'chat') setStep(s => s + 1); }}>{v} months</Button>)}</div><Field label="Or choose another period"><Input type="number" min={1} max={24} value={term} onChange={e => setTerm(Number(e.target.value))} /></Field></>}
+            {current === 'amount' && <LoanAmountSlider amount={amount} onChange={setAmount} />}
+            {current === 'term' && <LoanTermSlider term={term} onChange={setTerm} />}
             {current === 'purpose' && <div className="grid gap-2 sm:grid-cols-2">{PURPOSES.map(p => <Button key={p} type="button" variant="secondary" onClick={() => choosePurpose(p)}>{p}</Button>)}</div>}
             {current === 'income' && <Field label="Take-home income per month" hint="Use a reliable monthly average if your earnings vary."><MoneyInput cents={income} onCents={setIncome} autoFocus /></Field>}
             {current === 'expenses' && <Field label="Expenses and other debt repayments per month" hint="Include rent, food, transport, dependants and debt outside XTRA-CASH. We add your existing XTRA-CASH repayments separately."><MoneyInput cents={expenses} onCents={setExpenses} autoFocus /></Field>}

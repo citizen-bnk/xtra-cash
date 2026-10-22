@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ServiceProfile } from '@/components/ServiceProfile';
+import { NearbyOffers } from '@/components/NearbyOffers';
 import { Copy, Landmark, LogOut, Users } from 'lucide-react';
 import { EMPLOYMENT_LABELS, formatZAR } from '@xtra/shared';
 import { Button, Card, PageHeader, SecuritySettings, StatusBadge, useAuth, useToast } from '@xtra/ui';
@@ -19,6 +20,7 @@ export default function ProfilePage() {
     <div className="space-y-4">
       <PageHeader title="Profile" />
       <SecuritySettings />
+      {me.roles.includes('CONSUMER') && <NearbyOffers />}
       <Card className="grid gap-3 text-sm sm:grid-cols-2">
         <Row k="Name" v={`${me.firstName} ${me.lastName}`} />
         <Row k="Email" v={me.email} />
