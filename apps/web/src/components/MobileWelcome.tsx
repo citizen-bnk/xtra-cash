@@ -54,7 +54,7 @@ export function MobileWelcome() {
         <h1 className="mt-4 text-[2.9rem] font-black uppercase leading-[0.92] tracking-tight">
           Put out
           <br />
-          the <span className="text-brand-gradient-light">fire.</span>
+          the <span className="text-white">fire.</span>
         </h1>
         <p className="mt-3 text-base text-white/80">Money trouble spreads fast. XTRA-CASH stops it at the till.</p>
 

@@ -11,6 +11,7 @@ import type {
   LenderFunding,
   LenderOrg,
   LenderStats,
+  LenderPerformance,
   Loan,
   LoanOffer,
   Me,
@@ -120,7 +121,7 @@ export class XtraClient {
     return `${this.opts.baseUrl.replace(/\/$/, '')}${path}${qs ? `?${qs}` : ''}`;
   }
 
-  async request<T>(method: string, path: string, body?: unknown, query?: Query, retry = true): Promise<T> {
+  async request<T>(method: string, path: string, body?: unknown, query?: Query, retry = true, signal?: AbortSignal): Promise<T> {
     const tokens = await this.opts.tokens.get();
     const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
     const headers: Record<string, string> = {};
@@ -130,11 +131,12 @@ export class XtraClient {
     const res = await this.fetchImpl(this.url(path, query), {
       method,
       headers,
+      signal,
       body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
-    });
+    }).catch(e => { if (signal?.aborted) throw e; throw new ApiError(0, 'Connection interrupted. Check your connection and try again.'); });
 
     if (res.status === 401 && retry && tokens?.refreshToken && !path.startsWith('/auth/')) {
-      if (await this.tryRefresh(tokens.refreshToken)) return this.request<T>(method, path, body, query, false);
+      if (await this.tryRefresh(tokens.refreshToken)) return this.request<T>(method, path, body, query, false, signal);
       await this.opts.tokens.set(null);
       this.opts.onUnauthorized?.();
     }
@@ -142,6 +144,9 @@ export class XtraClient {
     const text = await res.text();
     const data = text ? safeJson(text) : undefined;
     if (!res.ok) {
+      if ([502, 503, 504].includes(res.status) && !res.headers.get('content-type')?.includes('application/json')) {
+        throw new ApiError(res.status, 'XTRA-CASH is temporarily unavailable. Please try again shortly.');
+      }
       const msg = (data as any)?.message;
       throw new ApiError(res.status, Array.isArray(msg) ? msg.join(', ') : msg || res.statusText || 'Request failed', data);
     }
@@ -247,6 +252,7 @@ export class XtraClient {
     submitAccreditation: (assisted: boolean) => this.request<LenderOrg>('POST', '/lender/accreditation/submit', { assisted }),
     payAccreditationFee: () => this.request<LenderOrg>('POST', '/lender/accreditation/pay-fee'),
     stats: () => this.request<LenderStats>('GET', '/lender/stats'),
+    performance: (signal?: AbortSignal) => this.request<LenderPerformance>('GET', '/lender/performance', undefined, undefined, true, signal),
     fundingInstructions: () =>
       this.request<{ bankDetails: string; maxRateBps: number; maxMonthlyServiceFeeCents: number; assistedAccreditationFeeCents: number; platformShareBps: number }>(
         'GET',
@@ -259,7 +265,7 @@ export class XtraClient {
     createOffer: (input: OfferInput) => this.request<LoanOffer>('POST', '/lender/offers', input),
     updateOffer: (id: string, input: Partial<OfferInput>) => this.request<LoanOffer>('PUT', `/lender/offers/${id}`, input),
     previewReach: (criteria: OfferCriteria) => this.request<{ eligibleConsumers: number; totalConsumers: number }>('POST', '/lender/offers/preview-reach', criteria),
-    loans: (page = 1, status?: string) => this.request<Paginated<Loan>>('GET', '/lender/loans', undefined, { page, status }),
+    loans: (page = 1, status?: string, product?: string) => this.request<Paginated<Loan>>('GET', '/lender/loans', undefined, { page, status, product }),
   };
 
   // ---------- affiliate ----------

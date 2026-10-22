@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundEx
 import { and, asc, count, desc, eq, inArray, lt, ne, SQL, sql } from 'drizzle-orm';
 import { InjectDb } from '../common/db.module';
 import { Db } from '../db/client';
-import { cardTransactions, installments, lenderOrgs, loans, repayments, users } from '../db/schema';
+import { cardTransactions, installments, lenderOrgs, loanOffers, loans, repayments, users } from '../db/schema';
 import { Accounts, LedgerService } from '../common/ledger.service';
 import { SettingsService } from '../common/settings.service';
 import { PAYMENT_GATEWAY } from '../integrations/integrations.module';
@@ -57,12 +57,13 @@ export class LoansService {
     return presentLoan(l, true);
   }
 
-  async page(filter: { userId?: string; lenderId?: string; status?: string }, q: { page?: any; pageSize?: any }) {
+  async page(filter: { userId?: string; lenderId?: string; status?: string; product?: string }, q: { page?: any; pageSize?: any }) {
     const { page, pageSize, offset } = pageParams(q);
     const where: SQL[] = [];
     if (filter.userId) where.push(eq(loans.userId, filter.userId));
     if (filter.lenderId) where.push(eq(loans.lenderId, filter.lenderId));
     if (filter.status) where.push(eq(loans.status, filter.status as any));
+    if (filter.product) where.push(inArray(loans.offerId, this.db.select({ id: loanOffers.id }).from(loanOffers).where(sql`${loanOffers.productType} = ${filter.product}`)));
     const cond = where.length ? and(...where) : undefined;
     const [rows, [{ total }]] = await Promise.all([
       this.db.query.loans.findMany({

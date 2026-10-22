@@ -30,7 +30,7 @@ export function VolumeChart({ data }: { data: { date: string; walletCents: numbe
           {ticks.map((t) => (
             <g key={t}>
               <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#ebe6f0" strokeWidth={1} />
-              <text x={pad.l - 8} y={y(t) + 4} textAnchor="end" fontSize={11} fill="#6b6180">
+              <text x={pad.l - 8} y={y(t) + 4} textAnchor="end" fontSize={11} fill="#2a1640">
                 {formatZAR(t, { decimals: false })}
               </text>
             </g>
@@ -48,7 +48,7 @@ export function VolumeChart({ data }: { data: { date: string; walletCents: numbe
                 {d.walletCents > 0 && <path d={bar(x, yw, w, base - yw, d.creditCents > 0 ? 0 : 3)} fill={WALLET} />}
                 {d.creditCents > 0 && <path d={bar(x, yc, w, Math.max(0, yw - yc - gap), 3)} fill={CREDIT} />}
                 {(data.length - 1 - i) % 7 === 0 && (
-                  <text x={pad.l + i * bw + bw / 2} y={H - 6} textAnchor="middle" fontSize={11} fill="#6b6180">
+                  <text x={pad.l + i * bw + bw / 2} y={H - 6} textAnchor="middle" fontSize={11} fill="#2a1640">
                     {new Date(d.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
                   </text>
                 )}

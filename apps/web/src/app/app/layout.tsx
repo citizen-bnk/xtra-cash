@@ -78,7 +78,7 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
               <Link href="/app/activity" aria-label="Activity" className="pressable grid h-10 w-10 place-items-center rounded-full text-ink">
                 <ReceiptText className="h-5 w-5" />
               </Link>
-              <Link href="/app/profile" aria-label="Profile" className="pressable grid h-9 w-9 place-items-center rounded-full bg-brand-gradient text-xs font-bold text-white">
+              <Link href="/app/profile" aria-label="Profile" className="pressable grid h-9 w-9 place-items-center rounded-full bg-brand-purple text-xs font-bold text-white">
                 {initials}
               </Link>
             </div>
@@ -96,7 +96,7 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
                 aria-label="Pay"
                 className="pressable -mt-6 flex flex-col items-center gap-1 pb-1.5 text-[11px] font-semibold text-ink"
               >
-                <span className="grid h-14 w-14 place-items-center rounded-full bg-brand-gradient text-white shadow-lg shadow-brand/40 ring-4 ring-white">
+                <span className="grid h-14 w-14 place-items-center rounded-full bg-brand-purple text-white shadow-lg shadow-brand/40 ring-4 ring-white">
                   <ScanLine className="h-6 w-6" />
                 </span>
                 Pay

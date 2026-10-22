@@ -340,18 +340,15 @@ export function XtraCard({ name, maskedPan, expiry, frozen }: { name: string; ma
 }
 
 /**
- * The XTRA-CASH logo: burning-wallet mark + wordmark (from the official brand artwork).
- * Apps serve the mark at /brand/mark.png (transparent). `light` is for dark or coloured backgrounds.
+ * Approved Brand Kit 2026 lockups, served unchanged by both web apps.
+ * `light`/`mono` select the supplied white lockup; never reconstruct or recolour the wordmark.
  */
 export function Logo({ light, mono, className, markOnly, size = 28 }: { light?: boolean; mono?: boolean; className?: string; markOnly?: boolean; size?: number }) {
-  // The mark has a transparent background, so it sits directly on light and dark surfaces.
-  const mark = <img src="/brand/mark.png" alt="" style={{ width: size, height: size }} className="shrink-0 object-contain" />;
   return (
-    <span className={cx('inline-flex shrink-0 items-center gap-2 whitespace-nowrap font-black tracking-tight', className)} aria-label="XTRA-CASH">
-      {mark}
-      {!markOnly && (
-        <span className={cx('text-[1.15em] leading-none', mono ? 'text-white' : light ? 'text-brand-gradient-light' : 'text-brand-gradient')}>XTRA-CASH</span>
-      )}
+    <span className={cx('inline-flex max-w-full shrink-0 items-center', className)} role="img" aria-label="XTRA-CASH">
+      <img src={markOnly ? '/brand/mark.png' : light || mono ? '/brand/lockup-white.png' : '/brand/lockup.png'} alt="" aria-hidden="true"
+        width={markOnly ? size : 1920} height={markOnly ? size : 420}
+        style={{ width: markOnly ? size : (size + 12) * 1920 / 420, height: markOnly ? size : 'auto', maxWidth: '100%' }} className="object-contain" />
     </span>
   );
 }

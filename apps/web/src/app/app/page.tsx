@@ -84,7 +84,7 @@ export default function ConsumerHome() {
         </Alert></div>
       )}
 
-      <section className="relative order-7 overflow-hidden rounded-3xl bg-brand-gradient p-6 text-white md:order-3">
+      <section className="relative order-7 overflow-hidden rounded-3xl bg-brand-purple p-6 text-white md:order-3">
         <div className="flex flex-wrap items-center justify-between gap-5"><div><span className="text-xs font-bold uppercase tracking-widest text-white/75">Beyond BNPL</span><h2 className="mt-2 text-2xl font-black">Need a personal loan?</h2><p className="mt-2 max-w-lg text-sm text-white/80">Apply one question at a time. View your progress and see matched lenders after KYC and FICA review.</p></div><Link href="/app/personal-loan"><Button variant="secondary" size="lg">Apply for a loan <ArrowRight className="h-4 w-4" /></Button></Link></div>
       </section>
       <div className="order-9 md:order-4"><SecuritySettings compact /></div>
@@ -125,7 +125,7 @@ export default function ConsumerHome() {
         {QUICK.map((q) => {
           const inner = (
             <>
-              <span className={q.primary ? 'grid h-14 w-14 place-items-center rounded-2xl bg-brand-gradient text-white shadow-md shadow-brand/30' : 'grid h-14 w-14 place-items-center rounded-2xl border border-line bg-white text-ink'}>
+              <span className={q.primary ? 'grid h-14 w-14 place-items-center rounded-2xl bg-brand-purple text-white shadow-md shadow-brand/30' : 'grid h-14 w-14 place-items-center rounded-2xl border border-line bg-white text-ink'}>
                 <q.icon className="h-6 w-6" />
               </span>
               <span className="text-xs font-semibold text-ink">{q.label}</span>

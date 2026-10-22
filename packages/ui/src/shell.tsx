@@ -105,7 +105,7 @@ export function AppShell({
           </div>
           <button
             onClick={() => setOpen(true)}
-            className="pressable grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-gradient text-xs font-bold text-white"
+            className="pressable grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-purple text-xs font-bold text-white"
             aria-label="Account and more"
           >
             {initials}
@@ -141,7 +141,7 @@ export function AppShell({
           <div role="dialog" aria-modal aria-label="Menu" onClick={(e) => e.stopPropagation()} className="safe-pb max-h-[85dvh] w-full overflow-y-auto rounded-t-[24px] bg-white animate-sheet-up">
             <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-line" />
             <div className="flex items-center gap-3 border-b border-line px-5 py-4">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-gradient text-sm font-bold text-white">{initials}</span>
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-purple text-sm font-bold text-white">{initials}</span>
               <div className="min-w-0 flex-1">
                 <div className="truncate font-bold">{userName}</div>
                 {userEmail && <div className="truncate text-xs text-muted">{userEmail}</div>}

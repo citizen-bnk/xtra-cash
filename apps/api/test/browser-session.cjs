@@ -29,6 +29,24 @@ async function main() {
     assert.equal(rotated.status, 200); assert(rotated.headers.get('set-cookie').includes('rotated-access'));
     const logout = await proxy(req('auth/logout', 'POST', {}, { cookie: '__Host-xtra-refresh=rotated-refresh' }), ctx('auth/logout'));
     assert(logout.headers.get('set-cookie').includes('Max-Age=0'));
+    calls = 0;
+    global.fetch = async () => { calls++; return new Response('The deployment is currently unavailable SERVICE_UNAVAILABLE internal-request-id', { status: 503 }); };
+    const unavailable = await proxy(req('personal-loans/verification', 'POST', {}), ctx('personal-loans/verification'));
+    assert.equal(calls, 1); assert.equal(unavailable.status, 503); assert(unavailable.headers.get('content-type').includes('application/json'));
+    assert(!(await unavailable.text()).includes('internal-request-id')); assert.equal(unavailable.headers.get('retry-after'), '5');
+    calls = 0;
+    global.fetch = async () => ++calls === 1 ? new Response('Unavailable', { status: 503 }) : Response.json({ ok: true });
+    const recovered = await proxy(req('me', 'GET'), ctx('me'));
+    assert.equal(recovered.status, 200); assert.equal(calls, 2);
+    const clientFile = path.resolve(__dirname, '../../../packages/shared/src/client.ts');
+    const clientModule = new Module(clientFile); clientModule.filename = clientFile; clientModule.paths = module.paths;
+    clientModule._compile(ts.transpileModule(fs.readFileSync(clientFile, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, clientFile);
+    const { XtraClient } = clientModule.exports;
+    const options = { baseUrl: origin, tokens: { get: () => null, set: () => undefined } };
+    const platform = new XtraClient({ ...options, fetchImpl: async () => new Response('SERVICE_UNAVAILABLE private-platform-id', { status: 503 }) });
+    await assert.rejects(platform.request('POST', '/personal-loans/applications', {}), e => e.status === 503 && !e.message.includes('private-platform-id') && e.message.includes('temporarily unavailable'));
+    const interrupted = new XtraClient({ ...options, fetchImpl: async () => { throw Error('private-network-details'); } });
+    await assert.rejects(interrupted.request('POST', '/personal-loans/applications', {}), e => e.status === 0 && e.message.includes('Connection interrupted') && !e.message.includes('private-network-details'));
     console.log('PASS: same-origin CSRF enforcement, HttpOnly/Secure session cookies, no tokens in browser response, server-side Authorization, automatic refresh and logout cookie removal.');
   } finally { global.fetch = fetchOriginal; }
 }

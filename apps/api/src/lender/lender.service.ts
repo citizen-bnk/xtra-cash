@@ -3,8 +3,9 @@ import { randomBytes } from 'crypto';
 import { and, count, desc, eq, gte, inArray, lte, sql, SQL } from 'drizzle-orm';
 import { REQUIRED_DOCUMENTS, type PlatformSettings } from '@xtra/shared';
 import { InjectDb } from '../common/db.module';
-import { Db } from '../db/client';
-import { accreditationDocuments, kycProfiles, lenderFunding, lenderOrgs, loanOffers, loans } from '../db/schema';
+import { Db, DbOrTx } from '../db/client';
+import { accreditationDocuments, kycProfiles, lenderFunding, lenderOrgs, loanOffers, loans, personalLoanApplications } from '../db/schema';
+import { calculatePerformance } from './performance';
 import { SettingsService } from '../common/settings.service';
 import { AuditService } from '../common/audit.service';
 import { Accounts, LedgerService } from '../common/ledger.service';
@@ -110,10 +111,10 @@ export class LenderService {
     return this.orgFor(user.id);
   }
 
-  async stats(lenderId: string) {
-    const org = await this.db.query.lenderOrgs.findFirst({ where: eq(lenderOrgs.id, lenderId) });
+  async stats(lenderId: string, conn: DbOrTx = this.db) {
+    const org = await conn.query.lenderOrgs.findFirst({ where: eq(lenderOrgs.id, lenderId) });
     if (!org) throw new NotFoundException();
-    const [agg] = await this.db
+    const [agg] = await conn
       .select({
         outstanding: sql<string>`coalesce(sum(${loans.outstandingCents}) filter (where ${loans.status} in ('ACTIVE','IN_ARREARS','DEFAULTED')), 0)`,
         active: sql<string>`count(*) filter (where ${loans.status} in ('ACTIVE','IN_ARREARS'))`,
@@ -122,10 +123,10 @@ export class LenderService {
       })
       .from(loans)
       .where(eq(loans.lenderId, lenderId));
-    const [repaid] = await this.db.execute<{ total: string }>(
+    const [repaid] = await conn.execute<{ total: string }>(
       sql`select coalesce(sum(r.lender_share_cents),0) as total from repayments r join loans l on l.id = r.loan_id where l.lender_id = ${lenderId}`,
     ).then((r) => r.rows);
-    const [{ offers }] = await this.db
+    const [{ offers }] = await conn
       .select({ offers: count() })
       .from(loanOffers)
       .where(and(eq(loanOffers.lenderId, lenderId), eq(loanOffers.active, true)));
@@ -142,6 +143,23 @@ export class LenderService {
   }
 
   // ---------------- funding ----------------
+  async performance(lenderId: string) {
+    const settings = await this.settings.get();
+    return this.db.transaction(async tx => {
+      const asOf = new Date();
+      const [stats, rows, [{ pending }]] = await Promise.all([
+        this.stats(lenderId, tx),
+        tx.query.loans.findMany({ where: eq(loans.lenderId, lenderId), with: {
+          offer: { columns: { productType: true } },
+          installments: { columns: { dueDate: true, amountCents: true, paidCents: true } },
+          repayments: { columns: { lenderShareCents: true } },
+        } }),
+        tx.select({ pending: count() }).from(personalLoanApplications).where(and(eq(personalLoanApplications.lenderId, lenderId), inArray(personalLoanApplications.status, ['SUBMITTED', 'REFERRED', 'UNDER_REVIEW']))),
+      ]);
+      return { ...stats, asOf: asOf.toISOString(), pendingApplications: pending, ...calculatePerformance(rows, settings.platformShareBps, asOf) };
+    }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
+  }
+
   async listFunding(lenderId: string) {
     return this.db.query.lenderFunding.findMany({ where: eq(lenderFunding.lenderId, lenderId), orderBy: desc(lenderFunding.createdAt) });
   }
