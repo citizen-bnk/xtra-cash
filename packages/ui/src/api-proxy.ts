@@ -43,7 +43,17 @@ export async function proxy(req: Request, ctx: { params: Promise<{ path?: string
     headers.set('content-type', 'application/json'); body = JSON.stringify({ refreshToken });
   }
   if (route === '/auth/refresh') return Response.json({ message: 'Sessions refresh automatically' }, { status: 400 });
-  const send = () => fetch(target, { method: req.method, headers, body, redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(90000) });
+  const send = async () => {
+    const once = () => fetch(target, { method: req.method, headers, body, redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(90000) });
+    let response = await once();
+    // Only safe reads retry automatically. Uploads and financial mutations need an explicit retry.
+    if (!hasBody && [502, 503, 504].includes(response.status)) {
+      await response.body?.cancel();
+      await new Promise(resolve => setTimeout(resolve, 250));
+      response = await once();
+    }
+    return response;
+  };
   try {
     let res = await send();
     const out = new Headers({ 'cache-control': 'no-store' });
@@ -55,6 +65,13 @@ export async function proxy(req: Request, ctx: { params: Promise<{ path?: string
     }
     for (const h of ['content-type', 'content-disposition']) { const v = res.headers.get(h); if (v) out.set(h, v); }
     if (route === '/auth/logout') setSession(out, null);
+    if ([502, 503, 504].includes(res.status) && !res.headers.get('content-type')?.includes('application/json')) {
+      await res.body?.cancel();
+      console.warn(JSON.stringify({ event: 'upstream_unavailable', route, status: res.status, requestId: res.headers.get('x-vercel-id') }));
+      out.set('content-type', 'application/json');
+      out.set('retry-after', '5');
+      return Response.json({ message: 'XTRA-CASH is temporarily unavailable. Please try again shortly.' }, { status: res.status, headers: out });
+    }
     if (route.startsWith('/auth/') && res.headers.get('content-type')?.includes('application/json')) {
       const data = await res.json();
       if (res.ok && data?.accessToken && data?.refreshToken) {

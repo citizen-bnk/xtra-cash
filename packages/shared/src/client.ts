@@ -131,7 +131,7 @@ export class XtraClient {
       method,
       headers,
       body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
-    });
+    }).catch(() => { throw new ApiError(0, 'Connection interrupted. Check your connection and try again.'); });
 
     if (res.status === 401 && retry && tokens?.refreshToken && !path.startsWith('/auth/')) {
       if (await this.tryRefresh(tokens.refreshToken)) return this.request<T>(method, path, body, query, false);
@@ -142,6 +142,9 @@ export class XtraClient {
     const text = await res.text();
     const data = text ? safeJson(text) : undefined;
     if (!res.ok) {
+      if ([502, 503, 504].includes(res.status) && !res.headers.get('content-type')?.includes('application/json')) {
+        throw new ApiError(res.status, 'XTRA-CASH is temporarily unavailable. Please try again shortly.');
+      }
       const msg = (data as any)?.message;
       throw new ApiError(res.status, Array.isArray(msg) ? msg.join(', ') : msg || res.statusText || 'Request failed', data);
     }

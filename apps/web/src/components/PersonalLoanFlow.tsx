@@ -2,11 +2,11 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, FileCheck, LockKeyhole } from 'lucide-react';
-import { EMPLOYMENT_LABELS, EmploymentStatus, PROVINCES, formatZAR, parseSaId, type PersonalLoanApplication, type PersonalLoanInput, type PersonalLoanMatch } from '@xtra/shared';
+import { ApiError, EMPLOYMENT_LABELS, EmploymentStatus, PROVINCES, formatZAR, parseSaId, type PersonalLoanApplication, type PersonalLoanInput, type PersonalLoanMatch } from '@xtra/shared';
 import { Alert, Button, Card, Field, Input, Loading, MoneyInput, Select, StatusBadge, useApi, useAuth } from '@xtra/ui';
 import { SavedLoanDetails } from './SavedLoanDetails';
 import { conversationalMoney, conversationalTerm } from '@/lib/loan-conversation';
-type Profile = { firstName: string; lastName: string; identityType: 'ID' | 'PASSPORT'; identityNumber: string; identityStatus: string; dateOfBirth: string; province: string; employment: EmploymentStatus | ''; mobile: string; address: string; income: number | null; expenses: number | null; financialUpdatedAt: string | null; draft: Partial<{ amount: number; term: number; purpose: string; income: number; expenses: number; identityType: 'ID' | 'PASSPORT'; identityNumber: string; dob: string; province: string; employment: EmploymentStatus; mobile: string; address: string }> };
+type Profile = { firstName: string; lastName: string; identityType: 'ID' | 'PASSPORT'; identityNumber: string; identityStatus: string; dateOfBirth: string; province: string; employment: EmploymentStatus | ''; mobile: string; address: string; income: number | null; expenses: number | null; financialUpdatedAt: string | null; draft: Partial<{ idempotencyKey: string; amount: number; term: number; purpose: string; income: number; expenses: number; identityType: 'ID' | 'PASSPORT'; identityNumber: string; dob: string; province: string; employment: EmploymentStatus; mobile: string; address: string }> };
 
 const PURPOSES = ['Home & repairs', 'Education', 'Medical', 'Transport', 'Debt consolidation', 'Other'];
 type Step = 'amount' | 'term' | 'purpose' | 'income' | 'expenses' | 'identity' | 'dob' | 'province' | 'employment' | 'mobile' | 'address' | 'identityDoc' | 'addressDoc' | 'review';
@@ -43,7 +43,7 @@ export function PersonalLoanFlow() {
   useEffect(() => { question.current?.focus(); setReply(''); }, [step]);
   useEffect(() => {
     if (!me || !profile.data || initialized.current) return;
-    initialized.current = true; key.current = crypto.randomUUID();
+    initialized.current = true; key.current = profile.data.draft.idempotencyKey || crypto.randomUUID();
     const p = profile.data, d = p.draft;
     setIncome(d.income ?? p.income); setExpenses(d.expenses ?? p.expenses);
     setProvince(d.province || p.province); setEmployment(d.employment || p.employment); setMobile(d.mobile || p.mobile); setAddress(d.address || p.address);
@@ -52,7 +52,7 @@ export function PersonalLoanFlow() {
     setKnownRequest({ amount: !!d.amount, term: !!d.term, purpose: !!d.purpose?.trim() });
     try { const stored = JSON.parse(sessionStorage.getItem('xtra-personal-request') ?? 'null'); if (stored?.amountCents >= 50000 && stored.amountCents <= 10000000) { setAmount(stored.amountCents); setKnownRequest(s => ({ ...s, amount: true })); } if (stored?.termMonths >= 1 && stored.termMonths <= 24) { setTerm(stored.termMonths); setKnownRequest(s => ({ ...s, term: true })); } sessionStorage.removeItem('xtra-personal-request'); } catch { /* Start with defaults. */ }
   }, [me, client, profile.data]);
-  const answers = () => ({ amount, term, purpose, income, expenses, identityType, identityNumber, dob, province, employment, mobile, address });
+  const answers = () => ({ idempotencyKey: key.current, amount, term, purpose, income, expenses, identityType, identityNumber, dob, province, employment, mobile, address });
   function persist(override: Record<string, unknown> = {}) {
     if (submitting.current) return;
     const data = { ...answers(), ...override };
@@ -118,6 +118,9 @@ export function PersonalLoanFlow() {
     try {
       if (!saved) for (const field of allSteps.filter(s => s !== 'review')) { const message = validateStep(field); if (message) throw new Error(message); }
       await saves.current;
+      // Persist the retry identity before any submission can reach the API.
+      // If its response is lost, reloading the draft must reuse this same application key.
+      if (!saved) { await client.request('PUT', '/me/service-profile/draft', { answers: answers() }); setDraftError(''); }
       if (needsDocuments && !saved) {
         const body = new FormData();
         Object.entries({ identityType, identityNumber, dateOfBirth: dob, province, employmentStatus: employment, mobile: mobile.replace(/\s/g, ''), address, consent: 'true' }).forEach(([k, v]) => { if (v) body.append(k, v); });
@@ -130,7 +133,7 @@ export function PersonalLoanFlow() {
       if (verification.data?.status === 'VERIFIED' && !offerId) {
         const result = await client.consumer.personalMatches(input()); setMatches(result.matches); setMatchReason(result.reason);
       } else if (!offerId) { setMatchReason('Your application is saved. Matched lenders remain private until KYC and FICA document review is complete.'); }
-    } catch (e) { setError(e instanceof Error ? e.message : 'Could not submit your application. Your answers are still here.'); }
+    } catch (e) { setError(e instanceof ApiError && [0, 502, 503, 504].includes(e.status) ? 'We could not confirm your submission. Your answers are still on this page. Try again to check or resend the same application.' : e instanceof Error ? e.message : 'Could not submit your application. Your answers are still here.'); }
     finally { submitting.current = false; setBusy(false); }
   }
   async function resume(app: PersonalLoanApplication) {
@@ -153,7 +156,7 @@ export function PersonalLoanFlow() {
             {current === 'mobile' && <Field label="Mobile number" hint="Used to contact you. WhatsApp OTP will be enabled once its provider is connected; this step does not verify ownership."><Input type="tel" autoComplete="tel" value={mobile} onChange={e => setMobile(e.target.value)} /></Field>}
             {current === 'address' && <Field label="Full residential address"><Input autoComplete="street-address" value={address} onChange={e => setAddress(e.target.value)} /></Field>}
             {(current === 'identityDoc' || current === 'addressDoc') && <Field label={current === 'identityDoc' ? 'ID or passport document' : 'Proof of residential address'} hint="A readable PDF, JPG or PNG under 1.9 MB. Documents are available only to you and authorised review staff."><Input type="file" accept="application/pdf,image/jpeg,image/png" onChange={e => upload(e.target.files?.[0], current === 'identityDoc' ? setIdentityDoc : setAddressDoc)} className="h-auto py-3" />{(current === 'identityDoc' ? identityDoc : addressDoc) && <p className="mt-2 flex items-center gap-1 text-sm"><FileCheck className="h-4 w-4" /> Document selected</p>}</Field>}
-            {current === 'review' && <div className="space-y-4"><dl className="grid grid-cols-2 gap-3 rounded-2xl bg-surface p-4 text-sm"><div><dt className="text-muted">Amount</dt><dd className="font-bold">{formatZAR(amount ?? 0)}</dd></div><div><dt className="text-muted">Period</dt><dd className="font-bold">{term} months</dd></div><div><dt className="text-muted">Purpose</dt><dd>{purpose}</dd></div><div><dt className="text-muted">Monthly income / expenses</dt><dd>{formatZAR(income ?? 0)} / {formatZAR(expenses ?? 0)}</dd></div></dl><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1" /><span>I confirm these details are accurate and consent to XTRA-CASH processing my application and documents, and sharing my application with a lender I select. This is a request for review, not a loan agreement.</span></label><p className="text-xs text-muted">Identity and bureau providers are not connected yet. Uploaded documents will be reviewed by staff. Credit checks, verified affordability and final lender terms are still required.</p></div>}</>;
+            {current === 'review' && <div className="space-y-4"><dl className="grid grid-cols-2 gap-3 rounded-2xl bg-surface p-4 text-sm"><div><dt className="text-muted">Amount</dt><dd className="font-bold">{formatZAR(amount ?? 0)}</dd></div><div><dt className="text-muted">Period</dt><dd className="font-bold">{term} months</dd></div><div><dt className="text-muted">Purpose</dt><dd>{purpose}</dd></div><div><dt className="text-muted">Monthly income / expenses</dt><dd>{formatZAR(income ?? 0)} / {formatZAR(expenses ?? 0)}</dd></div></dl><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1" /><span>I confirm these details are accurate and consent to XTRA-CASH processing my application and documents, and sharing my application with a lender I select. This is a request for review, not a loan agreement.</span></label><p className="text-xs text-muted">Your application and documents will be reviewed by staff. Submitting does not guarantee approval. Credit checks, affordability verification and final lender terms are required before credit can be approved.</p></div>}</>;
   if (verification.loading || profile.loading || !me) return <Loading />;
   if (profile.error) return <Alert tone="red">{profile.error}<Button onClick={profile.reload}>Try again</Button></Alert>;
   if (verification.error) return <Alert tone="red">{verification.error}<Button variant="secondary" onClick={verification.reload}>Try again</Button></Alert>;

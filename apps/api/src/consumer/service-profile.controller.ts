@@ -11,6 +11,7 @@ import { EMPLOYMENT_LABELS, PROVINCES } from '@xtra/shared';
 
 const money = z.number().int().min(0).max(100000000).nullable().optional();
 export const draftSchema = z.object({
+  idempotencyKey: z.string().uuid().optional(),
   amount: z.number().int().min(50000).max(10000000).nullable().optional(), term: z.number().int().min(1).max(24).optional(), purpose: z.string().max(100).optional(), income: money, expenses: money,
   identityType: z.enum(['ID', 'PASSPORT']).optional(), identityNumber: z.string().max(20).optional(), dob: z.string().max(10).optional(), province: z.string().max(40).optional(), employment: z.string().max(30).optional(), mobile: z.string().max(20).optional(), address: z.string().max(300).optional(),
 });

@@ -33,10 +33,11 @@ async function main() {
     await http().post('/me/wallet/topup').set(bearer(account.accessToken)).send({ amountCents: 1000 }).expect(403); // Service requires names.
     await http().put('/auth/passwordless/profile').set(bearer(account.accessToken)).send({ firstName: 'Test', lastName: 'Applicant' }).expect(200);
     const other = (await http().post('/auth/quick-register').send({ ...input, identifier: 'other@example.test' }).expect(201)).body;
-    const draft = { amount: 300000, term: 3, purpose: 'Education', income: 1200000, expenses: 400000, address: '123 Isolated Test Road' };
+    const draft = { idempotencyKey: crypto.randomUUID(), amount: 300000, term: 3, purpose: 'Education', income: 1200000, expenses: 400000, address: '123 Isolated Test Road' };
     await http().put('/me/service-profile/draft').set(bearer(account.accessToken)).send({ answers: draft }).expect(200);
     const stored = await db.query.serviceDrafts.findFirst(); assert(!stored.encrypted.includes('Education')); assert.equal(JSON.parse(decryptIdentity(stored.encrypted)).purpose, 'Education');
     assert.equal((await http().get('/me/service-profile').set(bearer(account.accessToken)).expect(200)).body.draft.income, draft.income);
+    assert.equal((await http().get('/me/service-profile').set(bearer(account.accessToken)).expect(200)).body.draft.idempotencyKey, draft.idempotencyKey);
     assert.deepEqual((await http().get('/me/service-profile').set(bearer(other.accessToken)).expect(200)).body.draft, {});
     await http().put('/me/service-profile/draft').set(bearer(account.accessToken)).send({ answers: { income: -1 } }).expect(400);
     const origin = 'http://localhost:3000';
