@@ -264,6 +264,27 @@ export interface LenderStats {
   activeOffers: number;
 }
 
+export type LendingProduct = 'BNPL' | 'PERSONAL' | 'BUSINESS' | 'OTHER';
+export interface LendingPerformance {
+  product: LendingProduct;
+  fundedLoans: number;
+  activeLoans: number;
+  outstandingCents: number;
+  advancedCents: number;
+  netReceivedCents: number;
+  realizedReturnCents: number;
+  projectedNetReturnCents: number;
+  /** Read-only estimates in millionths of one rand; ledger balances remain integer cents. */
+  estimatedAccruedMicros: number;
+  estimatedDailyMicros: number;
+}
+export interface LenderPerformance extends LenderStats {
+  asOf: string;
+  pendingApplications: number;
+  models: LendingPerformance[];
+  totals: Omit<LendingPerformance, 'product'>;
+}
+
 export interface AffiliateSummary {
   commissionBalanceCents: number;
   lifetimeEarnedCents: number;

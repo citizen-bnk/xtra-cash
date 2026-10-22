@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Header, HttpCode, Param, Post, Put, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { CurrentUser, Roles, type AuthUser } from '../common/auth';
@@ -84,6 +84,13 @@ export class LenderController {
     return this.lender.stats(org.id);
   }
 
+  @Get('performance')
+  @Header('Cache-Control', 'private, no-store')
+  async performance(@CurrentUser() u: AuthUser) {
+    const org = await this.lender.orgFor(u.id);
+    return this.lender.performance(org.id);
+  }
+
   @Get('funding')
   async funding(@CurrentUser() u: AuthUser) {
     const org = await this.lender.orgFor(u.id);
@@ -118,8 +125,9 @@ export class LenderController {
   }
 
   @Get('loans')
-  async loansList(@CurrentUser() u: AuthUser, @Query() q: { page?: string; status?: string }) {
+  async loansList(@CurrentUser() u: AuthUser, @Query() q: { page?: string; status?: string; product?: string }) {
+    if (q.product && !['BNPL', 'PERSONAL', 'BUSINESS'].includes(q.product)) throw new BadRequestException('Unknown loan product');
     const org = await this.lender.orgFor(u.id);
-    return this.loans.page({ lenderId: org.id, status: q.status }, q);
+    return this.loans.page({ lenderId: org.id, status: q.status, product: q.product }, q);
   }
 }
