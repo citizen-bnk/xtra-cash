@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "XTRA-CASH",
-    "slug": "xtra-cash",
+    "slug": "xtra-cash-fintech",
     "scheme": "xtracash",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -48,6 +48,12 @@
     "icon": "./assets/icon.png",
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "owner": "xtra-cash-team",
+    "extra": {
+      "eas": {
+        "projectId": "417255b5-4f68-4dc1-8614-7f1ac5ddd8fc"
+      }
     }
   }
 }
