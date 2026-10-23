@@ -9,3 +9,10 @@ coverage
 apps/api/uploads/*
 !apps/api/uploads/.gitkeep
 .vercel
+google-services.json
+GoogleService-Info.plist
+credentials.json
+*.jks
+*.keystore
+*.p8
+*.p12
