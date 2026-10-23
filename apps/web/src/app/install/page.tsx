@@ -1,0 +1,9 @@
+'use client';
+import Link from 'next/link';
+import { Button, Card } from '@xtra/ui';
+import { AuthPageShell } from '@/components/AuthPageShell';
+import { usePwa } from '@/components/pwa';
+export default function InstallPage() {
+  const pwa = usePwa();
+  return <AuthPageShell currentPath="/install"><Card className="w-full max-w-lg space-y-5 p-6 sm:p-8"><span className="text-xs font-bold uppercase tracking-widest text-brand-purple">XTRA-CASH on your phone</span><h1 className="text-3xl font-bold">Get the app.</h1><p className="text-sm text-muted">Install XTRA-CASH from your browser. Open it from your home screen and use your existing account.</p><ul className="list-inside list-disc space-y-2 text-sm"><li>Apply for a loan with saved answers.</li><li>Check your balance, card and repayments.</li><li>Choose nearby offers and device notifications.</li></ul><p className="text-xs text-muted">Nearby location matching runs while this app is open. Arrival alerts while the app is closed require the native mobile app and background location permission.</p>{pwa.installed ? <p role="status" className="font-semibold text-brand-purple">You’re already using the installed app.</p> : <Button className="w-full" size="lg" onClick={pwa.openInstall}>Install XTRA-CASH</Button>}<Link href="/app" className="block text-center text-sm font-semibold underline">{pwa.installed ? 'Open my dashboard' : 'Continue in browser'}</Link><div className="rounded-xl bg-brand-soft p-4 text-sm"><p className="font-semibold">On iPhone</p><p className="mt-1">Open this page in Safari, tap Share, then Add to Home Screen.</p><p className="mt-3 font-semibold">On Android</p><p className="mt-1">Open this page in Chrome, tap Install XTRA-CASH, or choose Install app from the browser menu.</p></div><p className="text-xs text-muted">No app-store account is needed. Notifications are optional and depend on browser support and your permission.</p></Card></AuthPageShell>;
+}

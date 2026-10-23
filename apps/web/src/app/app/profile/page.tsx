@@ -19,6 +19,7 @@ export default function ProfilePage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Profile" />
+      <Link href="/install" className="inline-block text-sm font-semibold text-brand-purple underline">Get the XTRA-CASH app</Link>
       <SecuritySettings />
       {me.roles.includes('CONSUMER') && <NearbyOffers />}
       <Card className="grid gap-3 text-sm sm:grid-cols-2">

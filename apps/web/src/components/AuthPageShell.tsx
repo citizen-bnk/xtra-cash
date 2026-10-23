@@ -7,9 +7,10 @@ const LINKS = [
   { href: '/', label: 'Home' },
   { href: '/login', label: 'Sign in' },
   { href: '/register', label: 'Create account' },
+  { href: '/install', label: 'Get the app' },
 ];
 
-export function AuthPageShell({ children, currentPath }: { children: ReactNode; currentPath: '/login' | '/register' | '/personal-loan' | '/offers' }) {
+export function AuthPageShell({ children, currentPath }: { children: ReactNode; currentPath: '/login' | '/register' | '/personal-loan' | '/offers' | '/install' }) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="safe-pt sticky top-0 z-20 border-b border-line bg-white/95 backdrop-blur">

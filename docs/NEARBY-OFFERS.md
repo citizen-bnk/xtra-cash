@@ -22,4 +22,6 @@ The scheduled job authenticates with `CRON_SECRET`. No production demo campaigns
 
 ## Native release connection
 
+The installable PWA is available without an Expo or app-store account at `/install`. This delivers an installed home-screen app now, while retaining the documented foreground-only location behavior. `xtra-cash-smart-my-co` is a suggested Expo account/team name, subject to availability. A real EAS project UUID must come from the verified account; it is not fabricated or committed as a placeholder ID.
+
 The Expo CLI on the release machine is not signed in. From `apps/mobile`, the account owner must sign in with `npx eas-cli login`, connect the intended project with `npx eas-cli init`, and configure APNs/FCM credentials with `npx eas-cli credentials`. The resulting EAS project ID must be supplied to the app configuration or as `EXPO_PUBLIC_EAS_PROJECT_ID`. Never put an Expo access token, APNs key or service-account JSON into source control. Build profiles are provided in `eas.json`; a device build is required to verify permission denial, background entry and push receipts. Store submission additionally requires the account owner's Apple/Google developer access.
