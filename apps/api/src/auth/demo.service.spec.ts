@@ -32,7 +32,7 @@ describe('hosted demo access', () => {
   });
   it('issues a session only for the expected existing sample account', async () => {
     const result = await service.login('shopper-salaried');
-    expect(result.user.email).toBe('naledi@example.com'); expect(result.user.passwordHash).toBeUndefined();
+    expect(result.user.email).toBe('naledi@example.com'); expect(result.user).not.toHaveProperty('passwordHash');
     expect(auth.issueTokens).toHaveBeenCalledWith(rows[0]);
   });
   it('never prepares hosted data when a fixture is missing', async () => {
