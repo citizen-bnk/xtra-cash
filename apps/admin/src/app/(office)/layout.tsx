@@ -34,6 +34,7 @@ export default function OfficeLayout({ children }: { children: React.ReactNode }
     { href: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
     { href: '/security', label: 'Sign-in & security', icon: UserCheck },
     { href: '/users', label: 'Users', icon: Users },
+    { href: '/payday', label: 'XTRA Payday staff & leads', icon: Users },
     { href: '/kyc', label: 'KYC review', icon: UserCheck, badge: s?.kycPending },
     { href: '/lenders', label: 'Credit Mall lenders', icon: Store, badge: s?.lendersPendingReview },
     { href: '/funding', label: 'Lender funding', icon: Banknote, badge: s?.fundingPending },

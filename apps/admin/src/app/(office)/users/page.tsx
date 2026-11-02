@@ -28,7 +28,7 @@ export default function UsersPage() {
         </div>
         <Select className="w-44" value={role} onChange={(e) => { setRole(e.target.value); setPage(1); }}>
           <option value="">All roles</option>
-          {['CONSUMER', 'LENDER', 'AFFILIATE', 'ADMIN', 'SUPER_ADMIN'].map((r) => <option key={r} value={r}>{r.replace('_', ' ').toLowerCase()}</option>)}
+          {['CONSUMER', 'LENDER', 'AFFILIATE', 'SALES_REP', 'ADMIN', 'SUPER_ADMIN'].map((r) => <option key={r} value={r}>{r.replace('_', ' ').toLowerCase()}</option>)}
         </Select>
         <Button variant="secondary">Search</Button>
       </form>
