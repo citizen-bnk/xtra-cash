@@ -171,6 +171,7 @@ export default function Landing() {
 
       <footer className="border-t border-line">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+          <Link href="/team/login" className="mb-5 inline-block text-sm font-semibold text-brand-purple underline">XTRA Payday employee workspace</Link>
           <div className="font-display text-lg font-bold">
             XTRA-CASH. <span className="text-brand-purple">Put out the fire.</span>
           </div>

@@ -24,7 +24,7 @@ const id = () => text('id').primaryKey().$defaultFn(() => randomUUID());
 const createdAt = () => timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow();
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
-export const roleEnum = pgEnum('role', ['CONSUMER', 'LENDER', 'AFFILIATE', 'ADMIN', 'SUPER_ADMIN']);
+export const roleEnum = pgEnum('role', ['CONSUMER', 'LENDER', 'AFFILIATE', 'ADMIN', 'SUPER_ADMIN', 'SALES_REP']);
 export const userStatusEnum = pgEnum('user_status', ['ACTIVE', 'SUSPENDED']);
 export const kycStatusEnum = pgEnum('kyc_status', ['NOT_STARTED', 'PENDING', 'VERIFIED', 'REJECTED']);
 export const employmentEnum = pgEnum('employment_status', [
@@ -541,3 +541,71 @@ export const marketingEvents = pgTable('marketing_events', {
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   kind: text('kind').notNull(), createdAt: createdAt(),
 }, t => [uniqueIndex('marketing_event_member_kind').on(t.campaignId, t.userId, t.kind)]);
+
+// XTRA Payday staff operations. Separate from consumer funds and affiliate commissions.
+export const paydayEmployees = pgTable('payday_employees', {
+  userId: text('user_id').primaryKey().references(() => users.id),
+  employeeNumber: text('employee_number').notNull().unique(), territory: text('territory').notNull().default('Sandton, Gauteng'),
+  status: text('status').notNull().default('ONBOARDING'), basicCents: integer('basic_cents').notNull().default(550000),
+  weeklyHours: integer('weekly_hours').notNull().default(40), startDate: text('start_date').notNull(),
+  employmentReference: text('employment_reference').notNull(), emergencyContact: text('emergency_contact'),
+  passwordChangeRequired: boolean('password_change_required').notNull().default(false),
+  onboardingAcknowledgedAt: ts('onboarding_acknowledged_at'), createdAt: createdAt(),
+});
+export const paydayTraining = pgTable('payday_training', {
+  id: id(), title: text('title').notNull(), content: text('content').notNull(),
+  required: boolean('required').notNull().default(true), active: boolean('active').notNull().default(true),
+  revision: integer('revision').notNull().default(1), createdBy: text('created_by').notNull().references(() => users.id), createdAt: createdAt(),
+});
+export const paydayCompletions = pgTable('payday_completions', {
+  id: id(), userId: text('user_id').notNull().references(() => users.id),
+  moduleId: text('module_id').notNull().references(() => paydayTraining.id), revision: integer('revision').notNull(), createdAt: createdAt(),
+}, t => [uniqueIndex('payday_training_completion').on(t.userId, t.moduleId, t.revision)]);
+export const paydayEmployers = pgTable('payday_employers', {
+  id: id(), ownerId: text('owner_id').notNull().references(() => users.id), createdBy: text('created_by').notNull().references(() => users.id),
+  clientKey: text('client_key').notNull(), requestHash: text('request_hash').notNull(),
+  legalName: text('legal_name').notNull(), registrationNumber: text('registration_number').notNull().unique(),
+  contactName: text('contact_name').notNull(), contactChannel: text('contact_channel').notNull(), address: text('address').notNull(),
+  headcount: integer('headcount').notNull(), permissionReference: text('permission_reference').notNull(),
+  nextAction: text('next_action').notNull(), followUpAt: ts('follow_up_at').notNull(), stage: text('stage').notNull().default('NEW'),
+  version: integer('version').notNull().default(1), agreementReference: text('agreement_reference'),
+  lenderReference: text('lender_reference'), payrollReference: text('payroll_reference'),
+  policyVersion: text('policy_version').notNull(), commissionCents: integer('commission_cents').notNull(),
+  bufferCents: integer('buffer_cents').notNull(), onboardingCents: integer('onboarding_cents').notNull(), createdAt: createdAt(),
+}, t => [uniqueIndex('payday_lead_sync_key').on(t.createdBy, t.clientKey), index('payday_lead_owner').on(t.ownerId)]);
+export const paydayVisits = pgTable('payday_visits', {
+  id: id(), employerId: text('employer_id').notNull().references(() => paydayEmployers.id), repId: text('rep_id').notNull().references(() => users.id),
+  clientKey: text('client_key').notNull(), requestHash: text('request_hash').notNull(), outcome: text('outcome').notNull(),
+  notes: text('notes').notNull(), nextAction: text('next_action').notNull(), followUpAt: ts('follow_up_at').notNull(), createdAt: createdAt(),
+}, t => [uniqueIndex('payday_visit_sync_key').on(t.repId, t.clientKey)]);
+export const paydayEntries = pgTable('payday_entries', {
+  id: id(), employerId: text('employer_id').notNull().references(() => paydayEmployers.id), kind: text('kind').notNull(),
+  amountCents: integer('amount_cents').notNull(), reference: text('reference').notNull().unique(), evidence: text('evidence').notNull(),
+  lenderId: text('lender_id').references(() => lenderOrgs.id), reversesId: text('reverses_id').unique(),
+  createdBy: text('created_by').notNull().references(() => users.id), verifiedBy: text('verified_by').references(() => users.id),
+  rejectedAt: ts('rejected_at'), settledAt: ts('settled_at').notNull(), createdAt: createdAt(),
+}, t => [index('payday_entries_employer').on(t.employerId)]);
+export const paydayAwards = pgTable('payday_awards', {
+  id: id(), employerId: text('employer_id').notNull().unique().references(() => paydayEmployers.id),
+  repId: text('rep_id').notNull().references(() => users.id), amountCents: integer('amount_cents').notNull(),
+  approvedBy: text('approved_by').notNull().references(() => users.id), approvedAt: createdAt(),
+  paidBy: text('paid_by').references(() => users.id), paidAt: ts('paid_at'), paymentReference: text('payment_reference'),
+});
+export const paydayKit = pgTable('payday_kit', {
+  id: id(), userId: text('user_id').notNull().references(() => users.id), item: text('item').notNull(), quantity: integer('quantity').notNull(),
+  issuedBy: text('issued_by').notNull().references(() => users.id), issuedAt: createdAt(), acknowledgedAt: ts('acknowledged_at'), returnedAt: ts('returned_at'),
+});
+export const paydayStatements = pgTable('payday_statements', {
+  id: id(), userId: text('user_id').notNull().references(() => users.id), period: text('period').notNull(),
+  basicCents: integer('basic_cents').notNull(), otherCents: integer('other_cents').notNull().default(0),
+  commissionCents: integer('commission_cents').notNull(),
+  deductions: jsonb('deductions').$type<{ label: string; cents: number }[]>().notNull(), netCents: integer('net_cents').notNull(),
+  status: text('status').notNull().default('DRAFT'), payrollEvidence: text('payroll_evidence').notNull(),
+  createdBy: text('created_by').notNull().references(() => users.id), createdAt: createdAt(),
+  approvedBy: text('approved_by').references(() => users.id), approvedAt: ts('approved_at'),
+  paidBy: text('paid_by').references(() => users.id), paidAt: ts('paid_at'), paymentReference: text('payment_reference').unique(),
+});
+export const paydayStatementAwards = pgTable('payday_statement_awards', {
+  id: id(), statementId: text('statement_id').notNull().references(() => paydayStatements.id),
+  awardId: text('award_id').notNull().unique().references(() => paydayAwards.id),
+});

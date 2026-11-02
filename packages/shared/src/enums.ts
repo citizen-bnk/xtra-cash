@@ -5,6 +5,7 @@ export const Role = {
   CONSUMER: 'CONSUMER',
   LENDER: 'LENDER',
   AFFILIATE: 'AFFILIATE',
+  SALES_REP: 'SALES_REP',
   ADMIN: 'ADMIN',
   SUPER_ADMIN: 'SUPER_ADMIN',
 } as const;

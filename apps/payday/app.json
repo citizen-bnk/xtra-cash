@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "XTRA Payday Field",
+    "slug": "xtra-payday-field",
+    "scheme": "xtrapayday",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "owner": "xtra-cash-team",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "bundleIdentifier": "za.co.xtracash.payday",
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "za.co.xtracash.payday",
+      "edgeToEdgeEnabled": true,
+      "permissions": []
+    },
+    "plugins": [
+      "expo-secure-store"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "bd0c6777-47e1-42d0-9c34-42632abf6526"
+      }
+    }
+  }
+}

@@ -20,7 +20,8 @@
     "test:access": "node test/access-flow.cjs && node test/browser-session.cjs",
     "test:esm": "node --no-experimental-require-module test/esm-load.cjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:marketing": "node test/marketing-flow.cjs"
+    "test:marketing": "node test/marketing-flow.cjs",
+    "test:payday": "node test/payday-flow.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",
