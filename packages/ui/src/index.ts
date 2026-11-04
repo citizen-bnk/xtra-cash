@@ -3,3 +3,4 @@ export * from './api';
 export * from './shell';
 export * from './demo';
 export * from './passkeys';
+export * from './personal-settlement';

@@ -115,7 +115,7 @@ export interface PersonalLoanMatch {
   monthlyInstallmentCents: number; totalRepayableCents: number; costOfCreditCents: number;
 }
 export interface PersonalLoanApplication extends PersonalLoanInput {
-  id: string; userId: string; status: 'SUBMITTED' | 'REFERRED' | 'UNDER_REVIEW' | 'DECLINED'; createdAt: string;
+  id: string; userId: string; status: 'SUBMITTED' | 'REFERRED' | 'UNDER_REVIEW' | 'ACTION_REQUIRED' | 'OFFERED' | 'ACCEPTED' | 'FUNDING_PENDING' | 'DISBURSED' | 'FUNDING_FAILED' | 'DECLINED' | 'CANCELLED'; createdAt: string;
   reviewNotes?: string | null;
   lenderId: string | null; firstName?: string; lastName?: string;
 }

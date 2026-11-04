@@ -21,7 +21,8 @@
     "test:esm": "node --no-experimental-require-module test/esm-load.cjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:marketing": "node test/marketing-flow.cjs",
-    "test:payday": "node test/payday-flow.cjs"
+    "test:payday": "node test/payday-flow.cjs",
+    "test:settlement": "node test/settlement-flow.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

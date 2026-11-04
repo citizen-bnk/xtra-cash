@@ -5,6 +5,7 @@ import { InjectDb } from '../common/db.module';
 import { Db, DbOrTx } from '../db/client';
 import { kycProfiles, lenderOrgs, loanOffers, loans, users } from '../db/schema';
 import { SettingsService } from '../common/settings.service';
+import { agreements, movements } from '../personal-loans/settlement.schema';
 import {
   affordableInstallmentCents,
   allocate,
@@ -54,9 +55,15 @@ export class CreditService {
     if (open.some((l) => l.status === 'IN_ARREARS')) {
       return { ...base, profile, reasonIfNone: 'You have an overdue installment. Settle it to unlock new credit.' };
     }
-    const existingInstallments = open.reduce((s, l) => s + quoteLoan(l.principalCents, l).monthlyInstallmentCents, 0);
+    // Reserved personal loans also consume affordability while banking is processing.
+    const pendingPersonal = await conn.select({ terms: agreements.terms }).from(movements)
+      .innerJoin(agreements, eq(movements.agreementId, agreements.id))
+      .where(and(eq(movements.userId, userId), eq(movements.kind, 'FUNDING'), inArray(movements.status, ['QUEUED','PROCESSING','PENDING'])));
+    const existingInstallments = open.reduce((s, l) => s + quoteLoan(l.principalCents, l).monthlyInstallmentCents, 0)
+      + pendingPersonal.reduce((s, p) => s + p.terms.monthlyInstallmentCents, 0);
     const openByOffer = new Map<string, number>();
     for (const l of open) openByOffer.set(l.offerId, (openByOffer.get(l.offerId) ?? 0) + l.principalCents);
+    for (const p of pendingPersonal) openByOffer.set(p.terms.offerId, (openByOffer.get(p.terms.offerId) ?? 0) + p.terms.principalCents);
 
     const s = await this.settings.get(conn);
     const affordable = affordableInstallmentCents(profile, existingInstallments, s.affordabilityRatioBps);

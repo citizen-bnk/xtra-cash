@@ -246,7 +246,7 @@ export const personalLoanApplications = pgTable('personal_loan_applications', {
   amountCents: integer('amount_cents').notNull(), termMonths: integer('term_months').notNull(),
   purpose: text('purpose').notNull(), monthlyIncomeCents: integer('monthly_income_cents').notNull(),
   monthlyExpensesCents: integer('monthly_expenses_cents').notNull(),
-  status: text('status').$type<'SUBMITTED' | 'REFERRED' | 'UNDER_REVIEW' | 'DECLINED'>().notNull().default('SUBMITTED'),
+  status: text('status').$type<'SUBMITTED' | 'REFERRED' | 'UNDER_REVIEW' | 'ACTION_REQUIRED' | 'OFFERED' | 'ACCEPTED' | 'FUNDING_PENDING' | 'DISBURSED' | 'FUNDING_FAILED' | 'DECLINED' | 'CANCELLED'>().notNull().default('SUBMITTED'),
   reviewNotes: text('review_notes'), reviewedAt: ts('reviewed_at'),
   lenderId: text('lender_id').references(() => lenderOrgs.id), offerId: text('offer_id').references(() => loanOffers.id),
   idempotencyKey: text('idempotency_key').notNull(), consentAt: ts('consent_at').notNull(), createdAt: createdAt(),

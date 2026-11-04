@@ -56,7 +56,7 @@ export default function ConsumerHome() {
   const QUICK = [
     { label: 'Pay', icon: ScanLine, onClick: requestPay, primary: true },
     { label: 'Top up', icon: Plus, onClick: () => setTopUp(true) },
-    { label: 'Activity', icon: ReceiptText, href: '/app/activity' },
+    { label: 'Bank transfer', icon: Wallet, href: '/app/wallet' },
     { label: 'Loan', icon: HandCoins, href: '/app/personal-loan' },
   ];
 
