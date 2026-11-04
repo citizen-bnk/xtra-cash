@@ -321,6 +321,10 @@ async function main() {
       funding.id,
     );
     assert.equal((await db.select().from(schema.loans)).length, 0);
+    const {CreditService}=require('../dist/consumer/credit.service');
+    const pendingContext=await app.get(CreditService).context(c.user.id,db,'PERSONAL');
+    assert.equal(pendingContext.affordableCents,450000-17255,'Pending personal funding must consume affordability before a card or other borrowing decision');
+    assert.equal(pendingContext.eligible.find(o=>o.offerId===offer.id).userOpenPrincipalCents,100000);
     assert.equal(
       (await http().get("/wallet").set(bearer(c.accessToken)).expect(200)).body
         .availableCents,
