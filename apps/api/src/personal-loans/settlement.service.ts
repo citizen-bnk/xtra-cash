@@ -37,6 +37,7 @@ import { SettingsService } from "../common/settings.service";
 import { AuthUser } from "../common/auth";
 import { encryptIdentity, decryptIdentity } from "../auth/identity-crypto";
 import { MoneyConnector, MoneyEvent, providerEvent } from "./money-connector";
+import { lenderAgentRuns } from "./lender-ai.schema";
 import {
   approveInput,
   acceptInput,
@@ -173,7 +174,9 @@ export class SettlementService {
           return r;
         })()
       : null;
+    const [humanReview]=await this.db.select().from(lenderAgentRuns).where(and(eq(lenderAgentRuns.applicationId,id),eq(lenderAgentRuns.step,"HUMAN_REVIEW"),eq(lenderAgentRuns.result,"OPEN")));
     return {
+      humanReviewPending:!!humanReview,
       application: app,
       agreement: visible,
       timeline,
@@ -226,7 +229,7 @@ export class SettlementService {
       return { ok: true };
     });
   }
-  async approve(a: AuthUser, id: string, input: z.infer<typeof approveInput>) {
+  async approve(a: AuthUser, id: string, input: z.infer<typeof approveInput>, conn?: DbOrTx) {
     const now = Date.now(),
       assessed = new Date(input.assessedAt),
       expires = new Date(input.expiresAt);
@@ -240,7 +243,7 @@ export class SettlementService {
       throw new BadRequestException(
         "Use a current assessment and an expiry within seven days of that assessment.",
       );
-    return this.db.transaction(async (tx) => {
+    const perform = async (tx: DbOrTx) => {
       const app = await this.app(a, id, tx, true);
       if (app.userId === a.id)
         throw new ForbiddenException(
@@ -252,7 +255,9 @@ export class SettlementService {
         )
       )
         throw new ConflictException("Application already has a decision.");
+      const [humanReview]=await tx.select().from(lenderAgentRuns).where(and(eq(lenderAgentRuns.applicationId,id),eq(lenderAgentRuns.step,"HUMAN_REVIEW"),eq(lenderAgentRuns.result,"OPEN")));if(humanReview)throw new BadRequestException("Resolve the requested human review before offering credit.");
       const u = await this.eligibleUser(app.userId, tx);
+      if(!app.lenderId||!app.offerId)throw new BadRequestException('The verified applicant must select one matched lender product before a lending offer can be authorised.');
       const [offer] = await tx
         .select()
         .from(loanOffers)
@@ -358,7 +363,8 @@ export class SettlementService {
         tx,
       );
       return { id: agreement.id, digest: agreement.digest };
-    });
+    };
+    return conn ? perform(conn) : this.db.transaction(perform);
   }
   async accept(a: AuthUser, id: string, input: z.infer<typeof acceptInput>) {
     if (!this.configuration().agreementsEnabled)
@@ -368,6 +374,7 @@ export class SettlementService {
     await this.password(a, input.password);
     return this.db.transaction(async (tx) => {
       const app = await this.app(a, id, tx, true);
+      const [humanReview]=await tx.select().from(lenderAgentRuns).where(and(eq(lenderAgentRuns.applicationId,id),eq(lenderAgentRuns.step,"HUMAN_REVIEW"),eq(lenderAgentRuns.result,"OPEN")));if(humanReview)throw new BadRequestException("Your requested human review is still pending.");
       if (app.userId !== a.id) throw new ForbiddenException();
       const [ag] = await tx
         .select()
