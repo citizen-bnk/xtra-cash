@@ -9,6 +9,7 @@ import {
   type MoneyConfiguration,
 } from "@xtra/shared";
 import { useApi, useAuth } from "./api";
+import { DecisionAiWorkspace, ManualDecisionForm } from "./lender-ai";
 import {
   Alert,
   Button,
@@ -36,6 +37,7 @@ export function PersonalSettlementView({
   reviewer?: boolean;
 }) {
   const { client, me } = useAuth();
+  const [preparationMode, setPreparationMode] = useState<"AI" | "MANUAL">("AI");
   const data = useApi(
     (c) =>
       c.request<PersonalSettlement>(
@@ -44,32 +46,11 @@ export function PersonalSettlementView({
       ),
     [applicationId],
   );
-  const products = useApi(
-    async (c) =>
-      reviewer
-        ? me?.roles.some((r) => r === "ADMIN" || r === "SUPER_ADMIN")
-          ? c.admin.offers()
-          : c.lender.offers()
-        : ([] as LoanOffer[]),
-    [reviewer, me?.id],
-  );
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [password, setPassword] = useState(""),
     [ack, setAck] = useState(false),
     [message, setMessage] = useState("");
-  const [offerId, setOfferId] = useState(""),
-    [assessmentReference, setAssessment] = useState(""),
-    [mandateReference, setMandate] = useState(""),
-    [legalReference, setLegal] = useState(""),
-    [agreementTerms, setTerms] = useState(""),
-    [checked, setChecked] = useState(false);
-  const [assessedAt, setAssessed] = useState(() =>
-      new Date().toISOString().slice(0, 16),
-    ),
-    [expiresAt, setExpires] = useState(() =>
-      new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 16),
-    );
   async function act(action: string, body: unknown = {}) {
     setBusy(true);
     setError("");
@@ -139,111 +120,64 @@ export function PersonalSettlementView({
           <p className="mt-2">{d.application.reviewNotes}</p>
         </Card>
       )}
-      {reviewer && reviewStates.includes(d.application.status) && (
-        <Card className="space-y-4">
-          <h2 className="text-xl font-bold">Approve a personalised offer</h2>
-          <p className="text-sm text-muted">
-            Complete the lender's financial assessment and record the evidence
-            below. Approval prepares a fixed agreement; a different
-            administrator releases funding after acceptance.
-          </p>
-          <Field label="Personal-loan product">
-            <Select
-              value={offerId}
-              onChange={(e) => setOfferId(e.target.value)}
-            >
-              <option value="">Select a product</option>
-              {products.data
-                ?.filter((o) => o.productType === "PERSONAL" && o.active)
-                .map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name} · {o.termMonths} months
-                  </option>
-                ))}
-            </Select>
-          </Field>
-          <Field label="Assessment evidence reference">
-            <Input
-              value={assessmentReference}
-              onChange={(e) => setAssessment(e.target.value)}
-              placeholder="Secure case reference for credit report, verified income and affordability"
-            />
-          </Field>
-          <Field label="Repayment mandate reference">
-            <Input
-              value={mandateReference}
-              onChange={(e) => setMandate(e.target.value)}
-            />
-          </Field>
-          <Field label="Legal approval / terms version reference">
-            <Input
-              value={legalReference}
-              onChange={(e) => setLegal(e.target.value)}
-            />
-          </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Assessment time (UTC)">
-              <Input
-                type="datetime-local"
-                value={assessedAt}
-                onChange={(e) => setAssessed(e.target.value)}
+      {reviewer &&
+        (reviewStates.includes(d.application.status) ||
+          d.humanReviewPending) && (
+          <section className="space-y-3">
+            <div className="flex gap-2">
+              <Button
+                variant={preparationMode === "AI" ? "primary" : "secondary"}
+                onClick={() => setPreparationMode("AI")}
+              >
+                Prepare with AI chat
+              </Button>
+              <Button
+                variant={preparationMode === "MANUAL" ? "primary" : "secondary"}
+                onClick={() => setPreparationMode("MANUAL")}
+              >
+                Enter manually
+              </Button>
+            </div>
+            {preparationMode === "AI" ? (
+              <DecisionAiWorkspace
+                applicationId={applicationId}
+                onAdvanced={data.reload}
               />
-            </Field>
-            <Field label="Offer expires (UTC)">
-              <Input
-                type="datetime-local"
-                value={expiresAt}
-                onChange={(e) => setExpires(e.target.value)}
+            ) : (
+              <ManualDecisionForm
+                applicationId={applicationId}
+                onAdvanced={data.reload}
               />
-            </Field>
-          </div>
-          <Field
-            label="Lender-approved credit agreement terms"
-            hint="Include all approved conditions, repayment arrangements, insurance disclosures where applicable, rights and complaint contacts."
-          >
-            <Textarea
-              rows={10}
-              maxLength={20000}
-              value={agreementTerms}
-              onChange={(e) => setTerms(e.target.value)}
-            />
-          </Field>
-          <label className="flex gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={checked}
-              onChange={(e) => setChecked(e.target.checked)}
-            />
-            I confirm the lender has completed and evidenced responsible-lending
-            checks and approved these terms and the repayment arrangement.
-          </label>
-          <Button
-            loading={busy}
-            disabled={
-              !checked ||
-              !offerId ||
-              agreementTerms.trim().length < 100 ||
-              [assessmentReference, mandateReference, legalReference].some(
-                (x) => x.trim().length < 5,
-              )
-            }
-            onClick={() =>
-              act("approve", {
-                offerId,
-                assessmentReference,
-                mandateReference,
-                legalReference,
-                assessedAt: new Date(assessedAt + "Z").toISOString(),
-                expiresAt: new Date(expiresAt + "Z").toISOString(),
-                agreementTerms,
-                responsibleLendingConfirmed: true,
-              })
-            }
-          >
-            Approve and prepare agreement
-          </Button>
-        </Card>
+            )}
+          </section>
+        )}
+      {d.humanReviewPending && (
+        <Alert tone="amber">
+          The applicant has requested human review. Automatic offers and
+          agreement acceptance are paused until the review is resolved.
+        </Alert>
       )}
+      {!reviewer &&
+        d.application.lenderId &&
+        [...reviewStates, "OFFERED"].includes(d.application.status) && (
+          <Card className="space-y-3">
+            <Field label="Questions for a human reviewer">
+              <Textarea
+                value={message}
+                maxLength={500}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+            </Field>
+            <Button
+              variant="secondary"
+              loading={busy}
+              disabled={message.trim().length < 3}
+              onClick={() => act("human-review", { message })}
+            >
+              Request human review
+            </Button>
+          </Card>
+        )}
       {ag && (
         <Card className="space-y-4">
           <div className="flex flex-wrap justify-between gap-2">
@@ -330,8 +264,7 @@ export function PersonalSettlementView({
           )}
         </Card>
       )}
-      {((reviewer && reviewStates.includes(d.application.status)) ||
-        (!reviewer && d.application.status === "ACTION_REQUIRED")) && (
+      {!reviewer && d.application.status === "ACTION_REQUIRED" && (
         <Card className="space-y-3">
           <Field
             label={
@@ -664,7 +597,14 @@ export function WalletTransferView() {
 }
 export function MoneyOperationsView() {
   const { client } = useAuth();
-  const reconciliation = useApi((c) => c.request<{trialBalanceCents:number;walletMismatches:unknown[];reservationMismatches:unknown[];note:string}>("GET","/money/reconciliation"));
+  const reconciliation = useApi((c) =>
+    c.request<{
+      trialBalanceCents: number;
+      walletMismatches: unknown[];
+      reservationMismatches: unknown[];
+      note: string;
+    }>("GET", "/money/reconciliation"),
+  );
   const data = useApi((c) =>
     c.request<{
       configuration: MoneyConfiguration;
@@ -700,7 +640,22 @@ export function MoneyOperationsView() {
       {error && <Alert tone="red">{error}</Alert>}
       {data.error && <Alert tone="red">{data.error}</Alert>}
       {reconciliation.error && <Alert tone="red">{reconciliation.error}</Alert>}
-      {reconciliation.data && <Card className="space-y-2"><h2 className="text-lg font-bold">Internal accounting checks</h2><p>Trial balance difference: {formatZAR(reconciliation.data.trialBalanceCents)}. Wallet mismatches: {reconciliation.data.walletMismatches.length}. Reservation mismatches: {reconciliation.data.reservationMismatches.length}.</p><p className="text-sm text-muted">{reconciliation.data.note}</p><Button variant="secondary" size="sm" onClick={reconciliation.reload}>Recheck accounting</Button></Card>}
+      {reconciliation.data && (
+        <Card className="space-y-2">
+          <h2 className="text-lg font-bold">Internal accounting checks</h2>
+          <p>
+            Trial balance difference:{" "}
+            {formatZAR(reconciliation.data.trialBalanceCents)}. Wallet
+            mismatches: {reconciliation.data.walletMismatches.length}.
+            Reservation mismatches:{" "}
+            {reconciliation.data.reservationMismatches.length}.
+          </p>
+          <p className="text-sm text-muted">{reconciliation.data.note}</p>
+          <Button variant="secondary" size="sm" onClick={reconciliation.reload}>
+            Recheck accounting
+          </Button>
+        </Card>
+      )}
       {data.data && (
         <>
           <Alert tone={data.data.configuration.enabled ? "blue" : "amber"}>

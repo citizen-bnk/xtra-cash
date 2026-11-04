@@ -12,6 +12,7 @@ const NAV = [
   { href: '/lender/campaigns', label: 'Nearby campaigns', short: 'Campaigns', icon: Tags },
   { href: '/lender/loans', label: 'Loan book', short: 'Loans', icon: FileStack },
   { href: '/lender/applications', label: 'Loan applications', short: 'Applications', icon: FileStack },
+  { href: '/lender/ai', label: 'XTRA-Lender-AI', short: 'Lender AI', icon: Tags },
 ];
 
 export default function LenderLayout({ children }: { children: React.ReactNode }) {

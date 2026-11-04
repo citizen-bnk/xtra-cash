@@ -4,3 +4,4 @@ export * from './shell';
 export * from './demo';
 export * from './passkeys';
 export * from './personal-settlement';
+export * from './lender-ai';
