@@ -8,7 +8,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
-import { createHash, randomUUID } from "crypto";
+import { createHash } from "crypto";
 import { compare } from "bcryptjs";
 import { addMonths, quoteLoan, formatZAR } from "@xtra/shared";
 import { z } from "zod";
