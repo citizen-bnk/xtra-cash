@@ -77,6 +77,7 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
                 </Link>
               ))}
             </nav>
+            <LoanActionCentre/>
             <div className="flex items-center gap-1 md:hidden">
               <Link href="/app/activity" aria-label="Activity" className="pressable grid h-10 w-10 place-items-center rounded-full text-ink">
                 <ReceiptText className="h-5 w-5" />
@@ -88,7 +89,6 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
           </div>
         </header>
         <main key={pathname} className="mx-auto max-w-5xl px-4 py-5 animate-fade-in md:py-6">
-          <LoanActionCentre/>
           {children}
         </main>
         <nav aria-label="App" className="safe-pb fixed inset-x-0 bottom-0 z-30 border-t border-line/70 bg-white/95 backdrop-blur-md md:hidden">

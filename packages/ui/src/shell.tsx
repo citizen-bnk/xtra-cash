@@ -171,7 +171,8 @@ export function AppShell({
         </div>
       )}
       <main className={cx('lg:pl-60', nav.length > 1 && 'pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0')}>
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8"><LoanActionCentre/><WorkFormAssistant pathname={pathname}/>{children}</div>
+        <header className="sticky top-0 z-30 flex items-center justify-end gap-2 border-b border-line bg-white px-4 py-2"><WorkFormAssistant pathname={pathname}/><LoanActionCentre/></header>
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">{children}</div>
       </main>
     </div>
   );

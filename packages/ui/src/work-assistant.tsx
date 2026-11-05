@@ -2,7 +2,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync, createPortal } from "react-dom";
 import { useApi, useAuth } from "./api";
-import { Alert, Button, Card, Field, Input, Textarea } from "./components";
+import { Alert, Button, Card, Field, Input, Textarea, Modal } from "./components";
+import { Sparkles } from 'lucide-react';
 type Prefs = {
   mode: "MANUAL" | "ASSIST" | "AUTO_PREPARE";
   instructions: string;
@@ -47,6 +48,7 @@ export function applyPreparedControl(
   });
 }
 export function WorkFormAssistant({ pathname }: { pathname: string }) {
+  const [popup, setPopup] = useState(false);
   const { client, me } = useAuth();
   const allowed =
     !!me?.roles.some(
@@ -486,5 +488,5 @@ export function WorkFormAssistant({ pathname }: { pathname: string }) {
       )}
     </section>
   );
-  return portalTarget ? createPortal(content, portalTarget) : content;
+  return <><button type="button" aria-label="Work assistance" title="Work assistance" onClick={() => { setPopup(true); setExpanded(true); }} className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-ink hover:bg-surface"><Sparkles className="h-5 w-5" /></button><Modal open={popup} title="Work assistance" onClose={() => setPopup(false)}>{content}</Modal></>;
 }

@@ -460,12 +460,7 @@ export class LoanOperationsService {
       read?: boolean;
     }[] = [];
     let rows: (typeof applications.$inferSelect)[] = [];
-    if (office(a))
-      rows = await this.db
-        .select()
-        .from(applications)
-        .orderBy(desc(applications.createdAt))
-        .limit(100);
+    if (office(a)) rows = [];
     else if (a.roles.includes("LENDER")) {
       const account = await this.db.query.lenderOrgs.findFirst({
         where: eq(lenderOrgs.ownerUserId, a.id),

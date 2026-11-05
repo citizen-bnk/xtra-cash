@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowUpRight, Loader2, X } from 'lucide-react';
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
@@ -264,8 +265,8 @@ export function Modal({ open, onClose, title, children, footer }: { open: boolea
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
-  if (!open) return null;
-  return (
+  if (!open || typeof document === 'undefined') return null;
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 animate-fade-in sm:items-center sm:p-4" onClick={onClose}>
       {/* Phones: a bottom sheet with a grab handle that clears the home indicator. */}
       <div role="dialog" aria-modal className="max-h-[92dvh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-[24px] bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] shadow-xl animate-sheet-up sm:rounded-2xl sm:pb-5" onClick={(e) => e.stopPropagation()}>
@@ -279,8 +280,8 @@ export function Modal({ open, onClose, title, children, footer }: { open: boolea
         {children}
         {footer && <div className="mt-5 flex justify-end gap-2">{footer}</div>}
       </div>
-    </div>
-  );
+      </div>, document.body
+    );
 }
 
 export function Tabs<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { value: T; label: string; count?: number }[] }) {

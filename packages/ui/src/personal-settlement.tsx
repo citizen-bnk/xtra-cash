@@ -38,6 +38,7 @@ export function PersonalSettlementView({
   reviewer?: boolean;
 }) {
   const { client, me } = useAuth();
+  const [intervening, setIntervening] = useState(false);
   const [preparationMode, setPreparationMode] = useState<"AI" | "MANUAL">(
     "MANUAL",
   );
@@ -140,6 +141,7 @@ export function PersonalSettlementView({
       />
       <StatusBadge status={d.application.status} />
       <LoanJourney status={d.application.status} reviewer={reviewer} />
+      {isOffice && <div className="flex items-center justify-between gap-3 rounded-xl border p-3"><p className="text-sm text-muted">Staff oversight · Customer and lender manage this loan.</p><Button variant="secondary" onClick={() => setIntervening(!intervening)}>{intervening ? 'Close intervention' : 'Intervene'}</Button></div>}
       {isOffice && d.application.status === "ACCEPTED" && (
         <Alert tone="blue">The applicant accepted the agreement. Finance can now release the lender-funded wallet transfer.</Alert>
       )}
@@ -156,7 +158,8 @@ export function PersonalSettlementView({
           <p className="mt-2">{d.application.reviewNotes}</p>
         </Card>
       )}
-      {reviewer &&
+      {isOffice && intervening && reviewStates.includes(d.application.status) && <Card className="space-y-3"><Field label="Intervention message"><Textarea value={message} maxLength={500} onChange={e => setMessage(e.target.value)}/></Field><Button loading={busy} disabled={message.trim().length < 3} onClick={() => act('information', {message})}>Request clarification</Button></Card>}
+      {reviewer && !isOffice &&
         (reviewStates.includes(d.application.status) ||
           d.humanReviewPending) && (
           <section className="space-y-3">
@@ -286,7 +289,7 @@ export function PersonalSettlementView({
               </Button>
             </div>
           )}
-          {reviewer && isOffice && d.application.status === "ACCEPTED" && (
+          {reviewer && isOffice && intervening && d.application.status === "ACCEPTED" && (
             <Button
               loading={busy}
               disabled={!d.configuration.enabled || ag.approvedBy === me?.id}

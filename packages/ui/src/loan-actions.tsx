@@ -67,11 +67,11 @@ export function LoanActionCentre() {
   }
   return (
     <section
-      className="mb-5 rounded-2xl border border-line bg-white p-4"
+      className="inline-flex"
       aria-label="Loan tasks and notifications"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div className="hidden">
           <h2 className="font-bold">Your next actions</h2>
           <p className="text-sm text-muted">
             {data.data?.notifications.length
@@ -98,6 +98,7 @@ export function LoanActionCentre() {
             )}
           </button>
           <Button
+            className="hidden"
             variant="secondary"
             onClick={() => {
               setOpen(!open);
