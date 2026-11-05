@@ -275,6 +275,7 @@ export class SettlementService {
         .where(eq(loanOffers.id, input.offerId));
       if (
         !offer ||
+        offer.id !== app.offerId ||
         !offer.active ||
         offer.productType !== "PERSONAL" ||
         offer.termMonths !== app.termMonths ||

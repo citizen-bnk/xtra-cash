@@ -31,6 +31,7 @@ import {
   routingRequests,
   routingInvitations,
   decisionSessions as lenderDecisionSessions,
+  lenderAssessments,
 } from "./lender-ai.schema";
 import { applicationEvents, agreements } from "./settlement.schema";
 import { parse } from "../payday/payday.dto";
@@ -327,6 +328,8 @@ export class RoutingService {
       .from(agreements)
       .where(eq(agreements.applicationId, id));
     if (agreement) throw new ConflictException("An agreement already exists.");
+    const [assessment]=await conn.select().from(lenderAssessments).where(eq(lenderAssessments.applicationId,id));
+    if(assessment&&input.action!=='DECLINE')throw new ConflictException('A lender assessment is recorded. Start a fresh application to change the assigned lender or product.');
     const policy = await this.policy(conn),
       [request] = await conn
         .select()

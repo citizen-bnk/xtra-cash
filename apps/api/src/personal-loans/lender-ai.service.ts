@@ -200,6 +200,8 @@ export class LenderAiService {
       }
     if (
       assessment?.decision === "APPROVED" &&
+      assessment.lenderId === app.lenderId &&
+      assessment.offerId === app.offerId &&
       assessment.expiresAt.getTime() > Date.now() &&
       Object.values(assessment.checks).every(Boolean)
     ) {

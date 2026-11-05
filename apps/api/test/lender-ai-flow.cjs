@@ -758,6 +758,10 @@ const modelCalls = [];
     const {distanceKm}=require('../dist/personal-loans/routing');assert.ok(distanceKm({latitude:-26.1076,longitude:28.0567},{latitude:-26.2,longitude:28.04})>10);
     await http().put('/personal-loans/routing/policy').set(bearer(staff)).send({...routingPolicy,version:0,confirmed:true}).expect(409);
     await saveRouting({mode:'ADMIN',automation:'OFF',geography:'PRODUCT_AREA'});
+    const lockedRouting=await submitRouting('routing-assessment-lock');assert.equal((await choose(lockedRouting,[offer.id])).status,201);
+    await db.insert(aiSchema.lenderAssessments).values({applicationId:lockedRouting.id,lenderId:org.id,eventId:'routing-lock-assessment',payloadHash:'test-lock',offerId:offer.id,assessmentReference:'ASSESS-LOCK',mandateReference:'MANDATE-LOCK',assessedAt:new Date(),expiresAt:new Date(Date.now()+3600000),decision:'APPROVED',checks:{identity:true,income:true,credit:true,affordability:true,mandate:true}});
+    assert.equal((await choose(lockedRouting,[extraOffer.id])).status,409);
+    assert.equal((await choose(lockedRouting,[],'CLEAR')).status,409);
     console.log(
       "PASS: chat preparation, encrypted persistent drafts, exact-source grounding, version conflicts, explicit authorisation, single-lender isolation, human-review pause/resolution, automatic engagement/offer gates, signed assessments, daily caps and controlled form assistance.",
     );
