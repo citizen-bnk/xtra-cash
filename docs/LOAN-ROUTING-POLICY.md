@@ -10,6 +10,8 @@ This policy supersedes the earlier applicant-choice default. **ADMIN** matching 
 
 The pool is not an unrestricted broadcast of personal data. Before claiming, a lender sees only the request reference, amount, term, purpose, province and matching product. Names, financial declarations, KYC documents, private notes and agreements are excluded from that preview. Full existing lender access starts only after assignment/claim. Other lenders' claims fail once the row is assigned. The separate admin viewing-grant feature remains available and does not grant decision powers.
 
+A recorded underwriting assessment locks reassignment/clearing to its lender/product; use a fresh application if a different lender is needed. Human administrative decline remains available before an agreement/decision. Assessment defaults are loaded only for the currently assigned lender and exact product, and approval must use that product.
+
 For admin shortlists, each product must belong to a different lender; limits are one to ten lenders. One selection assigns directly. Several selections create invitations; they do not create simultaneous approval powers. Human credit review, agreement acceptance and money gates remain separate. A decided application or one with an agreement cannot be rerouted. Reassignment resets the prior decision chat rather than exposing the prior lender's conversation or carrying its assessment references to another lender.
 
 ## Automatic matching and AI assistance
