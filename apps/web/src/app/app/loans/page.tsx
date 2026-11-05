@@ -1,7 +1,7 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { formatZAR } from '@xtra/shared';
-import { Loading, PageHeader, StatusBadge, Table, useApi } from '@xtra/ui';
+import { Button, Loading, PageHeader, StatusBadge, Table, useApi } from '@xtra/ui';
 import { PersonalLoanWorkspace } from '@/components/PersonalLoanWorkspace';
 
 export default function LoansPage() {
@@ -25,6 +25,7 @@ export default function LoansPage() {
           { header: 'Next due', cell: (l) => (l.nextDue ? `${formatZAR(l.nextDue.amountCents - l.nextDue.paidCents)} · ${new Date(l.nextDue.dueDate).toLocaleDateString('en-ZA')}` : '—') },
           { header: 'Outstanding', align: 'right', cell: (l) => <span className="font-semibold">{formatZAR(l.outstandingCents)}</span> },
           { header: 'Status', cell: (l) => <StatusBadge status={l.status} /> },
+          { header: 'Action', cell: (l) => <Button variant="secondary" onClick={e=>{e.stopPropagation();router.push(`/app/loans/${l.id}`);}}>View repayments</Button> },
         ]}
       /></section>}
     </div>
