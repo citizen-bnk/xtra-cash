@@ -483,16 +483,6 @@ export class LoanOperationsService {
         .where(eq(applications.lenderId, org.id))
         .orderBy(desc(applications.createdAt))
         .limit(100);
-      for (const opportunity of await this.queue(a))
-        notifications.push({
-          key: `competition:${opportunity.id}:${opportunity.version}`,
-          applicationId: opportunity.id,
-          title: "Prepare a matching offer",
-          description: `A consented request for ${opportunity.termMonths} months is open. Create a product if needed; the first valid authorised offer wins.`,
-          cta: "Prepare offer",
-          kind: "COMPETITION",
-          owner: "Lender",
-        });
     } else
       rows = await this.db
         .select()
@@ -519,14 +509,11 @@ export class LoanOperationsService {
           "The applicant accepted. A separate authorised administrator must release funding when banking is active.";
         cta = "Review funding";
         owner = "Finance admin";
-      } else if (
-        a.roles.includes("LENDER") &&
-        openStates.includes(app.status)
-      ) {
+      } else if (a.roles.includes("LENDER") && openStates.includes(app.status)) {
         title = "Complete the lending assessment";
         description =
-          "Prepare the evidence, review the quotation and authorise the next stage.";
-        cta = "Prepare decision";
+          "Review this customer request and make an offer if it fits your lending criteria. The first lender to offer proceeds to the customer for acceptance.";
+        cta = "Review and make offer";
         owner = "Lender";
       } else if (app.userId === a.id && app.status === "ACTION_REQUIRED") {
         title = "Your application needs information";

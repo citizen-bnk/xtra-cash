@@ -105,7 +105,8 @@ export class SettlementService {
         .select()
         .from(lenderOrgs)
         .where(eq(lenderOrgs.ownerUserId, a.id));
-      if (!l || l.id !== app.lenderId || l.accreditationStatus !== "ACCREDITED")
+      const openForOffer = !app.lenderId && ["SUBMITTED", "REFERRED", "UNDER_REVIEW", "ACTION_REQUIRED"].includes(app.status);
+      if (!l || l.accreditationStatus !== "ACCREDITED" || (!openForOffer && l.id !== app.lenderId))
         throw new NotFoundException();
     }
     return app;
@@ -268,7 +269,6 @@ export class SettlementService {
         throw new ConflictException("Application already has a decision.");
       const [humanReview]=await tx.select().from(lenderAgentRuns).where(and(eq(lenderAgentRuns.applicationId,id),eq(lenderAgentRuns.step,"HUMAN_REVIEW"),eq(lenderAgentRuns.result,"OPEN")));if(humanReview)throw new BadRequestException("Resolve the requested human review before offering credit.");
       const u = await this.eligibleUser(app.userId, tx);
-      if(!app.lenderId||!app.offerId)throw new BadRequestException('An authorised referral must assign a matched lender product before a lending offer can be authorised.');
       const [offer] = await tx
         .select()
         .from(loanOffers)
@@ -304,6 +304,8 @@ export class SettlementService {
         throw new BadRequestException(
           "The selected product belongs to another lender.",
         );
+      if (!app.lenderId || !app.offerId)
+        await tx.update(applications).set({ lenderId: lender.id, offerId: offer.id, status: "REFERRED" }).where(eq(applications.id, id));
       const settings = await this.settings.get(tx);
       if (
         offer.monthlyInterestRateBps > settings.maxRateBps ||

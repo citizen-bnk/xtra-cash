@@ -444,8 +444,8 @@ export function LoanJourney({
 }) {
   const steps = [
     "Apply",
-    "Review & match",
-    "Lender offer",
+    "Lenders notified",
+    "Offer received",
     "Applicant acceptance",
     "Wallet funding",
     "Own-bank EFT",
@@ -491,7 +491,7 @@ export function LoanJourney({
                   : status === "DECLINED"
                     ? "The request was declined. Read the recorded reason and contact support if you need human review."
                     : reviewer
-                      ? "Administration matches a lender or releases a consented request for offers. Lenders assess; the first valid authorised competing offer wins."
+            ? "All active accredited lenders receive this request. One lender can make an offer; you then decide whether to accept it."
                       : "Administration is reviewing and matching your request. You will receive an in-app notification when you need to act."}
       </p>
     </Card>

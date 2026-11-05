@@ -82,19 +82,7 @@ export class PersonalLoanService {
   }
 
   async matches(userId: string, dto: PersonalApplicationDto) {
-    const policy=await this.routing.policy();
-    if(policy.mode!=='APPLICANT')return {locked:true,matches:[],reason:policy.mode==='ADMIN'?'XTRA-CASH administration matches your request to suitable lenders. You do not need to select a lender.':'Your consented request can be claimed by an eligible lender in the configured service area.'};
-    const v = await this.verification(userId);
-    if (v.status !== 'VERIFIED') return { locked: true, reason: 'Complete KYC and FICA before viewing matched lenders.', matches: [] };
-    const ctx = await this.credit.context(userId, this.db, 'PERSONAL', dto);
-    if (!ctx.profile) return { locked: true, reason: ctx.reasonIfNone, matches: [] };
-    let nearbyIds:string[]|null=null;
-    if(policy.geography==='VICINITY'){const pending=await this.db.query.personalLoanApplications.findFirst({where:and(eq(personalLoanApplications.userId,userId),eq(personalLoanApplications.idempotencyKey,dto.idempotencyKey))});nearbyIds=pending?(await this.routing.candidates(pending.id)).map(c=>c.offerId):[];}
-    const matches = ctx.eligible.filter(o => (!nearbyIds||nearbyIds.includes(o.offerId))&&o.termMonths === dto.termMonths && dto.amountCents >= o.minAmountCents && dto.amountCents <= offerCapacity(o, ctx.affordableCents)).map(o => {
-      const q = quoteLoan(dto.amountCents, o);
-      return { offerId: o.offerId, lenderName: o.lenderName, offerName: o.offerName, termMonths: o.termMonths, monthlyInstallmentCents: q.monthlyInstallmentCents, totalRepayableCents: q.totalRepayableCents, costOfCreditCents: q.costOfCreditCents };
-    }).sort((a, b) => a.totalRepayableCents - b.totalRepayableCents);
-    return { locked: false, reason: matches.length ? null : ctx.reasonIfNone ?? 'No personal loan offers match the requested amount, period and affordability right now.', matches };
+    return { locked: true, matches: [], reason: 'Your request is sent to all active accredited lenders. You do not select a lender; a lender will make an offer if it fits their criteria.' };
   }
 
   async apply(u: AuthUser, dto: PersonalApplicationDto) {
@@ -102,17 +90,11 @@ export class PersonalLoanService {
     if (user?.status !== 'ACTIVE') throw new ForbiddenException('Account unavailable');
     if (!user.profileComplete) throw new BadRequestException('Complete your name and surname first');
     const policy=await this.routing.policy();
-    if(dto.offerId&&policy.mode!=='APPLICANT')throw new BadRequestException('Lender selection is managed by the current platform routing policy.');
+    if(dto.offerId) throw new BadRequestException('Lender selection is not part of the XTRA-CASH request flow. Lenders receive the request and make offers directly.');
     if((dto.latitude===undefined)!==(dto.longitude===undefined))throw new BadRequestException('Provide both location coordinates.');
     if(dto.latitude!==undefined&&!dto.routingConsent)throw new BadRequestException('Routing consent is required to supply matching location.');
     const routingConsent = dto.routingConsent !== false;
-    let lenderId: string | null = null;
-    if (dto.offerId) {
-      const match = await this.matches(u.id, dto);
-      if (match.locked || !match.matches.some(m => m.offerId === dto.offerId)) throw new BadRequestException('This lender match is not available. Refresh your application.');
-      const offer = await this.db.query.loanOffers.findFirst({ where: eq(loanOffers.id, dto.offerId) });
-      lenderId = offer!.lenderId;
-    }
+    const lenderId: string | null = null;
     return this.db.transaction(async tx => {
       await tx.select({ id: users.id }).from(users).where(eq(users.id, u.id)).for('update');
       const existing = await tx.query.personalLoanApplications.findFirst({ where: and(eq(personalLoanApplications.userId, u.id), eq(personalLoanApplications.idempotencyKey, dto.idempotencyKey)) });
@@ -124,7 +106,7 @@ export class PersonalLoanService {
       if (routingConsent) await tx.insert(competitionConsents).values({ applicationId: app.id, userId: u.id }).onConflictDoNothing();
       await tx.insert(applicationEvents).values({applicationId:app.id,actorId:u.id,status:app.status,message:lenderId?'Your application was sent to the selected lender for review.':'Your application was submitted for review.'});
       return app;
-    }).then(async app=>{if(policy.mode==='ADMIN'&&policy.automation!=='OFF'&&routingConsent)await this.routing.automate(u,app.id).catch(()=>undefined);return (await this.db.query.personalLoanApplications.findFirst({where:eq(personalLoanApplications.id,app.id)}))!;});
+    }).then(async app=>(await this.db.query.personalLoanApplications.findFirst({where:eq(personalLoanApplications.id,app.id)}))!);
   }
 
   list(userId: string) { return this.db.query.personalLoanApplications.findMany({ where: eq(personalLoanApplications.userId, userId), orderBy: desc(personalLoanApplications.createdAt), limit: 30 }); }
@@ -133,8 +115,8 @@ export class PersonalLoanService {
     if (!org) throw new NotFoundException();
     if (org.accreditationStatus !== 'ACCREDITED') return [];
     const grants=await this.db.select({id:applicationLenderAccess.applicationId}).from(applicationLenderAccess).where(and(eq(applicationLenderAccess.lenderId,org.id),eq(applicationLenderAccess.active,1)));
-    const rows=await this.db.select({ ...applicationFields, firstName: users.firstName, lastName: users.lastName }).from(personalLoanApplications).innerJoin(users, eq(users.id, personalLoanApplications.userId)).where(or(eq(personalLoanApplications.lenderId, org.id),inArray(personalLoanApplications.id,grants.map(g=>g.id)))).orderBy(desc(personalLoanApplications.createdAt)).limit(100);
-    return rows.map(r=>({...r,reviewNotes:r.lenderId===org.id?r.reviewNotes:null,accessMode:r.lenderId===org.id?'SELECTED_LENDER':'SHARED_VIEW'}));
+    const rows=await this.db.select({ ...applicationFields, firstName: users.firstName, lastName: users.lastName }).from(personalLoanApplications).innerJoin(users, eq(users.id, personalLoanApplications.userId)).where(or(inArray(personalLoanApplications.status,['SUBMITTED','REFERRED','UNDER_REVIEW','ACTION_REQUIRED']),eq(personalLoanApplications.lenderId, org.id),inArray(personalLoanApplications.id,grants.map(g=>g.id)))).orderBy(desc(personalLoanApplications.createdAt)).limit(100);
+    return rows.map(r=>({...r,reviewNotes:r.lenderId===org.id?r.reviewNotes:null,accessMode:r.lenderId===org.id?'SELECTED_LENDER':'OPEN_POOL'}));
   }
   reviewApplications() { return this.db.select({ ...applicationFields, firstName: users.firstName, lastName: users.lastName }).from(personalLoanApplications).innerJoin(users, eq(users.id, personalLoanApplications.userId)).orderBy(desc(personalLoanApplications.createdAt)).limit(100); }
   async reviewApplication(actor: AuthUser, id: string, dto: ApplicationReviewDto) {
@@ -174,7 +156,6 @@ export class PersonalLoanService {
       if (dto.approve) await tx.update(kycProfiles).set({ status: 'VERIFIED', verifiedAt: new Date() }).where(eq(kycProfiles.userId, userId));
       await this.audit.log(actor, 'personal_verification.reviewed', 'user', userId, { approved: dto.approve }, tx);
     });
-    if(dto.approve){const pending=await this.db.query.personalLoanApplications.findMany({where:and(eq(personalLoanApplications.userId,userId),eq(personalLoanApplications.status,'SUBMITTED')),limit:10});for(const a of pending)await this.routing.automate(actor,a.id).catch(()=>undefined);}
     return this.verification(userId);
   }
 }

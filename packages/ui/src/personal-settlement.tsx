@@ -1,8 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { ApplicationLenderAccess } from "./application-lender-access";
-import { ApplicationRouting } from "./routing";
-import { CompetitionRelease, LoanJourney } from "./loan-competition";
+import { LoanJourney } from "./loan-competition";
 import {
   formatZAR,
   type LoanOffer,
@@ -131,7 +129,7 @@ export function PersonalSettlementView({
     <div className="space-y-5">
       <PageHeader
         title={
-          reviewer ? "Lending decision and funding" : "Your loan application"
+          reviewer ? "Review request and make an offer" : "Your loan application"
         }
         subtitle={`${formatZAR(d.application.amountCents)} · ${d.application.termMonths} months · ${d.application.purpose}`}
         actions={
@@ -142,33 +140,8 @@ export function PersonalSettlementView({
       />
       <StatusBadge status={d.application.status} />
       <LoanJourney status={d.application.status} reviewer={reviewer} />
-      {(!reviewer || isOffice) &&
-        reviewStates.includes(d.application.status) && (
-          <CompetitionRelease
-            applicationId={applicationId}
-            reviewer={!!isOffice}
-            onChanged={data.reload}
-          />
-        )}
-      {isOffice && reviewStates.includes(d.application.status) && (
-        <details className="rounded-xl border p-3">
-          <summary className="cursor-pointer font-semibold">
-            Manual matching and lender access
-          </summary>
-          <ApplicationRouting
-            applicationId={applicationId}
-            onChanged={data.reload}
-          />
-          <ApplicationLenderAccess applicationId={applicationId} />
-        </details>
-      )}
-      {isOffice && !reviewStates.includes(d.application.status) && (
-        <details className="rounded-xl border p-3">
-          <summary className="cursor-pointer font-semibold">
-            Additional lender viewing access
-          </summary>
-          <ApplicationLenderAccess applicationId={applicationId} />
-        </details>
+      {isOffice && d.application.status === "ACCEPTED" && (
+        <Alert tone="blue">The applicant accepted the agreement. Finance can now release the lender-funded wallet transfer.</Alert>
       )}
       {(error || data.error) && <Alert tone="red">{error || data.error}</Alert>}
       {!d.configuration.enabled && (
