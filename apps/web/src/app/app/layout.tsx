@@ -52,21 +52,21 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
   return (
     <RequireRole roles={['CONSUMER', 'AFFILIATE', 'LENDER']}>
       <MarketingLocationObserver />
-      <div className="min-h-[100dvh] pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+      <div className="min-h-[100dvh] pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
         <header className="safe-pt sticky top-0 z-30 border-b border-line/70 bg-white/90 backdrop-blur-md">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5 md:py-3">
-            <Link href="/app" aria-label="XTRA-CASH home" className="hidden md:block">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5 lg:py-3">
+            <Link href="/app" aria-label="XTRA-CASH home" className="hidden lg:block">
               <Logo />
             </Link>
             {/* Phones: brand mark + greeting, like a banking app. */}
-            <Link href="/app" className="flex min-w-0 items-center gap-2.5 md:hidden">
+            <Link href="/app" className="flex min-w-0 items-center gap-2.5 lg:hidden">
               <Logo markOnly size={32} />
               <span className="min-w-0 leading-tight">
                 <span className="block text-[11px] font-medium text-muted">Sawubona</span>
                 <span className="block truncate text-sm font-bold">{me?.firstName ?? 'XTRA-CASH'}</span>
               </span>
             </Link>
-            <nav className="hidden gap-1 md:flex">
+            <nav className="hidden gap-1 lg:flex">
               {NAV.map((n) => (
                 <Link
                   key={n.href}
@@ -78,7 +78,7 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
               ))}
             </nav>
             <LoanActionCentre/>
-            <div className="flex items-center gap-1 md:hidden">
+            <div className="flex items-center gap-1 lg:hidden">
               <Link href="/app/activity" aria-label="Activity" className="pressable grid h-10 w-10 place-items-center rounded-full text-ink">
                 <ReceiptText className="h-5 w-5" />
               </Link>
@@ -88,10 +88,10 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
             </div>
           </div>
         </header>
-        <main key={pathname} className="mx-auto max-w-5xl px-4 py-5 animate-fade-in md:py-6">
+        <main key={pathname} className="mx-auto max-w-5xl px-4 py-5 animate-fade-in lg:py-6">
           {children}
         </main>
-        <nav aria-label="App" className="safe-pb fixed inset-x-0 bottom-0 z-30 border-t border-line/70 bg-white/95 backdrop-blur-md md:hidden">
+        <nav aria-label="App" className="safe-pb fixed inset-x-0 bottom-0 z-30 border-t border-line/70 bg-white/95 backdrop-blur-md lg:hidden">
           <div className="mx-auto grid max-w-md grid-cols-5 items-end">
             {TABS.slice(0, 2).map(tab)}
             <div className="flex justify-center">

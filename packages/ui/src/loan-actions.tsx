@@ -33,8 +33,7 @@ export function LoanActionCentre() {
         ),
       [me?.id],
     );
-  const [open, setOpen] = useState(false),
-    [bellOpen, setBellOpen] = useState(false),
+  const [bellOpen, setBellOpen] = useState(false),
     [active, setActive] = useState<Notification | null>(null),
     [notice, setNotice] = useState("");
   useEffect(() => {
@@ -97,40 +96,8 @@ export function LoanActionCentre() {
               </span>
             )}
           </button>
-          <Button
-            className="hidden"
-            variant="secondary"
-            onClick={() => {
-              setOpen(!open);
-              data.reload();
-            }}
-          >
-            Tasks & notifications{unread ? ` (${unread})` : ""}
-          </Button>
         </div>
       </div>
-      {data.error && <Alert tone="red">{data.error}</Alert>}
-      {notice && <Alert tone="amber">{notice}</Alert>}
-      {open && (
-        <div className="mt-3 space-y-2">
-          {data.data?.notifications.map((n) => (
-            <div key={n.key} className="rounded-xl border p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <strong>{n.title}</strong>
-                <span className="text-xs">
-                  {n.owner} · {n.read ? "Viewed" : "New"}
-                </span>
-              </div>
-              <p className="my-2 text-sm">{n.description}</p>
-              <Button onClick={() => act(n)}>{n.cta}</Button>
-            </div>
-          ))}
-          <p className="text-xs text-muted">
-            Notifications refresh while the app is open. Email, SMS and push
-            delivery are not activated by this inbox.
-          </p>
-        </div>
-      )}
       <Modal
         open={bellOpen}
         title={unread ? `Unread notifications (${unread})` : "Notifications"}
@@ -139,6 +106,8 @@ export function LoanActionCentre() {
           data.reload();
         }}
       >
+        {data.error && <Alert tone="red">{data.error}</Alert>}
+        {notice && <Alert tone="amber">{notice}</Alert>}
         {unread ? (
           <div className="space-y-3">
             {data.data?.notifications.filter((n) => !n.read).map((n) => (
