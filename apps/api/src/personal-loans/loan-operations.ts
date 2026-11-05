@@ -9,7 +9,7 @@ import {
   Param,
   Post,
 } from "@nestjs/common";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { CurrentUser, Roles, type AuthUser } from "../common/auth";
 import { InjectDb } from "../common/db.module";
@@ -480,7 +480,7 @@ export class LoanOperationsService {
       rows = await this.db
         .select()
         .from(applications)
-        .where(eq(applications.lenderId, org.id))
+        .where(or(inArray(applications.status, openStates), eq(applications.lenderId, org.id)))
         .orderBy(desc(applications.createdAt))
         .limit(100);
     } else
