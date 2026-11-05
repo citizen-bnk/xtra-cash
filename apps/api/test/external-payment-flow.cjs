@@ -43,6 +43,13 @@ async function main(){
  assert.equal((await db.select().from(schema.lenderOrgs))[0].availableCents,500000);
  assert.equal((await db.select().from(schema.personalLoanApplications))[0].status,'DISBURSED');
  assert.equal(audit.length,1);
+ const [fresh]=await db.insert(schema.personalLoanApplications).values({userId:customer.id,amountCents:100000,termMonths:6,purpose:'Transport',monthlyIncomeCents:1500000,monthlyExpensesCents:500000,status:'SUBMITTED',consentAt:new Date(),idempotencyKey:'approval-reference-test'}).returning();
+ const approvalService=new SettlementService(db,null,{log:async()=>{}},{get:async()=>({maxRateBps:500,maxMonthlyServiceFeeCents:6900})},{});
+ approvalService.eligibleUser=async()=>customer;
+ await approvalService.approve({id:lender.id,roles:['LENDER']},fresh.id,{offerId:product.id,responsibleLendingConfirmed:true});
+ const [prepared]=await db.select().from(s.agreements).where(eq(s.agreements.applicationId,fresh.id));
+ assert.equal(prepared.terms.depositReference,loanDepositReference(fresh.id));
+ assert.ok(prepared.content.includes(prepared.terms.depositReference));
  console.log('PASS: external payment role/consent gates, accepted-agreement requirement, funding collision prevention, concurrent retries, single loan/schedule, stable deposit reference, audit and unchanged wallet/lender cash.');
  } finally {await pg.close();}
 }
