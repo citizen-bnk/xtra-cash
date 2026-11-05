@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import type { PlatformSettings } from '@xtra/shared';
+import {RoutingSettings} from '@xtra/ui';
 import { Alert, Button, Card, Field, Input, Loading, MoneyInput, PageHeader, useAction, useApi, useAuth, useToast } from '@xtra/ui';
 
 export default function SettingsPage() {
@@ -32,7 +33,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Platform settings" subtitle="Responsible-lending guardrails, fees and commissions." actions={canEdit && <Button loading={save.loading} onClick={() => save.run()}>Save changes</Button>} />
-      {!canEdit && <Alert tone="blue">Only super-admins can change platform settings.</Alert>}
+      <RoutingSettings/>
+      {!canEdit && <Alert tone="blue">Only super-admins can change the financial settings below. Admins and super-admins can manage lender matching above.</Alert>}
       <Alert tone="amber" title="Compliance">Caps must reflect the current National Credit Act regulations. Confirm with your compliance officer before changing them.</Alert>
       {save.error && <Alert tone="red">{save.error}</Alert>}
       <Card>

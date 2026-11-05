@@ -1,0 +1,1 @@
+ALTER TABLE "application_routing" ADD COLUMN "consent_mode" text NOT NULL;

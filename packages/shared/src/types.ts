@@ -108,6 +108,9 @@ export interface PersonalLoanInput {
   consent: boolean;
   idempotencyKey: string;
   offerId?: string;
+  routingConsent?:boolean;
+  latitude?:number;
+  longitude?:number;
 }
 
 export interface PersonalLoanMatch {

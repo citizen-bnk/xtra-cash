@@ -25,6 +25,7 @@ async function main() {
   const pg = new PGlite(), db = drizzle(pg, { schema });
   console.log('Test: applying migrations to isolated database');
   await migrate(db, { migrationsFolder: path.join(__dirname, '../drizzle') });
+  await db.insert(schema.platformSettings).values({key:'personalLoanRouting',value:{mode:'APPLICANT',automation:'OFF',maxLenders:1,geography:'PRODUCT_AREA',radiusKm:25,version:0}});
   console.log('Test: booting isolated HTTP application');
   const module = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider('DB_BUNDLE').useValue({ db, pool: { end: () => pg.close() } }).compile();
   const app = module.createNestApplication({ rawBody: true, logger: false });

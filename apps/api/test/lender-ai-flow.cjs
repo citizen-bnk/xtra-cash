@@ -107,6 +107,9 @@ const modelCalls = [];
       })
       .returning();
     const staff = (await app.get(AuthService).issueTokens(admin)).accessToken;
+    const defaultPolicy=(await http().get('/personal-loans/routing/policy').set(bearer(staff)).expect(200)).body;
+    assert.equal(defaultPolicy.mode,'ADMIN');assert.equal(defaultPolicy.automation,'OFF');
+    await http().put('/personal-loans/routing/policy').set(bearer(staff)).send({...defaultPolicy,mode:'APPLICANT',confirmed:true}).expect(200);
     const [org] = await db
       .update(schema.lenderOrgs)
       .set({
@@ -405,6 +408,7 @@ const modelCalls = [];
       "OFFERED",
     );
     assert.equal((await db.select().from(schema.loans)).length, 0);
+
     console.log(
       "Lender AI: human review pauses acceptance and is resolved by an authorised reviewer",
     );
@@ -714,6 +718,46 @@ const modelCalls = [];
       })
       .expect(400);
     assert.equal((await db.select().from(schema.loans)).length, 0);
+    console.log('Routing: admin default, assignment, invitations, pool claims, geography, consent and manual decline');
+    let routingPolicy=(await http().get('/personal-loans/routing/policy').set(bearer(staff)).expect(200)).body;
+    const saveRouting=async patch=>{const result=await http().put('/personal-loans/routing/policy').set(bearer(staff)).send({...routingPolicy,...patch,confirmed:true}).expect(200);routingPolicy=result.body;};
+    await http().put('/personal-loans/routing/policy').set(bearer(lender.accessToken)).send({...routingPolicy,mode:'ADMIN',confirmed:true}).expect(403);
+    await saveRouting({mode:'ADMIN',automation:'OFF',maxLenders:2});
+    const submitRouting=async(key,consent=true)=>(await http().post('/personal-loans/applications').set(bearer(consumer.accessToken)).send({amountCents:100000,termMonths:6,purpose:'Transport',monthlyIncomeCents:1500000,monthlyExpensesCents:500000,consent:true,idempotencyKey:key,...(consent?{routingConsent:true}:{})}).expect(201)).body;
+    const choose=async(app,ids,action='ASSIGN')=>http().post(`/personal-loans/routing/applications/${app.id}`).set(bearer(staff)).send({action,offerIds:ids,reason:'Reviewed routing test evidence',confirmed:true});
+    const ra=await submitRouting('routing-admin-default');assert.equal(ra.lenderId,null);assert.equal(ra.status,'SUBMITTED');
+    await http().post('/personal-loans/applications').set(bearer(consumer.accessToken)).send({amountCents:100000,termMonths:6,purpose:'Transport',monthlyIncomeCents:1500000,monthlyExpensesCents:500000,consent:true,idempotencyKey:'cannot-force-lender',offerId:offer.id}).expect(400);
+    assert.equal((await http().post('/personal-loans/matches').set(bearer(consumer.accessToken)).send({amountCents:100000,termMonths:6,purpose:'Transport',monthlyIncomeCents:1500000,monthlyExpensesCents:500000,consent:true,idempotencyKey:'routing-admin-default'}).expect(200)).body.locked,true);
+    assert.equal((await choose(ra,[offer.id])).status,201);
+    assert.equal((await db.query.personalLoanApplications.findFirst({where:eq(schema.personalLoanApplications.id,ra.id)})).lenderId,org.id);
+    const noConsent=await submitRouting('routing-needs-consent',false);assert.equal((await choose(noConsent,[offer.id])).status,400);
+    await http().post(`/personal-loans/routing/applications/${noConsent.id}/consent`).set(bearer(other.accessToken)).send({confirmed:true}).expect(404);
+    await http().post(`/personal-loans/routing/applications/${noConsent.id}/consent`).set(bearer(consumer.accessToken)).send({confirmed:true}).expect(201);
+    assert.equal((await choose(noConsent,[],'CLEAR')).status,201);
+    assert.equal((await http().post(`/personal-loans/routing/applications/${noConsent.id}/claim`).set(bearer(otherLender.accessToken)).send({offerId:offer.id,confirmed:true})).status,404);
+    assert.equal((await choose(noConsent,[],'DECLINE')).status,201);
+    assert.equal((await db.query.personalLoanApplications.findFirst({where:eq(schema.personalLoanApplications.id,noConsent.id)})).status,'DECLINED');
+    await db.update(schema.lenderOrgs).set({availableCents:10000000}).where(eq(schema.lenderOrgs.id,extraOrg.id));
+    const {id:oldOfferId,...copyOffer}=offer;const [extraOffer]=await db.insert(schema.loanOffers).values({...copyOffer,lenderId:extraOrg.id,name:'Second eligible personal product'}).returning();
+    const multi=await submitRouting('routing-multiple');assert.equal((await choose(multi,[offer.id,extraOffer.id])).status,201);
+    const invitation=(await http().get('/personal-loans/routing/queue').set(bearer(otherLender.accessToken)).expect(200)).body.find(x=>x.id===multi.id);
+    assert.ok(invitation);assert.equal(invitation.firstName,undefined);assert.equal(invitation.monthlyIncomeCents,undefined);
+    await http().get('/personal-loans/applications/'+multi.id).set(bearer(otherLender.accessToken)).expect(404);
+    await http().post(`/personal-loans/routing/applications/${multi.id}/claim`).set(bearer(otherLender.accessToken)).send({offerId:extraOffer.id,confirmed:true}).expect(201);
+    await http().post(`/personal-loans/routing/applications/${multi.id}/claim`).set(bearer(lender.accessToken)).send({offerId:offer.id,confirmed:true}).expect(409);
+    assert.equal((await db.query.personalLoanApplications.findFirst({where:eq(schema.personalLoanApplications.id,multi.id)})).lenderId,extraOrg.id);
+    await saveRouting({mode:'OPEN_POOL',automation:'OFF'});const poolApp=await submitRouting('routing-open-pool');
+    assert.ok((await http().get('/personal-loans/routing/queue').set(bearer(lender.accessToken)).expect(200)).body.some(x=>x.id===poolApp.id));
+    await http().post(`/personal-loans/routing/applications/${poolApp.id}/claim`).set(bearer(lender.accessToken)).send({offerId:offer.id,confirmed:true}).expect(201);
+    await saveRouting({mode:'ADMIN',automation:'ASSIGN',maxLenders:1});const autoApp=await submitRouting('routing-automatic');assert.ok(autoApp.lenderId);assert.equal(autoApp.status,'REFERRED');
+    await saveRouting({mode:'ADMIN',automation:'PREPARE'});const prepApp=await submitRouting('routing-prepare-only');assert.equal(prepApp.lenderId,null);
+    await saveRouting({mode:'ADMIN',automation:'ASSIGN',geography:'VICINITY',radiusKm:10});const missingLocation=await submitRouting('routing-no-location');assert.equal(missingLocation.lenderId,null);
+    await db.update(schema.loanOffers).set({locationTarget:{latitude:-26.1076,longitude:28.0567,radiusMeters:10000,label:'Sandton test'}}).where(eq(schema.loanOffers.id,offer.id));
+    await http().post(`/personal-loans/routing/applications/${missingLocation.id}/consent`).set(bearer(consumer.accessToken)).send({confirmed:true,latitude:-26.1076,longitude:28.0567}).expect(201);
+    const withLocation=(await http().post(`/personal-loans/routing/applications/${missingLocation.id}/automate`).set(bearer(staff)).send({}).expect(201)).body;assert.equal(withLocation.applied,true);
+    const {distanceKm}=require('../dist/personal-loans/routing');assert.ok(distanceKm({latitude:-26.1076,longitude:28.0567},{latitude:-26.2,longitude:28.04})>10);
+    await http().put('/personal-loans/routing/policy').set(bearer(staff)).send({...routingPolicy,version:0,confirmed:true}).expect(409);
+    await saveRouting({mode:'ADMIN',automation:'OFF',geography:'PRODUCT_AREA'});
     console.log(
       "PASS: chat preparation, encrypted persistent drafts, exact-source grounding, version conflicts, explicit authorisation, single-lender isolation, human-review pause/resolution, automatic engagement/offer gates, signed assessments, daily caps and controlled form assistance.",
     );

@@ -195,7 +195,7 @@ export class LenderAiService {
         conversation.draft[k] = defaults[k];
         conversation.provenance[k] =
           k === "offerId"
-            ? "Applicant-selected product or lender policy"
+            ? "Assigned product or lender policy"
             : "Lender-approved policy";
       }
     if (
@@ -782,7 +782,7 @@ export class LenderAiService {
       .from(applications)
       .where(eq(applications.id, input.applicationId));
     if (!app || app.lenderId !== input.lenderId) throw new NotFoundException();
-    if(app.offerId!==input.offerId)throw new BadRequestException('Assessment must refer to the applicant-selected product.');
+    if(app.offerId!==input.offerId)throw new BadRequestException('Assessment must refer to the assigned product.');
     const [existing] = await this.db
       .select()
       .from(lenderAssessments)

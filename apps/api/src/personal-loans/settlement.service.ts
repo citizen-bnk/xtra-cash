@@ -268,7 +268,7 @@ export class SettlementService {
         throw new ConflictException("Application already has a decision.");
       const [humanReview]=await tx.select().from(lenderAgentRuns).where(and(eq(lenderAgentRuns.applicationId,id),eq(lenderAgentRuns.step,"HUMAN_REVIEW"),eq(lenderAgentRuns.result,"OPEN")));if(humanReview)throw new BadRequestException("Resolve the requested human review before offering credit.");
       const u = await this.eligibleUser(app.userId, tx);
-      if(!app.lenderId||!app.offerId)throw new BadRequestException('The verified applicant must select one matched lender product before a lending offer can be authorised.');
+      if(!app.lenderId||!app.offerId)throw new BadRequestException('An authorised referral must assign a matched lender product before a lending offer can be authorised.');
       const [offer] = await tx
         .select()
         .from(loanOffers)

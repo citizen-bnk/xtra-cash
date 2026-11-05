@@ -7,7 +7,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { users, lenderOrgs, personalLoanApplications } from "../db/schema";
+import { users, lenderOrgs, personalLoanApplications, loanOffers } from "../db/schema";
 const time = (name: string) =>
   timestamp(name, { withTimezone: true, mode: "date" });
 export const applicationLenderAccess = pgTable("application_lender_access", {
@@ -19,6 +19,21 @@ export const applicationLenderAccess = pgTable("application_lender_access", {
   active: integer("active").notNull().default(1),
   updatedAt: time("updated_at").notNull().defaultNow(),
 }, t => [uniqueIndex("application_lender_access_pair").on(t.applicationId,t.lenderId)]);
+export const routingRequests=pgTable('application_routing',{
+ applicationId:text('application_id').primaryKey().references(()=>personalLoanApplications.id),
+ mode:text('mode').notNull(),
+ consentMode:text('consent_mode').notNull(),
+ consentAt:time('consent_at'),
+ encryptedLocation:text('encrypted_location'),
+ updatedAt:time('updated_at').notNull().defaultNow(),
+});
+export const routingInvitations=pgTable('application_routing_invitations',{
+ id:text('id').primaryKey().$defaultFn(()=>randomUUID()),
+ applicationId:text('application_id').notNull().references(()=>personalLoanApplications.id),
+ lenderId:text('lender_id').notNull().references(()=>lenderOrgs.id),
+ offerId:text('offer_id').notNull().references(()=>loanOffers.id),
+ active:integer('active').notNull().default(1),
+},t=>[uniqueIndex('routing_invitation_pair').on(t.applicationId,t.lenderId)]);
 export interface DecisionDraft {
   offerId?: string;
   assessmentReference?: string;
