@@ -19,6 +19,7 @@ export interface MoneyMovement {
   attempts: number;
 }
 export interface PersonalSettlement {
+  sharedReadOnly?:boolean;
   humanReviewPending?:boolean;
   application: PersonalLoanApplication;
   agreement: null | {

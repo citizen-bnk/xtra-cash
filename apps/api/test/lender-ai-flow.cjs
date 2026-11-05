@@ -198,6 +198,28 @@ const modelCalls = [];
       ).body.length,
       0,
     );
+    // Additional lenders receive explicitly scoped viewing access, never decision powers.
+    const extraOrg=await db.query.lenderOrgs.findFirst({where:eq(schema.lenderOrgs.ownerUserId,otherLender.user.id)});
+    const sharing={lenderId:extraOrg.id,active:true,authorityReference:'CONSENT-TEST-SHARING',confirmed:true};
+    await http().get(route+'/lender-access').set(bearer(otherLender.accessToken)).expect(403);
+    await http().post(route+'/lender-access').set(bearer(otherLender.accessToken)).send(sharing).expect(403);
+    await http().post(route+'/lender-access').set(bearer(staff)).send({...sharing,confirmed:false}).expect(400);
+    await http().post(route+'/lender-access').set(bearer(staff)).send(sharing).expect(201);
+    await http().post(route+'/lender-access').set(bearer(staff)).send(sharing).expect(201);
+    const sharedList=(await http().get('/lender/personal-applications').set(bearer(otherLender.accessToken)).expect(200)).body;
+    assert.equal(sharedList.filter(x=>x.id===a.id).length,1);
+    assert.equal(sharedList[0].accessMode,'SHARED_VIEW');
+    const sharedDetail=(await http().get(route).set(bearer(otherLender.accessToken)).expect(200)).body;
+    assert.equal(sharedDetail.sharedReadOnly,true);
+    assert.equal(sharedDetail.agreement,null);
+    assert.deepEqual(sharedDetail.timeline,[]);
+    assert.deepEqual(sharedDetail.funding,[]);
+    await http().get(route+'/decision-chat').set(bearer(otherLender.accessToken)).expect(404);
+    await http().post(route+'/review').set(bearer(otherLender.accessToken)).send({action:'REVIEW',notes:'Cannot change this shared application'}).expect(404);
+    await http().post(route+'/lender-access').set(bearer(staff)).send({...sharing,active:false,authorityReference:'REVOKED-TEST-SHARING'}).expect(201);
+    await http().get(route).set(bearer(otherLender.accessToken)).expect(404);
+    assert.equal((await http().get('/lender/personal-applications').set(bearer(otherLender.accessToken)).expect(200)).body.length,0);
+    await http().get(route).set(bearer(lender.accessToken)).expect(200);
     let settings = (
       await http()
         .get("/lender/ai/settings")

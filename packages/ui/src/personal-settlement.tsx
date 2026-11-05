@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import {ApplicationLenderAccess} from './application-lender-access';
 import {
   formatZAR,
   type LoanOffer,
@@ -77,6 +78,7 @@ export function PersonalSettlementView({
   const d = data.data,
     ag = d.agreement,
     isOffice = me?.roles.some((r) => r === "ADMIN" || r === "SUPER_ADMIN");
+  if(d.sharedReadOnly)return <div className="space-y-5"><PageHeader title="Shared loan application" subtitle="Viewing access granted by XTRA-CASH administration"/><Alert tone="blue">You can view this request. The applicant's selected lender retains decision authority. This access does not allow offers, changes, documents, agreements or funding.</Alert><Card><p>{formatZAR(d.application.amountCents)} · {d.application.termMonths} months</p><p>{d.application.purpose}</p><StatusBadge status={d.application.status}/><p className="mt-3">Monthly income: {formatZAR(d.application.monthlyIncomeCents)} · Expenses: {formatZAR(d.application.monthlyExpensesCents)}</p></Card><Button variant="secondary" onClick={data.reload}>Refresh access</Button></div>;
   function download() {
     if (!ag) return;
     const blob = new Blob(
@@ -107,6 +109,7 @@ export function PersonalSettlementView({
         }
       />
       <StatusBadge status={d.application.status} />
+      {isOffice&&<ApplicationLenderAccess applicationId={applicationId}/>}
       {(error || data.error) && <Alert tone="red">{error || data.error}</Alert>}
       {!d.configuration.enabled && (
         <Alert tone="amber">

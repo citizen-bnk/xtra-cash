@@ -10,6 +10,15 @@ import {
 import { users, lenderOrgs, personalLoanApplications } from "../db/schema";
 const time = (name: string) =>
   timestamp(name, { withTimezone: true, mode: "date" });
+export const applicationLenderAccess = pgTable("application_lender_access", {
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()),
+  applicationId: text("application_id").notNull().references(() => personalLoanApplications.id),
+  lenderId: text("lender_id").notNull().references(() => lenderOrgs.id),
+  grantedBy: text("granted_by").notNull().references(() => users.id),
+  authorityReference: text("authority_reference").notNull(),
+  active: integer("active").notNull().default(1),
+  updatedAt: time("updated_at").notNull().defaultNow(),
+}, t => [uniqueIndex("application_lender_access_pair").on(t.applicationId,t.lenderId)]);
 export interface DecisionDraft {
   offerId?: string;
   assessmentReference?: string;

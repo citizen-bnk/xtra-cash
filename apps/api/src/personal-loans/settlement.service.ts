@@ -37,7 +37,7 @@ import { SettingsService } from "../common/settings.service";
 import { AuthUser } from "../common/auth";
 import { encryptIdentity, decryptIdentity } from "../auth/identity-crypto";
 import { MoneyConnector, MoneyEvent, providerEvent } from "./money-connector";
-import { lenderAgentRuns } from "./lender-ai.schema";
+import { lenderAgentRuns, applicationLenderAccess } from "./lender-ai.schema";
 import {
   approveInput,
   acceptInput,
@@ -146,6 +146,17 @@ export class SettlementService {
     return u;
   }
   async detail(a: AuthUser, id: string) {
+    // Sharing grants read access to the request only. Mutation helpers retain
+    // their original selected-lender checks; agreements and evidence stay private.
+    if(a.roles.includes('LENDER')&&!isAdmin(a)){
+      const [shared]=await this.db.select({app:applications, viewerLenderId:lenderOrgs.id}).from(applicationLenderAccess)
+        .innerJoin(applications,eq(applications.id,applicationLenderAccess.applicationId))
+        .innerJoin(lenderOrgs,eq(lenderOrgs.id,applicationLenderAccess.lenderId))
+        .where(and(eq(applications.id,id),eq(lenderOrgs.ownerUserId,a.id),eq(lenderOrgs.accreditationStatus,'ACCREDITED'),eq(applicationLenderAccess.active,1)));
+      if(shared&&shared.app.lenderId!==shared.viewerLenderId){
+        return {sharedReadOnly:true,application:{...shared.app,reviewNotes:null},agreement:null,timeline:[],funding:[],configuration:this.configuration()};
+      }
+    }
     const app = await this.app(a, id);
     const [agreement] = await this.db
       .select()

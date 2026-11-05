@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, desc, eq, gte, lte, ne } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, ne, or, inArray } from 'drizzle-orm';
+import { applicationLenderAccess } from './lender-ai.schema';
 import { ageOn, parseSaId, quoteLoan } from '@xtra/shared';
 import { InjectDb } from '../common/db.module';
 import { Db } from '../db/client';
@@ -119,7 +120,9 @@ export class PersonalLoanService {
     const org = await this.db.query.lenderOrgs.findFirst({ where: eq(lenderOrgs.ownerUserId, u.id) });
     if (!org) throw new NotFoundException();
     if (org.accreditationStatus !== 'ACCREDITED') return [];
-    return this.db.select({ ...applicationFields, firstName: users.firstName, lastName: users.lastName }).from(personalLoanApplications).innerJoin(users, eq(users.id, personalLoanApplications.userId)).where(eq(personalLoanApplications.lenderId, org.id)).orderBy(desc(personalLoanApplications.createdAt)).limit(100);
+    const grants=await this.db.select({id:applicationLenderAccess.applicationId}).from(applicationLenderAccess).where(and(eq(applicationLenderAccess.lenderId,org.id),eq(applicationLenderAccess.active,1)));
+    const rows=await this.db.select({ ...applicationFields, firstName: users.firstName, lastName: users.lastName }).from(personalLoanApplications).innerJoin(users, eq(users.id, personalLoanApplications.userId)).where(or(eq(personalLoanApplications.lenderId, org.id),inArray(personalLoanApplications.id,grants.map(g=>g.id)))).orderBy(desc(personalLoanApplications.createdAt)).limit(100);
+    return rows.map(r=>({...r,reviewNotes:r.lenderId===org.id?r.reviewNotes:null,accessMode:r.lenderId===org.id?'SELECTED_LENDER':'SHARED_VIEW'}));
   }
   reviewApplications() { return this.db.select({ ...applicationFields, firstName: users.firstName, lastName: users.lastName }).from(personalLoanApplications).innerJoin(users, eq(users.id, personalLoanApplications.userId)).orderBy(desc(personalLoanApplications.createdAt)).limit(100); }
   async reviewApplication(actor: AuthUser, id: string, dto: ApplicationReviewDto) {
