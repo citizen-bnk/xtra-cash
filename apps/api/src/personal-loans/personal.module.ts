@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { LenderAccessService, LenderAccessController } from './lender-access';
 import {RoutingService,RoutingController} from './routing';
+import {LoanOperationsService,LoanOperationsController} from './loan-operations';
+import {LenderModule} from '../lender/lender.module';
 import { ConsumerModule } from "../consumer/consumer.module";
 import {
   PersonalLoanController,
@@ -28,8 +30,9 @@ import {
   WorkAssistantModel,
 } from "./work-assistant";
 @Module({
-  imports: [ConsumerModule],
+  imports: [ConsumerModule,LenderModule],
   controllers: [
+    LoanOperationsController,
     RoutingController,
     LenderAccessController,
     PersonalLoanController,
@@ -44,6 +47,7 @@ import {
     WorkAssistantController,
   ],
   providers: [
+    LoanOperationsService,
     RoutingService,
     LenderAccessService,
     PersonalLoanService,
