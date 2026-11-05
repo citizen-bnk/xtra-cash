@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Ellipsis, LogOut, X } from 'lucide-react';
 import { cx, Logo } from './components';
 import { WorkFormAssistant } from './work-assistant';
+import {LoanActionCentre} from './loan-actions';
 
 export interface NavItem {
   href: string;
@@ -170,7 +171,7 @@ export function AppShell({
         </div>
       )}
       <main className={cx('lg:pl-60', nav.length > 1 && 'pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0')}>
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8"><WorkFormAssistant pathname={pathname}/>{children}</div>
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8"><LoanActionCentre/><WorkFormAssistant pathname={pathname}/>{children}</div>
       </main>
     </div>
   );

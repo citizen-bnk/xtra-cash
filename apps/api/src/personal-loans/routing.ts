@@ -32,6 +32,7 @@ import {
   routingInvitations,
   decisionSessions as lenderDecisionSessions,
   lenderAssessments,
+  loanCompetitions,
 } from "./lender-ai.schema";
 import { applicationEvents, agreements } from "./settlement.schema";
 import { parse } from "../payday/payday.dto";
@@ -328,6 +329,7 @@ export class RoutingService {
       .from(agreements)
       .where(eq(agreements.applicationId, id));
     if (agreement) throw new ConflictException("An agreement already exists.");
+    const [competition]=await conn.select().from(loanCompetitions).where(and(eq(loanCompetitions.applicationId,id),eq(loanCompetitions.status,'OPEN')));if(competition)throw new ConflictException('This request is in a first-offer competition. Close the competition before changing matching.');
     const [assessment]=await conn.select().from(lenderAssessments).where(eq(lenderAssessments.applicationId,id));
     if(assessment&&input.action!=='DECLINE')throw new ConflictException('A lender assessment is recorded. Start a fresh application to change the assigned lender or product.');
     const policy = await this.policy(conn),
@@ -551,6 +553,7 @@ export class RoutingService {
       .limit(100);
     for (const { app, routing } of requests) {
       if (app.lenderId || !routing.consentAt) continue;
+      const [competition]=await this.db.select().from(loanCompetitions).where(and(eq(loanCompetitions.applicationId,app.id),eq(loanCompetitions.status,'OPEN')));if(competition)continue;
       const [invitation] = await this.db
         .select()
         .from(routingInvitations)
@@ -596,6 +599,7 @@ export class RoutingService {
         throw new ConflictException(
           "This application has already been assigned or decided.",
         );
+      const [competition]=await tx.select().from(loanCompetitions).where(and(eq(loanCompetitions.applicationId,id),eq(loanCompetitions.status,'OPEN')));if(competition)throw new ConflictException('This request is won by the first valid offer, not by claiming it.');
       const org = await tx.query.lenderOrgs.findFirst({
         where: eq(lenderOrgs.ownerUserId, actor.id),
       });

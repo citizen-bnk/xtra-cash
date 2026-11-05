@@ -322,11 +322,28 @@ export function DecisionAiWorkspace({
 export function ManualDecisionForm({
   applicationId,
   onAdvanced,
+  endpoint,
+  request,
 }: {
   applicationId: string;
   onAdvanced: () => void;
+  endpoint?: string;
+  request?: {
+    amountCents: number;
+    termMonths: number;
+    offerId?: string | null;
+  };
 }) {
   const { client, me } = useAuth();
+  const evidence = useApi(
+    (c) =>
+      c.request<{
+        assessmentReferences: string[];
+        mandateReferences: string[];
+        legalTemplates: { reference: string; terms: string }[];
+      }>("GET", `/loan-operations/evidence/${applicationId}`),
+    [applicationId],
+  );
   const products = useApi(
     (c) =>
       me?.roles.some((r) => r === "ADMIN" || r === "SUPER_ADMIN")
@@ -350,10 +367,19 @@ export function ManualDecisionForm({
     setBusy(true);
     setError("");
     try {
+      if (!draft.assessedAt || !draft.expiresAt)
+        throw new Error(
+          "Choose the assessment date/time and offer expiry before authorising.",
+        );
       await client.request(
         "POST",
-        `/personal-loans/applications/${applicationId}/approve`,
-        { ...draft, responsibleLendingConfirmed: true },
+        endpoint ?? `/personal-loans/applications/${applicationId}/approve`,
+        {
+          ...draft,
+          assessedAt: new Date(draft.assessedAt).toISOString(),
+          expiresAt: new Date(draft.expiresAt).toISOString(),
+          responsibleLendingConfirmed: true,
+        },
       );
       onAdvanced();
     } catch (e) {
@@ -364,7 +390,7 @@ export function ManualDecisionForm({
   }
   return (
     <Card className="space-y-4">
-      <h2 className="text-xl font-bold">Prepare the decision manually</h2>
+      <h2 className="text-xl font-bold">Guided lending decision</h2>
       {error && <Alert tone="red">{error}</Alert>}
       <Field label="Personal-loan product">
         <Select
@@ -373,10 +399,19 @@ export function ManualDecisionForm({
         >
           <option value="">Choose a product</option>
           {products.data
-            ?.filter((o) => o.productType === "PERSONAL" && o.active)
+            ?.filter(
+              (o) =>
+                o.productType === "PERSONAL" &&
+                o.active &&
+                (!request ||
+                  (o.termMonths === request.termMonths &&
+                    o.minAmountCents <= request.amountCents &&
+                    o.maxAmountPerUserCents >= request.amountCents &&
+                    (!request.offerId || o.id === request.offerId))),
+            )
             .map((o) => (
               <option key={o.id} value={o.id}>
-                {o.name}
+                {o.name} · {o.termMonths} months
               </option>
             ))}
         </Select>
@@ -395,17 +430,57 @@ export function ManualDecisionForm({
           label={labels[k]}
           hint={
             k.endsWith("At")
-              ? "Use an ISO time, for example 2026-11-04T10:00:00Z."
+              ? "Choose the local date and time. The system converts it securely for submission."
               : undefined
           }
         >
           <Input
+            type={k.endsWith("At") ? "datetime-local" : "text"}
+            list={
+              k.endsWith("At") ? undefined : `decision-${applicationId}-${k}`
+            }
             value={draft[k]}
             onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}
           />
+          {!k.endsWith("At") && (
+            <datalist id={`decision-${applicationId}-${k}`}>
+              {(k === "assessmentReference"
+                ? evidence.data?.assessmentReferences
+                : k === "mandateReference"
+                  ? evidence.data?.mandateReferences
+                  : evidence.data?.legalTemplates.map((t) => t.reference)
+              )?.map((value) => (
+                <option key={value} value={value} />
+              ))}
+            </datalist>
+          )}
         </Field>
       ))}
       <Field label="Lender-approved agreement wording">
+        <Select
+          aria-label="Approved agreement template"
+          value={draft.legalReference}
+          onChange={(e) => {
+            const template = evidence.data?.legalTemplates.find(
+              (t) => t.reference === e.target.value,
+            );
+            if (template)
+              setDraft({
+                ...draft,
+                legalReference: template.reference,
+                agreementTerms: template.terms,
+              });
+          }}
+        >
+          <option value="">
+            Choose a saved approved template, or supply approved wording below
+          </option>
+          {evidence.data?.legalTemplates.map((t) => (
+            <option key={t.reference} value={t.reference}>
+              {t.reference}
+            </option>
+          ))}
+        </Select>
         <Textarea
           value={draft.agreementTerms}
           maxLength={20000}

@@ -1,7 +1,8 @@
 "use client";
 import React, { useState } from "react";
-import {ApplicationLenderAccess} from './application-lender-access';
-import {ApplicationRouting,ApplicantRoutingConsent} from './routing';
+import { ApplicationLenderAccess } from "./application-lender-access";
+import { ApplicationRouting, ApplicantRoutingConsent } from "./routing";
+import { CompetitionRelease, LoanJourney } from "./loan-competition";
 import {
   formatZAR,
   type LoanOffer,
@@ -39,7 +40,9 @@ export function PersonalSettlementView({
   reviewer?: boolean;
 }) {
   const { client, me } = useAuth();
-  const [preparationMode, setPreparationMode] = useState<"AI" | "MANUAL">("AI");
+  const [preparationMode, setPreparationMode] = useState<"AI" | "MANUAL">(
+    "MANUAL",
+  );
   const data = useApi(
     (c) =>
       c.request<PersonalSettlement>(
@@ -79,7 +82,35 @@ export function PersonalSettlementView({
   const d = data.data,
     ag = d.agreement,
     isOffice = me?.roles.some((r) => r === "ADMIN" || r === "SUPER_ADMIN");
-  if(d.sharedReadOnly)return <div className="space-y-5"><PageHeader title="Shared loan application" subtitle="Viewing access granted by XTRA-CASH administration"/><Alert tone="blue">You can view this request. The assigned lender retains decision authority. This access does not allow offers, changes, documents, agreements or funding.</Alert><Card><p>{formatZAR(d.application.amountCents)} · {d.application.termMonths} months</p><p>{d.application.purpose}</p><StatusBadge status={d.application.status}/><p className="mt-3">Monthly income: {formatZAR(d.application.monthlyIncomeCents)} · Expenses: {formatZAR(d.application.monthlyExpensesCents)}</p></Card><Button variant="secondary" onClick={data.reload}>Refresh access</Button></div>;
+  if (d.sharedReadOnly)
+    return (
+      <div className="space-y-5">
+        <PageHeader
+          title="Shared loan application"
+          subtitle="Viewing access granted by XTRA-CASH administration"
+        />
+        <Alert tone="blue">
+          You can view this request. The assigned lender retains decision
+          authority. This access does not allow offers, changes, documents,
+          agreements or funding.
+        </Alert>
+        <Card>
+          <p>
+            {formatZAR(d.application.amountCents)} · {d.application.termMonths}{" "}
+            months
+          </p>
+          <p>{d.application.purpose}</p>
+          <StatusBadge status={d.application.status} />
+          <p className="mt-3">
+            Monthly income: {formatZAR(d.application.monthlyIncomeCents)} ·
+            Expenses: {formatZAR(d.application.monthlyExpensesCents)}
+          </p>
+        </Card>
+        <Button variant="secondary" onClick={data.reload}>
+          Refresh access
+        </Button>
+      </div>
+    );
   function download() {
     if (!ag) return;
     const blob = new Blob(
@@ -110,9 +141,38 @@ export function PersonalSettlementView({
         }
       />
       <StatusBadge status={d.application.status} />
-      {isOffice&&reviewStates.includes(d.application.status)&&<ApplicationRouting applicationId={applicationId} onChanged={data.reload}/>}
-      {!reviewer&&reviewStates.includes(d.application.status)&&<ApplicantRoutingConsent applicationId={applicationId}/>}
-      {isOffice&&<ApplicationLenderAccess applicationId={applicationId}/>}
+      <LoanJourney status={d.application.status} reviewer={reviewer} />
+      {(!reviewer || isOffice) &&
+        reviewStates.includes(d.application.status) && (
+          <CompetitionRelease
+            applicationId={applicationId}
+            reviewer={!!isOffice}
+            onChanged={data.reload}
+          />
+        )}
+      {isOffice && reviewStates.includes(d.application.status) && (
+        <details className="rounded-xl border p-3">
+          <summary className="cursor-pointer font-semibold">
+            Manual matching and lender access
+          </summary>
+          <ApplicationRouting
+            applicationId={applicationId}
+            onChanged={data.reload}
+          />
+          <ApplicationLenderAccess applicationId={applicationId} />
+        </details>
+      )}
+      {!reviewer && reviewStates.includes(d.application.status) && (
+        <ApplicantRoutingConsent applicationId={applicationId} />
+      )}
+      {isOffice && !reviewStates.includes(d.application.status) && (
+        <details className="rounded-xl border p-3">
+          <summary className="cursor-pointer font-semibold">
+            Additional lender viewing access
+          </summary>
+          <ApplicationLenderAccess applicationId={applicationId} />
+        </details>
+      )}
       {(error || data.error) && <Alert tone="red">{error || data.error}</Alert>}
       {!d.configuration.enabled && (
         <Alert tone="amber">
@@ -141,7 +201,7 @@ export function PersonalSettlementView({
                 variant={preparationMode === "MANUAL" ? "primary" : "secondary"}
                 onClick={() => setPreparationMode("MANUAL")}
               >
-                Enter manually
+                Guided decision form
               </Button>
             </div>
             {preparationMode === "AI" ? (
@@ -151,6 +211,11 @@ export function PersonalSettlementView({
               />
             ) : (
               <ManualDecisionForm
+                request={{
+                  amountCents: d.application.amountCents,
+                  termMonths: d.application.termMonths,
+                  offerId: d.application.offerId,
+                }}
                 applicationId={applicationId}
                 onAdvanced={data.reload}
               />

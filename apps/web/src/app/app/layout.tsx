@@ -1,4 +1,5 @@
 'use client';
+import {LoanActionCentre} from '@xtra/ui';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { CreditCard, Home, ListOrdered, ReceiptText, ScanLine, UserRound } from 'lucide-react';
@@ -87,6 +88,7 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
           </div>
         </header>
         <main key={pathname} className="mx-auto max-w-5xl px-4 py-5 animate-fade-in md:py-6">
+          <LoanActionCentre/>
           {children}
         </main>
         <nav aria-label="App" className="safe-pb fixed inset-x-0 bottom-0 z-30 border-t border-line/70 bg-white/95 backdrop-blur-md md:hidden">

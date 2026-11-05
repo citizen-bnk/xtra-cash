@@ -34,6 +34,32 @@ export const routingInvitations=pgTable('application_routing_invitations',{
  offerId:text('offer_id').notNull().references(()=>loanOffers.id),
  active:integer('active').notNull().default(1),
 },t=>[uniqueIndex('routing_invitation_pair').on(t.applicationId,t.lenderId)]);
+export const loanCompetitions=pgTable('loan_competitions',{
+ applicationId:text('application_id').primaryKey().references(()=>personalLoanApplications.id),
+ status:text('status').notNull().default('OPEN'),
+ releasedBy:text('released_by').notNull().references(()=>users.id),
+ authorityReference:text('authority_reference').notNull(),
+ winnerLenderId:text('winner_lender_id').references(()=>lenderOrgs.id),
+ version:integer('version').notNull().default(1),
+ createdAt:time('created_at').notNull().defaultNow(),
+});
+export const competitionConsents=pgTable('loan_competition_consents',{
+ applicationId:text('application_id').primaryKey().references(()=>personalLoanApplications.id),
+ userId:text('user_id').notNull().references(()=>users.id),
+ consentAt:time('consent_at').notNull().defaultNow(),
+});
+export const loanNotificationReceipts=pgTable('loan_notification_receipts',{
+ id:text('id').primaryKey().$defaultFn(()=>randomUUID()),
+ userId:text('user_id').notNull().references(()=>users.id),
+ notificationKey:text('notification_key').notNull(),
+ readAt:time('read_at').notNull().defaultNow(),
+},t=>[uniqueIndex('loan_notification_receipt_user_key').on(t.userId,t.notificationKey)]);
+export const loanDemoCases=pgTable('loan_demo_cases',{
+ id:text('id').primaryKey(),
+ title:text('title').notNull(),
+ stage:text('stage').notNull(),
+ payload:jsonb('payload').$type<{amountCents:number;termMonths:number;purpose:string;nextActor:string;action:string;description:string}>().notNull(),
+});
 export interface DecisionDraft {
   offerId?: string;
   assessmentReference?: string;
