@@ -60,6 +60,8 @@ h1, h2 {
 
 /* ---- App feel on phones and when installed as an app (PWA) ---- */
 main { min-width: 0; overflow-wrap: anywhere; }
+[role="dialog"] { min-width: 0; overflow-wrap: anywhere; }
+[role="dialog"] .grid > *, [role="dialog"] .flex > * { min-width: 0; }
 main .grid > *, main .flex > * { min-width: 0; }
 input, select, textarea { max-width: 100%; }
 .xc-record-table { table-layout: fixed; }

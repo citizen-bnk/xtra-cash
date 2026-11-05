@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { formatZAR } from '@xtra/shared';
 import { Loading, PageHeader, StatusBadge, Table, useApi } from '@xtra/ui';
+import { PersonalLoanWorkspace } from '@/components/PersonalLoanWorkspace';
 
 export default function LoansPage() {
   const router = useRouter();
@@ -11,7 +12,8 @@ export default function LoansPage() {
   const owed = open.reduce((s, l) => s + l.outstandingCents, 0);
   return (
     <div>
-      <PageHeader title="Repayments" subtitle={`You owe ${formatZAR(owed)} across ${open.length} active XTRA-CASH advance${open.length === 1 ? '' : 's'}.`} />
+      <PersonalLoanWorkspace title="My loans"/>
+      {!!loans.data?.length && <section className="mt-8"><PageHeader title="Repayment schedules" subtitle={`You owe ${formatZAR(owed)} across ${open.length} active XTRA-CASH advance${open.length === 1 ? '' : 's'}.`} />
       <Table
         rows={loans.data ?? []}
         onRowClick={(l) => router.push(`/app/loans/${l.id}`)}
@@ -24,7 +26,7 @@ export default function LoansPage() {
           { header: 'Outstanding', align: 'right', cell: (l) => <span className="font-semibold">{formatZAR(l.outstandingCents)}</span> },
           { header: 'Status', cell: (l) => <StatusBadge status={l.status} /> },
         ]}
-      />
+      /></section>}
     </div>
   );
 }

@@ -1,2 +1,2 @@
-import { PersonalLoanFlow } from '@/components/PersonalLoanFlow';
-export default function PersonalLoanPage() { return <PersonalLoanFlow />; }
+import { PersonalLoanWorkspace } from '@/components/PersonalLoanWorkspace';
+export default function PersonalLoanPage() { return <PersonalLoanWorkspace />; }

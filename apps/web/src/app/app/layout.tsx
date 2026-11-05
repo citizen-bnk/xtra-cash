@@ -11,7 +11,7 @@ import { MarketingLocationObserver } from '@/components/MarketingLocationObserve
 const NAV = [
   { href: '/app', label: 'Home', icon: Home, exact: true },
   { href: '/app/card', label: 'Card', icon: CreditCard },
-  { href: '/app/loans', label: 'Repayments', icon: ListOrdered },
+  { href: '/app/loans', label: 'Loans', icon: ListOrdered },
   { href: '/app/activity', label: 'Activity', icon: ReceiptText },
   { href: '/app/profile', label: 'Profile', icon: UserRound },
 ];
@@ -20,7 +20,7 @@ const NAV = [
 const TABS = [
   { href: '/app', label: 'Home', icon: Home, exact: true },
   { href: '/app/card', label: 'Card', icon: CreditCard },
-  { href: '/app/loans', label: 'Repay', icon: ListOrdered },
+  { href: '/app/loans', label: 'Loans', icon: ListOrdered },
   { href: '/app/profile', label: 'Me', icon: UserRound },
 ];
 
