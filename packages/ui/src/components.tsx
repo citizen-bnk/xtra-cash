@@ -29,8 +29,8 @@ export function Button({
       {...rest}
       disabled={disabled || loading}
       className={cx(
-        'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple/60',
-        size === 'sm' ? 'h-8 px-3 text-sm' : size === 'lg' ? 'h-12 px-6 text-base' : 'h-10 px-4 text-sm',
+        'inline-flex max-w-full shrink-0 items-center justify-center gap-2 whitespace-normal break-words rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple/60',
+        size === 'sm' ? 'min-h-8 px-3 py-1 text-sm' : size === 'lg' ? 'min-h-12 px-6 py-2 text-base' : 'min-h-10 px-4 py-2 text-sm',
         variants[variant],
         className,
       )}
@@ -171,7 +171,7 @@ export function Stat({ label, value, sub, icon, href }: { label: string; value: 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: React.ReactNode; actions?: React.ReactNode }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-      <div>
+      <div className="min-w-0 max-w-full">
         <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
       </div>
@@ -228,7 +228,7 @@ export function Table<T>({ rows, columns, onRowClick, empty = 'Nothing here yet'
   if (!rows.length) return <Empty title={empty} />;
   return (
     <div className="overflow-x-auto rounded-2xl border border-line bg-white">
-      <table className="w-full text-sm">
+      <table className="xc-record-table w-full text-sm">
         <thead>
           <tr className="border-b border-line bg-surface/60 text-left text-xs uppercase tracking-wide text-muted">
             {columns.map((c) => (
@@ -246,7 +246,7 @@ export function Table<T>({ rows, columns, onRowClick, empty = 'Nothing here yet'
               className={cx('border-b border-line last:border-0', onRowClick && 'cursor-pointer hover:bg-surface/70')}
             >
               {columns.map((c) => (
-                <td key={c.header} className={cx('whitespace-nowrap px-4 py-3 align-middle', c.align === 'right' && 'text-right tabular-nums', c.className)}>
+                <td key={c.header} data-label={c.header} className={cx('whitespace-normal break-words px-4 py-3 align-middle', c.align === 'right' && 'text-right tabular-nums', c.className)}>
                   {c.cell(r)}
                 </td>
               ))}

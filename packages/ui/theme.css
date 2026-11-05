@@ -59,6 +59,22 @@ h1, h2 {
 }
 
 /* ---- App feel on phones and when installed as an app (PWA) ---- */
+main { min-width: 0; overflow-wrap: anywhere; }
+main .grid > *, main .flex > * { min-width: 0; }
+input, select, textarea { max-width: 100%; }
+.xc-record-table { table-layout: fixed; }
+.xc-record-table th, .xc-record-table td { overflow-wrap: anywhere; white-space: normal; }
+.xc-record-table td * { overflow-wrap: anywhere; white-space: normal; }
+@media (max-width: 767px) {
+  .xc-record-table, .xc-record-table tbody { display: block; width: 100%; }
+  .xc-record-table thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+  .xc-record-table tbody tr { display: block; padding: 0.75rem; border-bottom: 1px solid var(--color-line, #e5e7eb); }
+  .xc-record-table tbody tr:nth-child(even) { background: #faf9fc; }
+  .xc-record-table td { display: block; width: 100%; padding: 0.4rem 0.25rem; text-align: left; }
+  .xc-record-table td::before { content: attr(data-label); display: block; margin-bottom: 0.2rem; color: #625c70; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
+  .xc-record-table td > * { max-width: 100%; }
+  main pre { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
+}
 html {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
