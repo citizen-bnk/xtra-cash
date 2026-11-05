@@ -55,6 +55,8 @@ const schema = require("../dist/db/schema"),
     ])
     .returning();
   const identity = makeSaId(new Date("1990-01-01"), 2345);
+  await db.insert(schema.users).values({id:'preview-extra-lender',email:'extra@settlement.test',firstName:'Additional',lastName:'Lender',roles:['LENDER'],referralCode:'SETTLEEXTRALENDER',passwordHash});
+  await db.insert(schema.lenderOrgs).values({id:'preview-extra-org',ownerUserId:'preview-extra-lender',name:'Additional Preview Credit',contactEmail:'extra@settlement.test',contactPhone:'LOCAL-ONLY',accreditationStatus:'ACCREDITED'});
   await db.insert(schema.kycProfiles).values({
     userId: consumer.id,
     idNumber: identity,

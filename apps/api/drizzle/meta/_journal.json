@@ -71,6 +71,27 @@
       "when": 1793816629018,
       "tag": "0009_illegal_ser_duncan",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793838456595,
+      "tag": "0010_silent_taskmaster",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793838975746,
+      "tag": "0011_pink_doomsday",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793851711723,
+      "tag": "0012_nasty_tarantula",
+      "breakpoints": true
     }
   ]
 }

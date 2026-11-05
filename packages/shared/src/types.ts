@@ -108,6 +108,9 @@ export interface PersonalLoanInput {
   consent: boolean;
   idempotencyKey: string;
   offerId?: string;
+  routingConsent?:boolean;
+  latitude?:number;
+  longitude?:number;
 }
 
 export interface PersonalLoanMatch {
@@ -115,6 +118,7 @@ export interface PersonalLoanMatch {
   monthlyInstallmentCents: number; totalRepayableCents: number; costOfCreditCents: number;
 }
 export interface PersonalLoanApplication extends PersonalLoanInput {
+  accessMode?: 'SELECTED_LENDER' | 'SHARED_VIEW';
   id: string; userId: string; status: 'SUBMITTED' | 'REFERRED' | 'UNDER_REVIEW' | 'ACTION_REQUIRED' | 'OFFERED' | 'ACCEPTED' | 'FUNDING_PENDING' | 'DISBURSED' | 'FUNDING_FAILED' | 'DECLINED' | 'CANCELLED'; createdAt: string;
   reviewNotes?: string | null;
   lenderId: string | null; firstName?: string; lastName?: string;

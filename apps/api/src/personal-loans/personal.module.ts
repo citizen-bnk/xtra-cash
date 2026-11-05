@@ -1,4 +1,6 @@
 import { Module } from "@nestjs/common";
+import { LenderAccessService, LenderAccessController } from './lender-access';
+import {RoutingService,RoutingController} from './routing';
 import { ConsumerModule } from "../consumer/consumer.module";
 import {
   PersonalLoanController,
@@ -28,6 +30,8 @@ import {
 @Module({
   imports: [ConsumerModule],
   controllers: [
+    RoutingController,
+    LenderAccessController,
     PersonalLoanController,
     PersonalLenderController,
     SettlementController,
@@ -40,6 +44,8 @@ import {
     WorkAssistantController,
   ],
   providers: [
+    RoutingService,
+    LenderAccessService,
     PersonalLoanService,
     SettlementService,
     MoneyConnector,

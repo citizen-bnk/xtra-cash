@@ -1,5 +1,7 @@
 # XTRA-Lender-AI and shared work assistance
 
+Update: LOAN-ROUTING-POLICY.md supersedes the earlier applicant-choice default below. Administration now controls lender selection by default, with optional applicant choice and eligible lender pool modes. AI preparation and credit-authorisation safeguards remain in force.
+
 Implementation plan and operating guide — 4 November 2026.
 
 ## Agreed choices

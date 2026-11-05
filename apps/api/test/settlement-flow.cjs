@@ -33,6 +33,7 @@ async function main() {
   const pg = new PGlite(),
     db = drizzle(pg, { schema });
   await migrate(db, { migrationsFolder: path.join(__dirname, "../drizzle") });
+  await db.insert(schema.platformSettings).values({key:'personalLoanRouting',value:{mode:'APPLICANT',automation:'OFF',maxLenders:1,geography:'PRODUCT_AREA',radiusKm:25,version:0}});
   const real = new MoneyConnector(),
     calls = [];
   let providerError = false,

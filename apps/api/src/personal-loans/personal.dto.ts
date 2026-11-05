@@ -1,4 +1,4 @@
-import { Equals, IsBoolean, IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { Equals, IsBoolean, IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, IsNumber } from 'class-validator';
 import { EmploymentStatus, PROVINCES } from '@xtra/shared';
 export class PrecheckDto {
   @IsIn(['ID', 'PASSPORT']) identityType: 'ID' | 'PASSPORT';
@@ -8,6 +8,9 @@ export class PrecheckDto {
   @IsBoolean() @Equals(true) consent: boolean;
 }
 export class PersonalApplicationDto {
+  @IsOptional() @IsBoolean() @Equals(true) routingConsent?:boolean;
+  @IsOptional() @IsNumber() @Min(-90) @Max(90) latitude?:number;
+  @IsOptional() @IsNumber() @Min(-180) @Max(180) longitude?:number;
   @IsInt() @Min(50000) @Max(10000000) amountCents: number;
   @IsInt() @Min(1) @Max(24) termMonths: number;
   @IsIn(['Home & repairs', 'Education', 'Medical', 'Transport', 'Debt consolidation', 'Other']) purpose: string;
