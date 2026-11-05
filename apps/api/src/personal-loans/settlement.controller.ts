@@ -21,6 +21,7 @@ import {
   beneficiaryInput,
   withdrawInput,
   updateReview,
+  externalPaymentInput,
 } from "./settlement.dto";
 @Controller("personal-loans")
 export class SettlementController {
@@ -83,6 +84,11 @@ export class SettlementController {
     @Param("id") id: string,
   ) {
     return this.service.fund(a, id);
+  }
+  @Roles('ADMIN', 'SUPER_ADMIN') @Post('applications/:id/external-payment') externalPayment(
+    @CurrentUser() a: AuthUser, @Param('id') id: string, @Body() body: unknown,
+  ) {
+    return this.service.confirmExternalPayment(a, id, parse(externalPaymentInput, body));
   }
 }
 @Controller("wallet")

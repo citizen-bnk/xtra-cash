@@ -438,16 +438,18 @@ export function CompetitionOfferForm({
 export function LoanJourney({
   status,
   reviewer,
+  externalPayment = false,
 }: {
   status: string;
   reviewer: boolean;
+  externalPayment?: boolean;
 }) {
   const steps = [
     "Apply",
     "Lenders notified",
     "Offer received",
     "Applicant acceptance",
-    "Wallet funding",
+    "Payment",
     "Own-bank EFT",
   ];
   const index = [
@@ -481,11 +483,11 @@ export function LoanJourney({
         {status === "OFFERED"
           ? "Applicant action: read the final quote and agreement, then accept if you agree."
           : status === "ACCEPTED"
-            ? "Finance action: a different authorised administrator reviews funding. Banking activation is required."
+            ? "Payment can now be sent externally using the deposit reference. Administration confirms when the funds have been sent."
             : status === "FUNDING_PENDING"
               ? "Waiting for the banking provider. Do not repeat funding or treat pending money as available."
               : status === "DISBURSED"
-                ? "Applicant action: manage your wallet. Own-bank EFT requires verification and an active banking programme."
+                ? externalPayment ? "Payment was confirmed outside XTRA-CASH. View your loan repayment schedule below." : "Applicant action: manage your wallet. Own-bank EFT requires verification and an active banking programme."
                 : status === "ACTION_REQUIRED"
                   ? "Applicant action: reply to the information request below."
                   : status === "DECLINED"

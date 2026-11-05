@@ -19,6 +19,8 @@ export interface MoneyMovement {
   attempts: number;
 }
 export interface PersonalSettlement {
+  depositReference?: string;
+  externalPayment?: null | { depositReference: string; amountCents: number; note: string; confirmedAt: string };
   sharedReadOnly?:boolean;
   humanReviewPending?:boolean;
   application: PersonalLoanApplication;

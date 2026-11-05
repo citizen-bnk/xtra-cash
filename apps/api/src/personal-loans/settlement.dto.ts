@@ -38,3 +38,7 @@ export const withdrawInput = z
 export const updateReview = z
   .object({ message: z.string().trim().min(3).max(500) })
   .strict();
+export const externalPaymentInput = z.object({
+  confirmed: z.literal(true),
+  note: z.string().trim().min(3).max(1000),
+}).strict();

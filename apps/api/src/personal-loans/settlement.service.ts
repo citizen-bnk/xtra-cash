@@ -30,6 +30,7 @@ import {
   movements,
   moneyEvents,
   applicationEvents,
+  externalLoanPayments,
 } from "./settlement.schema";
 import { Accounts, LedgerService } from "../common/ledger.service";
 import { AuditService } from "../common/audit.service";
@@ -48,6 +49,7 @@ const digest = (v: unknown) =>
   createHash("sha256")
     .update(typeof v === "string" ? v : JSON.stringify(v))
     .digest("hex");
+export const loanDepositReference = (applicationId: string) => `XC${digest(applicationId).slice(0, 16).toUpperCase()}`;
 const isAdmin = (a: AuthUser) =>
   a.roles.some((r) => r === "ADMIN" || r === "SUPER_ADMIN");
 const reserve = (id: string) => `liability:funding_reserved:${id}`;
@@ -187,7 +189,10 @@ export class SettlementService {
         })()
       : null;
     const [humanReview]=await this.db.select().from(lenderAgentRuns).where(and(eq(lenderAgentRuns.applicationId,id),eq(lenderAgentRuns.step,"HUMAN_REVIEW"),eq(lenderAgentRuns.result,"OPEN")));
+    const [externalPayment] = await this.db.select().from(externalLoanPayments).where(eq(externalLoanPayments.applicationId, id));
     return {
+      depositReference: agreement?.terms.depositReference ?? (agreement ? loanDepositReference(id) : undefined),
+      externalPayment: externalPayment ? { depositReference: externalPayment.depositReference, amountCents: externalPayment.amountCents, note: externalPayment.note, confirmedAt: externalPayment.confirmedAt } : null,
       humanReviewPending:!!humanReview,
       application: app,
       agreement: visible,
@@ -323,6 +328,7 @@ export class SettlementService {
           "Instalment exceeds declared disposable income; the lender must reassess.",
         );
       const terms = {
+        depositReference: loanDepositReference(id),
         offerId: offer.id,
         principalCents: app.amountCents,
         termMonths: offer.termMonths,
@@ -332,15 +338,15 @@ export class SettlementService {
         totalRepayableCents: quote.totalRepayableCents,
         monthlyInstallmentCents: quote.monthlyInstallmentCents,
       };
-      const content = `XTRA-CASH PERSONAL LOAN — PRE-AGREEMENT QUOTATION AND CREDIT AGREEMENT\nApplication: ${app.id}\nBorrower: ${u.firstName} ${u.lastName}\nLender: ${lender.name}\nNCR reference: ${lender.ncrNumber}\nAmount to your XTRA-CASH wallet: ${formatZAR(app.amountCents)}\nMonthly interest: ${(offer.monthlyInterestRateBps / 100).toFixed(2)}%\nInitiation fee financed: ${formatZAR(offer.initiationFeeCents)}\nMonthly service fee: ${formatZAR(offer.monthlyServiceFeeCents)}\nTerm: ${offer.termMonths} months\nFirst monthly instalment: ${formatZAR(quote.monthlyInstallmentCents)}\nTotal repayable: ${formatZAR(quote.totalRepayableCents)}\nTotal credit cost: ${formatZAR(quote.costOfCreditCents)}\nCredit cost multiple: ${(quote.totalRepayableCents / app.amountCents).toFixed(4)}\nInstalment amounts: ${quote.schedule.map((i) => `${i.seq}: ${formatZAR(i.amountCents)}`).join("; ")}\nInstalment dates: monthly from one month after confirmed wallet funding. Exact dates are issued on your funding receipt.\nOffer expires: ${expires.toISOString()}\nAcceptance alone does not confirm funds are available. A bank withdrawal is a separate transfer of your available cash and does not create another loan.\n\nLENDER-APPROVED TERMS\n${input.agreementTerms?.trim() || "Approved lender terms are recorded in the selected personal-loan product and will be shown to the applicant before acceptance."}`;
+      const content = `XTRA-CASH PERSONAL LOAN — PRE-AGREEMENT QUOTATION AND CREDIT AGREEMENT\nApplication: ${app.id}\nBorrower: ${u.firstName} ${u.lastName}\nLender: ${lender.name}\nNCR reference: ${lender.ncrNumber}\nLoan payment amount: ${formatZAR(app.amountCents)}\nMonthly interest: ${(offer.monthlyInterestRateBps / 100).toFixed(2)}%\nInitiation fee financed: ${formatZAR(offer.initiationFeeCents)}\nMonthly service fee: ${formatZAR(offer.monthlyServiceFeeCents)}\nTerm: ${offer.termMonths} months\nFirst monthly instalment: ${formatZAR(quote.monthlyInstallmentCents)}\nTotal repayable: ${formatZAR(quote.totalRepayableCents)}\nTotal credit cost: ${formatZAR(quote.costOfCreditCents)}\nCredit cost multiple: ${(quote.totalRepayableCents / app.amountCents).toFixed(4)}\nInstalment amounts: ${quote.schedule.map((i) => `${i.seq}: ${formatZAR(i.amountCents)}`).join("; ")}\nInstalment dates: monthly from one month after payment confirmation. Exact dates are issued on your funding receipt.\nOffer expires: ${expires.toISOString()}\nAcceptance alone does not confirm payment has been sent. A bank withdrawal is a separate transfer of your available cash and does not create another loan.\n\nLENDER-APPROVED TERMS\n${input.agreementTerms?.trim() || "Approved lender terms are recorded in the selected personal-loan product and will be shown to the applicant before acceptance."}`;
       const [agreement] = await tx
         .insert(agreements)
         .values({
           applicationId: id,
           userId: app.userId,
           lenderId: lender.id,
-          content,
-          digest: digest(content),
+          content: content + `\n\nBANK DEPOSIT REFERENCE: ${terms.depositReference}\nUse this reference for the loan payment and bank statement reconciliation. Payment may be made externally; wallet funding requires the banking connection.`,
+          digest: digest(content + `\n\nBANK DEPOSIT REFERENCE: ${terms.depositReference}\nUse this reference for the loan payment and bank statement reconciliation. Payment may be made externally; wallet funding requires the banking connection.`),
           terms,
           assessmentReference: input.assessmentReference?.trim() || `assessment-${id.slice(0, 8)}`,
           mandateReference: input.mandateReference?.trim() || `mandate-pending-${id.slice(0, 8)}`,
@@ -476,6 +482,32 @@ export class SettlementService {
         tx,
       );
       return { ok: true };
+    });
+  }
+  async confirmExternalPayment(a: AuthUser, id: string, input: {confirmed: true; note: string}) {
+    if (!isAdmin(a)) throw new ForbiddenException();
+    return this.db.transaction(async tx => {
+      const app = await this.app(a, id, tx, true);
+      if (app.userId === a.id) throw new ForbiddenException('You cannot confirm payment to yourself.');
+      const [prior] = await tx.select().from(externalLoanPayments).where(eq(externalLoanPayments.applicationId, id));
+      if (prior) return {ok: true, depositReference: prior.depositReference};
+      const [ag] = await tx.select().from(agreements).where(eq(agreements.applicationId, id)).for('update');
+      if (!ag || app.status !== 'ACCEPTED' || ag.status !== 'ACCEPTED' || !ag.acceptedAt || ag.loanId)
+        throw new ConflictException('An accepted agreement is required before confirming payment.');
+      const [pending] = await tx.select().from(movements).where(and(eq(movements.agreementId, ag.id), inArray(movements.status, ['QUEUED','PROCESSING','PENDING','SUCCEEDED'])));
+      if (pending) throw new ConflictException('A platform funding transfer already exists. Reconcile it before recording an external payment.');
+      const [review] = await tx.select().from(lenderAgentRuns).where(and(eq(lenderAgentRuns.applicationId,id),eq(lenderAgentRuns.step,'HUMAN_REVIEW'),eq(lenderAgentRuns.result,'OPEN')));
+      if (review) throw new ConflictException('Resolve the requested human review first.');
+      const t = ag.terms, q = quoteLoan(t.principalCents,t), paidAt = new Date();
+      const [loan] = await tx.insert(loans).values({userId:app.userId, offerId:t.offerId, lenderId:ag.lenderId, principalCents:t.principalCents, termMonths:t.termMonths, monthlyInterestRateBps:t.monthlyInterestRateBps, initiationFeeCents:t.initiationFeeCents, monthlyServiceFeeCents:t.monthlyServiceFeeCents, totalRepayableCents:q.totalRepayableCents, outstandingCents:q.totalRepayableCents}).returning();
+      await tx.insert(installments).values(q.schedule.map(i=>({loanId:loan.id,seq:i.seq,dueDate:addMonths(paidAt,i.seq),amountCents:i.amountCents})));
+      const reference = t.depositReference ?? loanDepositReference(id);
+      await tx.insert(externalLoanPayments).values({applicationId:id,agreementId:ag.id,depositReference:reference,amountCents:t.principalCents,note:input.note,confirmedBy:a.id});
+      await tx.update(agreements).set({status:'FUNDED',loanId:loan.id}).where(eq(agreements.id,ag.id));
+      await tx.update(applications).set({status:'DISBURSED',reviewNotes:`Payment confirmed outside XTRA-CASH. Deposit reference: ${reference}.`}).where(eq(applications.id,id));
+      await this.event(tx,id,a.id,'DISBURSED',`External bank payment confirmed. Reference ${reference}. Your loan repayment schedule is ready.`);
+      await this.audit.log(a,'personal_loan.external_payment_confirmed','personal_loan_application',id,{depositReference:reference,amountCents:t.principalCents,note:input.note,loanId:loan.id},tx);
+      return {ok:true,depositReference:reference};
     });
   }
   async fund(a: AuthUser, id: string) {

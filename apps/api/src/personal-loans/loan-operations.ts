@@ -33,7 +33,7 @@ import {
   lenderAgentPolicies,
   competitionConsents,
 } from "./lender-ai.schema";
-import { applicationEvents, agreements } from "./settlement.schema";
+import { applicationEvents, agreements, externalLoanPayments } from "./settlement.schema";
 import { SettlementService } from "./settlement.service";
 import { RoutingService, distanceKm } from "./routing";
 import { CreditService } from "../consumer/credit.service";
@@ -485,6 +485,7 @@ export class LoanOperationsService {
         .where(eq(applications.userId, a.id))
         .orderBy(desc(applications.createdAt))
         .limit(100);
+    const paidExternally = new Set((rows.length ? await this.db.select({id: externalLoanPayments.applicationId}).from(externalLoanPayments).where(inArray(externalLoanPayments.applicationId,rows.map(r=>r.id))) : []).map(r=>r.id));
     for (const app of rows) {
       let title = "",
         description = "",
@@ -522,10 +523,10 @@ export class LoanOperationsService {
         cta = "Read offer";
         owner = "Applicant";
       } else if (app.userId === a.id && app.status === "DISBURSED") {
-        title = "Manage your wallet";
+        title = paidExternally.has(app.id) ? 'Your loan payment was sent' : "Manage your wallet";
         description =
-          "Confirmed loan proceeds are in your wallet. EFT requires an activated banking connection and a verified own-name bank account.";
-        cta = "Open wallet";
+          paidExternally.has(app.id) ? 'Administration confirmed the external bank payment. View the payment reference and repayment schedule.' : "Confirmed loan proceeds are in your wallet. EFT requires an activated banking connection and a verified own-name bank account.";
+        cta = paidExternally.has(app.id) ? 'View payment and loan' : "Open wallet";
         owner = "Applicant";
       } else if (
         app.userId === a.id &&
@@ -545,7 +546,7 @@ export class LoanOperationsService {
           title,
           description,
           cta,
-          kind: app.status === "DISBURSED" ? "WALLET" : "APPLICATION",
+          kind: app.status === "DISBURSED" && !paidExternally.has(app.id) ? "WALLET" : "APPLICATION",
           owner,
         });
     }

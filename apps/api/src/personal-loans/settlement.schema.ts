@@ -45,6 +45,7 @@ export const agreements = pgTable("personal_agreements", {
       monthlyServiceFeeCents: number;
       totalRepayableCents: number;
       monthlyInstallmentCents: number;
+      depositReference?: string;
     }>(),
   assessmentReference: text("assessment_reference").notNull(),
   mandateReference: text("mandate_reference").notNull(),
@@ -73,6 +74,16 @@ export const beneficiaries = pgTable("wallet_beneficiaries", {
   providerReference: text("provider_reference"),
   verifiedAt: time("verified_at"),
   createdAt: time("created_at").notNull().defaultNow(),
+});
+export const externalLoanPayments = pgTable('external_loan_payments', {
+  id: id(),
+  applicationId: text('application_id').notNull().unique().references(() => personalLoanApplications.id),
+  agreementId: text('agreement_id').notNull().unique().references(() => agreements.id),
+  depositReference: text('deposit_reference').notNull().unique(),
+  amountCents: integer('amount_cents').notNull(),
+  note: text('note').notNull(),
+  confirmedBy: text('confirmed_by').notNull().references(() => users.id),
+  confirmedAt: time('confirmed_at').notNull().defaultNow(),
 });
 export const movements = pgTable(
   "money_movements",

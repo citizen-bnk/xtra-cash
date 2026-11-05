@@ -39,6 +39,8 @@ export function PersonalSettlementView({
 }) {
   const { client, me } = useAuth();
   const [intervening, setIntervening] = useState(false);
+  const [paymentNote, setPaymentNote] = useState('');
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [preparationMode, setPreparationMode] = useState<"AI" | "MANUAL">(
     "MANUAL",
   );
@@ -140,16 +142,17 @@ export function PersonalSettlementView({
         }
       />
       <StatusBadge status={d.application.status} />
-      <LoanJourney status={d.application.status} reviewer={reviewer} />
+      <LoanJourney status={d.application.status} reviewer={reviewer} externalPayment={!!d.externalPayment} />
+      {d.depositReference && <Card><h2 className="font-semibold">Bank deposit reference</h2><p className="my-2 font-mono text-lg font-bold">{d.depositReference}</p><p className="text-sm text-muted">Use this exact reference when paying the customer, so the deposit can be matched to this loan on bank statements.</p></Card>}
+      {d.externalPayment && <Card><h2 className="font-semibold">External payment confirmed</h2><p className="my-2">{formatZAR(d.externalPayment.amountCents)} · {new Date(d.externalPayment.confirmedAt).toLocaleString('en-ZA')}</p><p>{d.externalPayment.note}</p><p className="mt-2 text-sm text-muted">Paid outside XTRA-CASH. This payment does not increase the wallet balance.</p></Card>}
       {isOffice && <div className="flex items-center justify-between gap-3 rounded-xl border p-3"><p className="text-sm text-muted">Staff oversight · Customer and lender manage this loan.</p><Button variant="secondary" onClick={() => setIntervening(!intervening)}>{intervening ? 'Close intervention' : 'Intervene'}</Button></div>}
       {isOffice && d.application.status === "ACCEPTED" && (
-        <Alert tone="blue">The applicant accepted the agreement. Finance can now release the lender-funded wallet transfer.</Alert>
+        <Alert tone="blue">The applicant accepted the agreement. Once the lender has paid the customer, record the external payment confirmation below.</Alert>
       )}
       {(error || data.error) && <Alert tone="red">{error || data.error}</Alert>}
-      {!d.configuration.enabled && (
+      {!d.configuration.enabled && !d.externalPayment && (
         <Alert tone="amber">
-          Wallet funding and bank transfers are awaiting banking activation. You
-          can track your application and read a prepared offer.
+          Payment can be made outside XTRA-CASH using the deposit reference. Administration records confirmation after the funds have been sent.
         </Alert>
       )}
       {d.application.reviewNotes && (
@@ -289,19 +292,11 @@ export function PersonalSettlementView({
               </Button>
             </div>
           )}
-          {reviewer && isOffice && intervening && d.application.status === "ACCEPTED" && (
-            <Button
-              loading={busy}
-              disabled={!d.configuration.enabled || ag.approvedBy === me?.id}
-              onClick={() => act("fund")}
-            >
-              Reserve lender funds and request wallet funding
-            </Button>
-          )}
+          {reviewer && isOffice && d.application.status === 'ACCEPTED' && <div className="space-y-3 rounded-xl border p-4"><h3 className="font-semibold">Confirm funds sent outside XTRA-CASH</h3><p className="text-sm">Amount: {formatZAR(ag.terms.principalCents)}. Deposit reference: <strong>{d.depositReference}</strong></p><Field label="Payment note" hint="Record the payment details for reconciliation. Do not include full bank account numbers."><Textarea maxLength={1000} value={paymentNote} onChange={e=>setPaymentNote(e.target.value)}/></Field><label className="flex gap-2 text-sm"><input type="checkbox" checked={paymentConfirmed} onChange={e=>setPaymentConfirmed(e.target.checked)}/>I confirm the lender's funds have already been sent to the customer outside the platform.</label><Button loading={busy} disabled={!paymentConfirmed || paymentNote.trim().length < 3} onClick={()=>act('external-payment',{confirmed:true,note:paymentNote})}>Confirm payment sent</Button>{d.configuration.enabled && intervening && <Button variant="secondary" loading={busy} disabled={ag.approvedBy === me?.id} onClick={()=>act('fund')}>Use integrated wallet funding</Button>}</div>}
           {ag.loanId && (
             <a
               className="block font-semibold underline"
-              href={reviewer ? "/loans" : `/app/loans/${ag.loanId}`}
+              href={reviewer ? isOffice ? "/loans" : "/lender/loans" : `/app/loans/${ag.loanId}`}
             >
               View loan and repayment schedule
             </a>
