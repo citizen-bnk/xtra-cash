@@ -242,15 +242,15 @@ export class SettlementService {
   }
   async approve(a: AuthUser, id: string, input: z.infer<typeof approveInput>, conn?: DbOrTx) {
     const now = Date.now(),
-      assessed = new Date(input.assessedAt),
-      expires = new Date(input.expiresAt);
-    if (
+      assessed = input.assessedAt ? new Date(input.assessedAt) : new Date(now),
+      expires = input.expiresAt ? new Date(input.expiresAt) : new Date(now + 7 * 86400000);
+    if ((input.assessedAt || input.expiresAt) && (
       assessed.getTime() > now ||
       now - assessed.getTime() > 7 * 86400000 ||
       expires.getTime() <= now ||
       expires.getTime() >
         Math.min(now + 7 * 86400000, assessed.getTime() + 7 * 86400000)
-    )
+    ))
       throw new BadRequestException(
         "Use a current assessment and an expiry within seven days of that assessment.",
       );
@@ -330,7 +330,7 @@ export class SettlementService {
         totalRepayableCents: quote.totalRepayableCents,
         monthlyInstallmentCents: quote.monthlyInstallmentCents,
       };
-      const content = `XTRA-CASH PERSONAL LOAN — PRE-AGREEMENT QUOTATION AND CREDIT AGREEMENT\nApplication: ${app.id}\nBorrower: ${u.firstName} ${u.lastName}\nLender: ${lender.name}\nNCR reference: ${lender.ncrNumber}\nAmount to your XTRA-CASH wallet: ${formatZAR(app.amountCents)}\nMonthly interest: ${(offer.monthlyInterestRateBps / 100).toFixed(2)}%\nInitiation fee financed: ${formatZAR(offer.initiationFeeCents)}\nMonthly service fee: ${formatZAR(offer.monthlyServiceFeeCents)}\nTerm: ${offer.termMonths} months\nFirst monthly instalment: ${formatZAR(quote.monthlyInstallmentCents)}\nTotal repayable: ${formatZAR(quote.totalRepayableCents)}\nTotal credit cost: ${formatZAR(quote.costOfCreditCents)}\nCredit cost multiple: ${(quote.totalRepayableCents / app.amountCents).toFixed(4)}\nInstalment amounts: ${quote.schedule.map((i) => `${i.seq}: ${formatZAR(i.amountCents)}`).join("; ")}\nInstalment dates: monthly from one month after confirmed wallet funding. Exact dates are issued on your funding receipt.\nOffer expires: ${expires.toISOString()}\nAcceptance alone does not confirm funds are available. A bank withdrawal is a separate transfer of your available cash and does not create another loan.\n\nLENDER-APPROVED TERMS\n${input.agreementTerms}`;
+      const content = `XTRA-CASH PERSONAL LOAN — PRE-AGREEMENT QUOTATION AND CREDIT AGREEMENT\nApplication: ${app.id}\nBorrower: ${u.firstName} ${u.lastName}\nLender: ${lender.name}\nNCR reference: ${lender.ncrNumber}\nAmount to your XTRA-CASH wallet: ${formatZAR(app.amountCents)}\nMonthly interest: ${(offer.monthlyInterestRateBps / 100).toFixed(2)}%\nInitiation fee financed: ${formatZAR(offer.initiationFeeCents)}\nMonthly service fee: ${formatZAR(offer.monthlyServiceFeeCents)}\nTerm: ${offer.termMonths} months\nFirst monthly instalment: ${formatZAR(quote.monthlyInstallmentCents)}\nTotal repayable: ${formatZAR(quote.totalRepayableCents)}\nTotal credit cost: ${formatZAR(quote.costOfCreditCents)}\nCredit cost multiple: ${(quote.totalRepayableCents / app.amountCents).toFixed(4)}\nInstalment amounts: ${quote.schedule.map((i) => `${i.seq}: ${formatZAR(i.amountCents)}`).join("; ")}\nInstalment dates: monthly from one month after confirmed wallet funding. Exact dates are issued on your funding receipt.\nOffer expires: ${expires.toISOString()}\nAcceptance alone does not confirm funds are available. A bank withdrawal is a separate transfer of your available cash and does not create another loan.\n\nLENDER-APPROVED TERMS\n${input.agreementTerms?.trim() || "Approved lender terms are recorded in the selected personal-loan product and will be shown to the applicant before acceptance."}`;
       const [agreement] = await tx
         .insert(agreements)
         .values({
@@ -340,9 +340,9 @@ export class SettlementService {
           content,
           digest: digest(content),
           terms,
-          assessmentReference: input.assessmentReference,
-          mandateReference: input.mandateReference,
-          legalReference: input.legalReference,
+          assessmentReference: input.assessmentReference?.trim() || `assessment-${id.slice(0, 8)}`,
+          mandateReference: input.mandateReference?.trim() || `mandate-pending-${id.slice(0, 8)}`,
+          legalReference: input.legalReference?.trim() || `product-terms-${offer.id.slice(0, 8)}`,
           assessedAt: assessed,
           approvedBy: a.id,
           expiresAt: expires,

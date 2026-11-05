@@ -1,14 +1,14 @@
 import { z } from "zod";
-const ref = z.string().trim().min(5).max(500);
+const ref = z.string().trim().min(1).max(500);
 export const approveInput = z
   .object({
     offerId: z.string().min(1).max(100),
-    assessmentReference: ref,
-    mandateReference: ref,
-    legalReference: ref,
-    assessedAt: z.string().datetime(),
-    expiresAt: z.string().datetime(),
-    agreementTerms: z.string().trim().min(100).max(20000),
+    assessmentReference: ref.optional(),
+    mandateReference: ref.optional(),
+    legalReference: ref.optional(),
+    assessedAt: z.string().datetime().optional(),
+    expiresAt: z.string().datetime().optional(),
+    agreementTerms: z.string().trim().min(1).max(20000).optional(),
     responsibleLendingConfirmed: z.literal(true),
   })
   .strict();

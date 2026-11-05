@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { ApplicationLenderAccess } from "./application-lender-access";
-import { ApplicationRouting, ApplicantRoutingConsent } from "./routing";
+import { ApplicationRouting } from "./routing";
 import { CompetitionRelease, LoanJourney } from "./loan-competition";
 import {
   formatZAR,
@@ -161,9 +161,6 @@ export function PersonalSettlementView({
           />
           <ApplicationLenderAccess applicationId={applicationId} />
         </details>
-      )}
-      {!reviewer && reviewStates.includes(d.application.status) && (
-        <ApplicantRoutingConsent applicationId={applicationId} />
       )}
       {isOffice && !reviewStates.includes(d.application.status) && (
         <details className="rounded-xl border p-3">

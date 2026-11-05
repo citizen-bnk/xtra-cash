@@ -1,17 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
-import { formatZAR } from "@xtra/shared";
+import { Bell } from "lucide-react";
 import { useApi, useAuth } from "./api";
 import {
   Alert,
   Button,
   Card,
   Modal,
-  StatusBadge,
-  Field,
-  Select,
-  Input,
-  Textarea,
 } from "./components";
 import {
   PersonalSettlementView,
@@ -28,19 +23,6 @@ type Notification = {
   owner: string;
   read: boolean;
 };
-type Demo = {
-  id: string;
-  title: string;
-  stage: string;
-  payload: {
-    amountCents: number;
-    termMonths: number;
-    purpose: string;
-    nextActor: string;
-    action: string;
-    description: string;
-  };
-};
 export function LoanActionCentre() {
   const { client, me } = useAuth(),
     data = useApi(
@@ -50,14 +32,10 @@ export function LoanActionCentre() {
           "/loan-operations/notifications",
         ),
       [me?.id],
-    ),
-    demos = useApi((c) =>
-      c.request<Demo[]>("GET", "/loan-operations/demo-cases"),
     );
   const [open, setOpen] = useState(false),
+    [bellOpen, setBellOpen] = useState(false),
     [active, setActive] = useState<Notification | null>(null),
-    [demo, setDemo] = useState<Demo | null>(null),
-    [training, setTraining] = useState(false),
     [notice, setNotice] = useState("");
   useEffect(() => {
     const timer = setInterval(() => {
@@ -101,7 +79,24 @@ export function LoanActionCentre() {
               : "No loan action is waiting for you."}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}
+            title="Notifications"
+            onClick={() => {
+              setBellOpen(true);
+              data.reload();
+            }}
+            className="relative grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-ink hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple/60"
+          >
+            <Bell className="h-5 w-5" />
+            {unread > 0 && (
+              <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-brand px-1 text-center text-[11px] font-bold leading-5 text-white">
+                {unread > 99 ? "99+" : unread}
+              </span>
+            )}
+          </button>
           <Button
             variant="secondary"
             onClick={() => {
@@ -110,9 +105,6 @@ export function LoanActionCentre() {
             }}
           >
             Tasks & notifications{unread ? ` (${unread})` : ""}
-          </Button>
-          <Button variant="ghost" onClick={() => setTraining(true)}>
-            Explore demo journey
           </Button>
         </div>
       </div>
@@ -138,6 +130,35 @@ export function LoanActionCentre() {
           </p>
         </div>
       )}
+      <Modal
+        open={bellOpen}
+        title={unread ? `Unread notifications (${unread})` : "Notifications"}
+        onClose={() => {
+          setBellOpen(false);
+          data.reload();
+        }}
+      >
+        {unread ? (
+          <div className="space-y-3">
+            {data.data?.notifications.filter((n) => !n.read).map((n) => (
+              <Card key={n.key} className="border-brand/30">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <strong>{n.title}</strong>
+                    <p className="mt-1 text-sm text-muted">{n.description}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-brand-soft px-2 py-1 text-xs font-semibold">Unread</span>
+                </div>
+                <Button className="mt-3" onClick={() => { setBellOpen(false); void act(n); }}>
+                  {n.cta || "Open task"}
+                </Button>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">You’re all caught up. New loan tasks will appear here with an action button.</p>
+        )}
+      </Modal>
       <Modal
         open={!!active}
         title={active?.title ?? "Loan task"}
@@ -169,123 +190,6 @@ export function LoanActionCentre() {
           )
         )}
       </Modal>
-      <Modal
-        open={training}
-        title="Personal-loan demo journey"
-        onClose={() => {
-          setTraining(false);
-          setDemo(null);
-        }}
-      >
-        <Alert tone="amber">
-          Training only. These examples are separate from real applications,
-          agreements, wallet balances and EFT payments.
-        </Alert>
-        <p className="my-3 text-sm">
-          Follow a request from submission to lender offers, acceptance and
-          banking. Every stage names the person who acts next.
-        </p>
-        {demo ? (
-          <Card>
-            <Button variant="ghost" onClick={() => setDemo(null)}>
-              Back to all examples
-            </Button>
-            <h3 className="mt-3 font-bold">{demo.title}</h3>
-            <StatusBadge status={demo.stage} />
-            <p className="my-2">
-              {formatZAR(demo.payload.amountCents)} · {demo.payload.termMonths}{" "}
-              months · {demo.payload.purpose}
-            </p>
-            <p>
-              <strong>Who acts:</strong> {demo.payload.nextActor}
-            </p>
-            <p className="my-2">{demo.payload.description}</p>
-            <DemoActivity
-              key={demo.id}
-              demo={demo}
-              onNext={() => {
-                const list = demos.data ?? [];
-                const i = list.findIndex((d) => d.id === demo.id);
-                setDemo(list[(i + 1) % list.length] ?? null);
-              }}
-            />
-            <p className="mt-2 text-sm" role="status">
-              {notice}
-            </p>
-          </Card>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {demos.data?.map((d) => (
-              <button
-                key={d.id}
-                className="block w-full rounded-xl border p-3 text-left hover:bg-surface"
-                onClick={() => setDemo(d)}
-              >
-                <strong>{d.title}</strong>
-                <p className="text-sm">
-                  {d.stage} · Next: {d.payload.nextActor}
-                </p>
-              </button>
-            ))}
-            {demos.data?.length === 0 && (
-              <p>Demo records are awaiting setup.</p>
-            )}
-          </div>
-        )}
-      </Modal>
     </section>
-  );
-}
-function DemoActivity({ demo, onNext }: { demo: Demo; onNext: () => void }) {
-  const [choice, setChoice] = useState(""),
-    [confirmed, setConfirmed] = useState(false),
-    [done, setDone] = useState(false);
-  return (
-    <div className="mt-3 space-y-3">
-      <Field label="Training action">
-        <Select value={choice} onChange={(e) => setChoice(e.target.value)}>
-          <option value="">Choose an action</option>
-          <option value="complete">{demo.payload.action}</option>
-          <option value="review">
-            Ask for human review / more information
-          </option>
-        </Select>
-      </Field>
-      {["COMPETITION_OPEN", "OFFERED"].includes(demo.stage) && (
-        <Field label="Demo assessment date and time">
-          <Input type="datetime-local" />
-        </Field>
-      )}
-      {demo.stage === "ACTION_REQUIRED" && (
-        <Field label="Demo information reply">
-          <Textarea placeholder="Enter a synthetic training reply only" />
-        </Field>
-      )}
-      <label className="flex gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={confirmed}
-          onChange={(e) => setConfirmed(e.target.checked)}
-        />
-        I understand this is a training simulation.
-      </label>
-      <Button
-        disabled={!choice || !confirmed || done}
-        onClick={() => setDone(true)}
-      >
-        {demo.payload.action} · demo
-      </Button>
-      {done && (
-        <>
-          <Alert tone="green">
-            Training action completed. No real application, agreement, balance
-            or payment changed.
-          </Alert>
-          <Button variant="secondary" onClick={onNext}>
-            Explore the next stage
-          </Button>
-        </>
-      )}
-    </div>
   );
 }

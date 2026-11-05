@@ -367,17 +367,13 @@ export function ManualDecisionForm({
     setBusy(true);
     setError("");
     try {
-      if (!draft.assessedAt || !draft.expiresAt)
-        throw new Error(
-          "Choose the assessment date/time and offer expiry before authorising.",
-        );
       await client.request(
         "POST",
         endpoint ?? `/personal-loans/applications/${applicationId}/approve`,
         {
           ...draft,
-          assessedAt: new Date(draft.assessedAt).toISOString(),
-          expiresAt: new Date(draft.expiresAt).toISOString(),
+          ...(draft.assessedAt ? { assessedAt: new Date(draft.assessedAt).toISOString() } : {}),
+          ...(draft.expiresAt ? { expiresAt: new Date(draft.expiresAt).toISOString() } : {}),
           responsibleLendingConfirmed: true,
         },
       );
@@ -416,46 +412,12 @@ export function ManualDecisionForm({
             ))}
         </Select>
       </Field>
-      {(
-        [
-          "assessmentReference",
-          "mandateReference",
-          "legalReference",
-          "assessedAt",
-          "expiresAt",
-        ] as const
-      ).map((k) => (
-        <Field
-          key={k}
-          label={labels[k]}
-          hint={
-            k.endsWith("At")
-              ? "Choose the local date and time. The system converts it securely for submission."
-              : undefined
-          }
-        >
-          <Input
-            type={k.endsWith("At") ? "datetime-local" : "text"}
-            list={
-              k.endsWith("At") ? undefined : `decision-${applicationId}-${k}`
-            }
-            value={draft[k]}
-            onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}
-          />
-          {!k.endsWith("At") && (
-            <datalist id={`decision-${applicationId}-${k}`}>
-              {(k === "assessmentReference"
-                ? evidence.data?.assessmentReferences
-                : k === "mandateReference"
-                  ? evidence.data?.mandateReferences
-                  : evidence.data?.legalTemplates.map((t) => t.reference)
-              )?.map((value) => (
-                <option key={value} value={value} />
-              ))}
-            </datalist>
-          )}
-        </Field>
-      ))}
+      <Alert tone="blue">
+        Assessment references and dates are optional for this guided review. If
+        you leave them blank, XTRA-CASH records an internal placeholder and the
+        lender remains responsible for completing the real checks before any
+        agreement is accepted or money is funded.
+      </Alert>
       <Field label="Lender-approved agreement wording">
         <Select
           aria-label="Approved agreement template"

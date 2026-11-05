@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, gte, lte, ne, or, inArray } from 'drizzle-orm';
-import { applicationLenderAccess } from './lender-ai.schema';
+import { applicationLenderAccess, competitionConsents } from './lender-ai.schema';
 import {RoutingService} from './routing';
 import { ageOn, parseSaId, quoteLoan } from '@xtra/shared';
 import { InjectDb } from '../common/db.module';
@@ -105,6 +105,7 @@ export class PersonalLoanService {
     if(dto.offerId&&policy.mode!=='APPLICANT')throw new BadRequestException('Lender selection is managed by the current platform routing policy.');
     if((dto.latitude===undefined)!==(dto.longitude===undefined))throw new BadRequestException('Provide both location coordinates.');
     if(dto.latitude!==undefined&&!dto.routingConsent)throw new BadRequestException('Routing consent is required to supply matching location.');
+    const routingConsent = dto.routingConsent !== false;
     let lenderId: string | null = null;
     if (dto.offerId) {
       const match = await this.matches(u.id, dto);
@@ -119,10 +120,11 @@ export class PersonalLoanService {
       const payload = { amountCents: dto.amountCents, termMonths: dto.termMonths, purpose: dto.purpose, monthlyIncomeCents: dto.monthlyIncomeCents, monthlyExpensesCents: dto.monthlyExpensesCents, offerId: dto.offerId ?? null, lenderId, status: lenderId ? 'REFERRED' as const : 'SUBMITTED' as const, consentAt: new Date() };
       const [app] = await tx.insert(personalLoanApplications).values({ ...payload, userId: u.id, idempotencyKey: dto.idempotencyKey }).onConflictDoUpdate({ target: [personalLoanApplications.userId, personalLoanApplications.idempotencyKey], set: payload }).returning();
       await this.audit.log(u, 'personal_loan.submitted', 'personal_loan_application', app.id, { referred: !!lenderId }, tx);
-      await this.routing.record(app.id,policy.mode,!!dto.routingConsent,dto.latitude!==undefined?{latitude:dto.latitude,longitude:dto.longitude!}:undefined,tx);
+      await this.routing.record(app.id,policy.mode,routingConsent,dto.latitude!==undefined?{latitude:dto.latitude,longitude:dto.longitude!}:undefined,tx);
+      if (routingConsent) await tx.insert(competitionConsents).values({ applicationId: app.id, userId: u.id }).onConflictDoNothing();
       await tx.insert(applicationEvents).values({applicationId:app.id,actorId:u.id,status:app.status,message:lenderId?'Your application was sent to the selected lender for review.':'Your application was submitted for review.'});
       return app;
-    }).then(async app=>{if(policy.mode==='ADMIN'&&policy.automation!=='OFF'&&dto.routingConsent)await this.routing.automate(u,app.id).catch(()=>undefined);return (await this.db.query.personalLoanApplications.findFirst({where:eq(personalLoanApplications.id,app.id)}))!;});
+    }).then(async app=>{if(policy.mode==='ADMIN'&&policy.automation!=='OFF'&&routingConsent)await this.routing.automate(u,app.id).catch(()=>undefined);return (await this.db.query.personalLoanApplications.findFirst({where:eq(personalLoanApplications.id,app.id)}))!;});
   }
 
   list(userId: string) { return this.db.query.personalLoanApplications.findMany({ where: eq(personalLoanApplications.userId, userId), orderBy: desc(personalLoanApplications.createdAt), limit: 30 }); }
