@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { formatZAR } from '@xtra/shared';
-import { Alert, Loading, PageHeader, StatusBadge, Table, useApi } from '@xtra/ui';
+import { Alert, Loading, PageHeader, RecordActions, StatusBadge, Table, useApi } from '@xtra/ui';
 
 export default function ApplicationsReview() {
   const applications = useApi((c) => c.admin.personalApplications());
@@ -15,7 +15,7 @@ export default function ApplicationsReview() {
         { header: 'Request', cell: (a) => <div>{formatZAR(a.amountCents)} · {a.termMonths} months<div className="text-xs text-muted">{a.purpose}</div></div> },
         { header: 'Status', cell: (a) => <StatusBadge status={a.status} /> },
         { header: 'Submitted', cell: (a) => new Date(a.createdAt).toLocaleDateString('en-ZA') },
-        { header: 'Oversight', cell: (a) => <Link className="font-semibold underline" href={`/applications/${a.id}`}>View / intervene</Link> },
+        { header: 'Actions', cell: (a) => <RecordActions actions={[{ label: 'Open application', href: `/applications/${a.id}` }, { label: 'View applicant', href: `/users/${a.userId}` }]} /> },
       ]} />}
     </div>
   );

@@ -1,6 +1,7 @@
 export * from './components';
 export * from './api';
 export * from './shell';
+export * from './record-actions';
 export * from './demo';
 export * from './passkeys';
 export * from './personal-settlement';

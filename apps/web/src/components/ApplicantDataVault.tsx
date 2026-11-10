@@ -3,14 +3,14 @@ import { useState } from 'react';
 import { BadgeCheck, CircleEllipsis, FileUp, Fingerprint, ShieldCheck, TrendingUp, WalletCards } from 'lucide-react';
 import type { ApplicantVaultStatus } from '@xtra/shared';
 import { formatZAR } from '@xtra/shared';
-import { Alert, Button, Card, Field, Input, Loading, StatusBadge, useApi, useAuth } from '@xtra/ui';
+import { Alert, Button, Card, Loading, StatusBadge, useApi, useAuth } from '@xtra/ui';
 
 type EvidenceType = 'ID_DOCUMENT' | 'PROOF_OF_ADDRESS' | 'BANK_STATEMENT' | 'PROOF_OF_INCOME';
-const evidence: { type: EvidenceType; label: string; detail: string; period: boolean }[] = [
-  { type: 'ID_DOCUMENT', label: 'Identity document', detail: 'ID card, green book or passport', period: false },
-  { type: 'PROOF_OF_ADDRESS', label: 'Proof of address', detail: 'Recent utility, municipal or official account', period: false },
-  { type: 'BANK_STATEMENT', label: '3 months of bank statements', detail: 'One PDF or clear images covering at least 80 days', period: true },
-  { type: 'PROOF_OF_INCOME', label: 'Proof of income', detail: 'Payslip, financials or accountant letter', period: false },
+const evidence: { type: EvidenceType; label: string; detail: string }[] = [
+  { type: 'ID_DOCUMENT', label: 'Identity document', detail: 'ID card, green book or passport' },
+  { type: 'PROOF_OF_ADDRESS', label: 'Proof of address', detail: 'Recent utility, municipal or official account' },
+  { type: 'BANK_STATEMENT', label: '3 months of bank statements', detail: 'Upload the statement files. The lender reviews their dates and coverage.' },
+  { type: 'PROOF_OF_INCOME', label: 'Proof of income', detail: 'Payslip, financials or accountant letter' },
 ];
 
 export function ApplicantDataVault({ onReady }: { onReady?: () => void }) {
@@ -21,11 +21,11 @@ export function ApplicantDataVault({ onReady }: { onReady?: () => void }) {
   if (vault.loading && !vault.data) return <Loading />;
   if (!vault.data) return <Alert tone="red">{vault.error || 'Your data vault is unavailable.'}<Button variant="secondary" onClick={vault.reload}>Try again</Button></Alert>;
   const data = vault.data;
-  const upload = async (type: EvidenceType, file: File | undefined, from?: string, to?: string) => {
+  const upload = async (type: EvidenceType, file: File | undefined) => {
     if (!file) return;
     setUploading(type); setError('');
     try {
-      const next = await client.consumer.uploadVaultDocument(type, file, from, to);
+      const next = await client.consumer.uploadVaultDocument(type, file);
       vault.setData(next);
       if (next.eligible) onReady?.();
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not upload this evidence'); }
@@ -63,8 +63,7 @@ function Pillar({ icon: Icon, name, status, confidence, value }: { icon: typeof 
   return <Card className="min-w-0"><div className="flex items-center justify-between gap-2"><Icon className="h-5 w-5 text-brand" /><StatusBadge status={status} /></div><h2 className="mt-3 font-bold">{name}</h2>{value ? <p className="mt-1 text-lg font-black">{value}</p> : null}<div className="mt-3 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(2, confidence / 100)}%` }} /></div><p className="mt-1 text-xs text-muted">{Math.round(confidence / 100)}% confidence</p></Card>;
 }
 
-function EvidenceUpload({ item, status, busy, onUpload }: { item: (typeof evidence)[number]; status?: ApplicantVaultStatus['fastTrack']['required'][number]; busy: boolean; onUpload: (type: EvidenceType, file: File | undefined, from?: string, to?: string) => Promise<void> }) {
-  const [from, setFrom] = useState(''), [to, setTo] = useState('');
+function EvidenceUpload({ item, status, busy, onUpload }: { item: (typeof evidence)[number]; status?: ApplicantVaultStatus['fastTrack']['required'][number]; busy: boolean; onUpload: (type: EvidenceType, file: File | undefined) => Promise<void> }) {
   const supplied = !!status?.supplied;
-  return <div className="rounded-2xl border border-line p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex min-w-0 items-start gap-3">{supplied ? <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" /> : <CircleEllipsis className="mt-0.5 h-5 w-5 shrink-0 text-muted" />}<div><div className="font-semibold">{item.label}</div><div className="text-xs text-muted">{item.detail}</div></div></div><StatusBadge status={status?.status ?? 'MISSING'} /></div>{item.period ? <div className="mt-3 grid gap-3 sm:grid-cols-2"><Field label="Statement period starts"><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field><Field label="Statement period ends"><Input type="date" value={to} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setTo(e.target.value)} /></Field></div> : null}<label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm font-semibold hover:bg-surface"><FileUp className="h-4 w-4" />{busy ? 'Uploading…' : supplied ? 'Replace evidence' : 'Choose document'}<input className="sr-only" type="file" accept="application/pdf,image/jpeg,image/png" disabled={busy || (item.period && (!from || !to))} onChange={(e) => { void onUpload(item.type, e.target.files?.[0], from || undefined, to || undefined); e.currentTarget.value = ''; }} /></label>{item.period && (!from || !to) ? <p className="mt-2 text-xs text-muted">Choose the statement period before selecting the file.</p> : null}</div>;
+  return <div className="rounded-2xl border border-line p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex min-w-0 items-start gap-3">{supplied ? <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" /> : <CircleEllipsis className="mt-0.5 h-5 w-5 shrink-0 text-muted" />}<div><div className="font-semibold">{item.label}</div><div className="text-xs text-muted">{item.detail}</div></div></div><StatusBadge status={status?.status ?? 'MISSING'} /></div><label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm font-semibold hover:bg-surface"><FileUp className="h-4 w-4" />{busy ? 'Uploading…' : supplied ? 'Replace evidence' : 'Choose document'}<input className="sr-only" type="file" accept="application/pdf,image/jpeg,image/png" disabled={busy} onChange={(e) => { void onUpload(item.type, e.target.files?.[0]); e.currentTarget.value = ''; }} /></label></div>;
 }

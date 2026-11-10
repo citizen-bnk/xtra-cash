@@ -94,18 +94,16 @@ export function WorkFormAssistant({ pathname }: { pathname: string }) {
         HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
       >(),
       next: Target[] = [];
-    const dialogs = [
-      ...document.querySelectorAll<HTMLElement>('[role="dialog"]'),
-    ].filter(
+    const dialogs = Array.from(
+      document.querySelectorAll<HTMLElement>('[role="dialog"]'),
+    ).filter(
       (el) =>
         el.getClientRects().length && !el.closest("[data-work-assistant]"),
     );
     const target = dialogs.at(-1) ?? null;
     setPortalTarget((current) => (current === target ? current : target));
     const root = target || document;
-    for (const el of root.querySelectorAll<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >("input,textarea,select")) {
+    for (const el of Array.from(root.querySelectorAll("input,textarea,select")) as (HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement)[]) {
       if (
         next.length >= 40 ||
         el.closest("[data-work-assistant], [data-decision-ai]") ||
@@ -142,7 +140,7 @@ export function WorkFormAssistant({ pathname }: { pathname: string }) {
       if (!label || protectedField.test(label)) continue;
       const options =
         el instanceof HTMLSelectElement
-          ? [...el.options]
+          ? Array.from(el.options)
               .filter((o) => o.value && !o.disabled)
               .slice(0, 100)
               .map((o) => ({ value: o.value, label: o.label.slice(0, 120) }))

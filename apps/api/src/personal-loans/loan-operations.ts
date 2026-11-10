@@ -488,7 +488,10 @@ export class LoanOperationsService {
       read?: boolean;
     }[] = [];
     let rows: (typeof applications.$inferSelect)[] = [];
-    if (office(a)) rows = [];
+    let lenderOrganizationId: string | null = null;
+    if (office(a)) rows = await this.db.select().from(applications)
+      .where(or(inArray(applications.status, openStates), eq(applications.status, 'OFFERED'), eq(applications.status, 'ACCEPTED'), eq(applications.status, 'DISBURSED')))
+      .orderBy(desc(applications.createdAt)).limit(100);
     else if (a.roles.includes("LENDER")) {
       const account = await this.db.query.lenderOrgs.findFirst({
         where: eq(lenderOrgs.ownerUserId, a.id),
@@ -500,6 +503,7 @@ export class LoanOperationsService {
           externalDeliveryConfigured: false,
         };
       const org = await this.org(a);
+      lenderOrganizationId = org.id;
       rows = await this.db
         .select()
         .from(applications)
@@ -527,6 +531,11 @@ export class LoanOperationsService {
           "Review the request, manage consent and match a lender or open an offer competition.";
         cta = "Review application";
         owner = "Admin";
+      } else if (office(a) && app.status === "OFFERED") {
+        title = "Customer offers are ready";
+        description = "The applicant has offers to compare. Monitor progress if support is needed.";
+        cta = "View application";
+        owner = "Platform admin";
       } else if (office(a) && app.status === "ACCEPTED") {
         title = "Release wallet funding";
         description =
@@ -538,6 +547,11 @@ export class LoanOperationsService {
         description =
           "Review this customer request and submit an offer if it fits your lending criteria. XTRA-CASH ranks the customer’s three best current offers.";
         cta = "Review and make offer";
+        owner = "Lender";
+      } else if (a.roles.includes("LENDER") && app.lenderId && app.lenderId === lenderOrganizationId && app.status === "ACCEPTED") {
+        title = "Applicant accepted your offer";
+        description = "Review the signed agreement and funding status for this loan.";
+        cta = "Open application";
         owner = "Lender";
       } else if (app.userId === a.id && app.status === "ACTION_REQUIRED") {
         title = "Your application needs information";

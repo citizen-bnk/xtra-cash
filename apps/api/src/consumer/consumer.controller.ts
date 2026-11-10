@@ -10,6 +10,7 @@ import { CreditService } from './credit.service';
 import { CardsService } from './cards.service';
 import { AuthorizationService } from './authorization.service';
 import { LoansService } from './loans.service';
+import { AuditService } from '../common/audit.service';
 import { AmountDto, KycDto, PurchaseDto, QuoteDto } from './consumer.dto';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { and, sql } from 'drizzle-orm';
@@ -23,7 +24,20 @@ export class ConsumerController {
     private cards: CardsService,
     private authz: AuthorizationService,
     private loans: LoansService,
+    private audit: AuditService,
   ) {}
+
+  @HttpCode(200)
+  @Post('personal-account')
+  async enablePersonalAccount(@CurrentUser() actor: AuthUser) {
+    if (!actor.roles.includes('LENDER')) throw new ForbiddenException('This option is for lender account holders.');
+    const user = await this.db.query.users.findFirst({ where: eq(users.id, actor.id) });
+    if (!user) throw new NotFoundException();
+    const roles = [...new Set([...user.roles, 'CONSUMER' as const])];
+    const [updated] = await this.db.update(users).set({ roles }).where(eq(users.id, actor.id)).returning();
+    await this.audit.log(actor, 'user.personal_account_enabled', 'user', actor.id, {});
+    return sanitizeUser(updated);
+  }
 
   @Get()
   async me(@CurrentUser() u: AuthUser) {

@@ -132,9 +132,9 @@ export class VaultService {
     const prefix = file.buffer.subarray(0, 8).toString('hex');
     const valid = file.mimetype === 'application/pdf' ? file.buffer.subarray(0, 5).toString() === '%PDF-' : file.mimetype === 'image/png' ? prefix === '89504e470d0a1a0a' : prefix.startsWith('ffd8ff');
     if (!valid) throw new BadRequestException('The document content does not match its file type');
+    // Statement coverage is determined from the document by the lender/analysis provider.
+    // Keep legacy date fields optional for older clients, but never require them.
     const from = observedFrom ? new Date(observedFrom) : null, to = observedTo ? new Date(observedTo) : null;
-    if ((from && !to) || (!from && to) || (from && to && (from > to || to > new Date()))) throw new BadRequestException('Choose a valid evidence period');
-    if (type === 'BANK_STATEMENT' && from && to && to.getTime() - from.getTime() < 80 * DAY) throw new BadRequestException('Bank statements must cover at least 80 days');
     const contentHash = createHash('sha256').update(file.buffer).digest('hex');
     const duplicate = await this.db.query.vaultDocuments.findFirst({ where: and(eq(vaultDocuments.userId, actor.id), eq(vaultDocuments.contentHash, contentHash)) });
     if (duplicate) return this.status(actor.id);

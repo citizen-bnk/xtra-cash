@@ -26,6 +26,7 @@ import { CommissionService } from '../affiliate/commission.service';
 import { LenderService, presentDoc } from '../lender/lender.service';
 import { LoansService, presentLoan } from '../consumer/loans.service';
 import { AuthService } from '../auth/auth.service';
+import * as bcrypt from 'bcryptjs';
 
 const num = (v: unknown) => Number(v ?? 0);
 const userCols = { columns: { id: true, firstName: true, lastName: true, email: true } } as const;
@@ -168,6 +169,16 @@ export class AdminService {
     }
     await this.audit.log(actor, `user.${status.toLowerCase()}`, 'user', id);
     return sanitizeUser(u);
+  }
+
+  async resetUserPassword(actor: AuthUser, id: string, password: string) {
+    if (id === actor.id) throw new BadRequestException('Use your own sign-in security settings to change your password');
+    if (Buffer.byteLength(password, 'utf8') > 72) throw new BadRequestException('Password must be at most 72 UTF-8 bytes');
+    const [user] = await this.db.update(users).set({ passwordHash: await bcrypt.hash(password, 12) }).where(eq(users.id, id)).returning({ id: users.id });
+    if (!user) throw new NotFoundException();
+    await this.auth.revokeAll(id);
+    await this.audit.log(actor, 'user.password_reset_by_admin', 'user', id, { sessionsRevoked: true });
+    return { ok: true, sessionsRevoked: true };
   }
 
   async setUserRoles(actor: AuthUser, id: string, roles: string[]) {

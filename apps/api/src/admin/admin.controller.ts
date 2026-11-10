@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { ArrayNotEmpty, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Role } from '@xtra/shared';
 import { CurrentUser, Roles, type AuthUser } from '../common/auth';
 import { SettingsService } from '../common/settings.service';
@@ -21,6 +21,9 @@ class StatusDto {
 }
 class RolesDto {
   @IsArray() @ArrayNotEmpty() @IsIn(Object.values(Role), { each: true }) roles: Role[];
+}
+class PasswordResetDto {
+  @IsString() @MinLength(12) @MaxLength(72) password: string;
 }
 class LenderReviewDto {
   @IsIn(['UNDER_REVIEW', 'ACCREDITED', 'REJECTED', 'SUSPENDED']) status: string;
@@ -75,6 +78,9 @@ export class AdminController {
   }
   @HttpCode(200) @Post('users/:id/status') userStatus(@CurrentUser() a: AuthUser, @Param('id') id: string, @Body() dto: StatusDto) {
     return this.admin.setUserStatus(a, id, dto.status);
+  }
+  @HttpCode(200) @Post('users/:id/password') userPassword(@CurrentUser() a: AuthUser, @Param('id') id: string, @Body() dto: PasswordResetDto) {
+    return this.admin.resetUserPassword(a, id, dto.password);
   }
   @Roles('SUPER_ADMIN')
   @HttpCode(200)

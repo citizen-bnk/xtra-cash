@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
-import { Badge, Button, Input, Loading, PageHeader, Select, StatusBadge, Table, useApi } from '@xtra/ui';
+import { Badge, Button, Input, Loading, PageHeader, RecordActions, Select, StatusBadge, Table, useApi } from '@xtra/ui';
 
 export default function UsersPage() {
   const router = useRouter();
@@ -47,6 +47,7 @@ export default function UsersPage() {
               { header: 'KYC', cell: (u) => <StatusBadge status={u.kycStatus} /> },
               { header: 'Status', cell: (u) => <StatusBadge status={u.status} /> },
               { header: 'Joined', cell: (u) => new Date(u.createdAt).toLocaleDateString('en-ZA') },
+              { header: 'Actions', cell: (u) => <RecordActions actions={[{ label: 'Open account', href: `/users/${u.id}` }]} /> },
             ]}
           />
           <div className="mt-4 flex items-center justify-between text-sm text-muted">

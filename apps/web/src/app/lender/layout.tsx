@@ -1,8 +1,8 @@
 'use client';
-import Link from 'next/link';
-import { BadgeCheck, Banknote, FileStack, LayoutDashboard, ShoppingBag, Tags } from 'lucide-react';
+import { BadgeCheck, Banknote, FileStack, LayoutDashboard, Tags } from 'lucide-react';
 import { RequireRole } from '@/lib/guard';
 import { PortalShell } from '@/components/PortalShell';
+import { LenderPersonalAccess } from '@/components/LenderPersonalAccess';
 
 const NAV = [
   { href: '/lender', label: 'Overview', icon: LayoutDashboard, exact: true },
@@ -22,9 +22,7 @@ export default function LenderLayout({ children }: { children: React.ReactNode }
         nav={NAV}
         section="Credit Mall · Lender"
         footer={
-          <Link href="/app" className="flex items-center gap-2 text-xs font-medium text-white/60 hover:text-white">
-            <ShoppingBag className="h-3.5 w-3.5" /> Shopper app
-          </Link>
+          <LenderPersonalAccess />
         }
       >
         {children}

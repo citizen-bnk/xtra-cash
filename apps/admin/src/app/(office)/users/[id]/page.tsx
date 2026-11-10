@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { EMPLOYMENT_LABELS, formatZAR, Role } from '@xtra/shared';
-import { Alert, Badge, Button, Card, cx, Loading, Modal, PageHeader, StatusBadge, Table, useAction, useApi, useAuth, useToast } from '@xtra/ui';
+import { Alert, Badge, Button, Card, cx, Input, Loading, Modal, PageHeader, StatusBadge, Table, useAction, useApi, useAuth, useToast } from '@xtra/ui';
 
 const ALL_ROLES = Object.values(Role);
 
@@ -14,6 +14,8 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
   const user = useApi((c) => c.admin.user(id), [id]);
   const [rolesOpen, setRolesOpen] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordNotice, setPasswordNotice] = useState('');
   const status = useAction(async (s: 'ACTIVE' | 'SUSPENDED') => {
     await client.admin.setUserStatus(id, s);
     toast(s === 'SUSPENDED' ? 'User suspended, sessions revoked and cards frozen' : 'User reactivated');
@@ -24,6 +26,12 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
     toast('Roles updated');
     setRolesOpen(false);
     user.reload();
+  });
+  const resetPassword = useAction(async () => {
+    await client.request('POST', `/admin/users/${id}/password`, { password: newPassword });
+    setNewPassword('');
+    setPasswordNotice('Password updated. The user has been signed out of active sessions.');
+    toast('Password updated and active sessions revoked');
   });
 
   if (!user.data) return user.error ? <Alert tone="red">{user.error}</Alert> : <Loading />;
@@ -80,6 +88,16 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
           )}
         </Card>
       </div>
+      <details className="rounded-2xl border border-line bg-white p-4">
+        <summary className="cursor-pointer font-bold">Password support</summary>
+        <p className="mt-2 text-sm text-muted">Set a new temporary password when a user needs sign-in help. Use at least 12 characters, then share it with the user through a secure channel. Their active sessions will be revoked.</p>
+        <form className="mt-3 flex flex-wrap items-end gap-3" onSubmit={e => { e.preventDefault(); setPasswordNotice(''); resetPassword.run(); }}>
+          <label className="min-w-60 flex-1 text-sm font-medium">New password<Input className="mt-1" type="password" minLength={12} maxLength={72} autoComplete="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required /></label>
+          <Button loading={resetPassword.loading} disabled={newPassword.length < 12}>Update password</Button>
+        </form>
+        {resetPassword.error && <div className="mt-3"><Alert tone="red">{resetPassword.error}</Alert></div>}
+        {passwordNotice && <p role="status" className="mt-3 text-sm font-semibold text-green-700">{passwordNotice}</p>}
+      </details>
       <div>
         <h2 className="mb-3 font-bold">Loans</h2>
         <Table
