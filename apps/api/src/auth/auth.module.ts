@@ -7,6 +7,7 @@ import { accessTokenTtl, refreshTokenDays } from './config';
 import { PasswordlessController } from './passwordless.controller';
 import { PasswordlessService } from './passwordless.service';
 import { PasskeysController, SessionsController } from './passkeys.controller';
+import { SupportSessionController } from './support-session.controller';
 
 @Global()
 @Module({
@@ -23,7 +24,7 @@ import { PasskeysController, SessionsController } from './passkeys.controller';
       },
     }),
   ],
-  controllers: [AuthController, PasswordlessController, PasskeysController, SessionsController],
+  controllers: [AuthController, PasswordlessController, PasskeysController, SessionsController, SupportSessionController],
   providers: [AuthService, DemoService, PasswordlessService],
   exports: [AuthService],
 })

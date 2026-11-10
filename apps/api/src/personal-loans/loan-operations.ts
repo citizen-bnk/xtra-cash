@@ -22,6 +22,8 @@ import {
   personalLoanApplications as applications,
   personalVerifications,
   kycProfiles,
+  vaultDocuments,
+  vaultDocumentReviews,
 } from "../db/schema";
 import {
   loanCompetitions,
@@ -54,17 +56,6 @@ const office = (a: AuthUser) =>
 const releaseInput = z
   .object({
     authorityReference: z.string().trim().min(5).max(500),
-    confirmed: z.literal(true),
-  })
-  .strict();
-const customProductInput = z
-  .object({
-    name: z.string().trim().min(3).max(80),
-    monthlyInterestRateBps: z.number().int().min(0).max(2000),
-    initiationFeeCents: z.number().int().min(0).max(200000),
-    monthlyServiceFeeCents: z.number().int().min(0).max(100000),
-    minCreditScore: z.number().int().min(0).max(999),
-    minMonthlyIncomeCents: z.number().int().min(0).max(100000000),
     confirmed: z.literal(true),
   })
   .strict();
@@ -330,46 +321,6 @@ export class LoanOperationsService {
         "The applicant consented to lender review. Obtain genuine assessment and repayment evidence through the approved secure process. No credit decision is implied by these declared figures.",
     };
   }
-  async createProduct(
-    a: AuthUser,
-    id: string,
-    input: z.infer<typeof customProductInput>,
-  ) {
-    const { app } = await this.visible(id);
-    await this.org(a);
-    if (app.userId === a.id) throw new NotFoundException();
-    const [profile] = await this.db
-      .select()
-      .from(kycProfiles)
-      .where(eq(kycProfiles.userId, app.userId));
-    const product = await this.lender.createOffer(a, {
-      productType: "PERSONAL",
-      name: input.name,
-      description:
-        "Personal-loan product prepared from a consented request. Final affordability and lender approval are required.",
-      active: true,
-      monthlyInterestRateBps: input.monthlyInterestRateBps,
-      initiationFeeCents: input.initiationFeeCents,
-      monthlyServiceFeeCents: input.monthlyServiceFeeCents,
-      termMonths: app.termMonths,
-      minAmountCents: app.amountCents,
-      maxAmountPerUserCents: app.amountCents,
-      minMonthlyIncomeCents: input.minMonthlyIncomeCents,
-      minCreditScore: input.minCreditScore,
-      minAge: 18,
-      maxAge: 75,
-      employmentStatuses: [],
-      provinces: profile ? [profile.province] : [],
-    });
-    await this.audit.log(
-      a,
-      "personal_loan.competition_product_created",
-      "personal_loan_application",
-      id,
-      { offerId: product.id },
-    );
-    return product;
-  }
   async offer(a: AuthUser, id: string, input: z.infer<typeof approveInput>) {
     return this.db.transaction(async (tx) => {
       const [app] = await tx
@@ -558,6 +509,11 @@ export class LoanOperationsService {
         description = app.reviewNotes ?? "Please reply to the request.";
         cta = "Reply now";
         owner = "Applicant";
+      } else if (app.userId === a.id && app.status === "UNDER_REVIEW" && app.reviewNotes) {
+        title = "Your application is under review";
+        description = app.reviewNotes;
+        cta = "View application";
+        owner = "Applicant";
       } else if (app.userId === a.id && app.status === "OFFERED") {
         title = "Your loan offer is ready";
         description =
@@ -591,6 +547,14 @@ export class LoanOperationsService {
           kind: app.status === "DISBURSED" && !paidExternally.has(app.id) ? "WALLET" : "APPLICATION",
           owner,
         });
+    }
+    if (!office(a) && !a.roles.includes('LENDER')) {
+      const [pendingDocs, flaggedReviews] = await Promise.all([
+        this.db.select({ id: vaultDocuments.id, type: vaultDocuments.type }).from(vaultDocuments).where(and(eq(vaultDocuments.userId, a.id), inArray(vaultDocuments.status, ['PROCESSING', 'RECEIVED']))).orderBy(desc(vaultDocuments.createdAt)).limit(20),
+        this.db.select({ id: vaultDocumentReviews.id, applicationId: vaultDocumentReviews.applicationId, status: vaultDocumentReviews.status, comment: vaultDocumentReviews.comment, documentId: vaultDocumentReviews.documentId }).from(vaultDocumentReviews).where(and(eq(vaultDocumentReviews.userId, a.id), inArray(vaultDocumentReviews.status, ['REJECTED', 'REVOKED']))).orderBy(desc(vaultDocumentReviews.createdAt)).limit(20),
+      ]);
+      for (const doc of pendingDocs) notifications.unshift({ key: `vault:${doc.id}:processing`, applicationId: 'vault', title: 'Document received · review pending', description: 'This document is safely stored in your profile vault. Automated extraction is waiting for the OCR provider; no profile match or discrepancy has been confirmed yet.', cta: 'Open my data vault', kind: 'VAULT', owner: 'Applicant' });
+      for (const review of flaggedReviews) notifications.unshift({ key: `vault-review:${review.id}`, applicationId: review.applicationId, title: review.status === 'REVOKED' ? 'Document acceptance was revoked' : 'Document needs attention', description: review.comment, cta: 'Review document', kind: 'VAULT', owner: 'Applicant' });
     }
     if (!office(a) && !a.roles.includes('LENDER') && rows.length) {
       const candidateRows = await this.db.select({ applicationId: applicationCandidateOffers.applicationId }).from(applicationCandidateOffers).where(and(inArray(applicationCandidateOffers.applicationId, rows.map((r) => r.id)), eq(applicationCandidateOffers.status, 'SUBMITTED')));
@@ -687,7 +651,7 @@ export class LoanOperationsService {
       if (!openStates.includes(app.status))
         throw new ConflictException("This request already has a decision.");
       const message =
-        "Please confirm whether you consent to all active accredited lenders reviewing your request and preparing a matching offer. Open your application and use Confirm competition consent.";
+        "Please confirm whether you consent to all active accredited lenders reviewing your loan request. Open your application and use Confirm competition consent.";
       await tx
         .update(applications)
         .set({ status: "ACTION_REQUIRED", reviewNotes: message })
@@ -786,13 +750,6 @@ export class LoanOperationsController {
     @Param("id") id: string,
   ) {
     return this.service.detail(a, id);
-  }
-  @Roles("LENDER") @Post("competitions/:id/products") product(
-    @CurrentUser() a: AuthUser,
-    @Param("id") id: string,
-    @Body() b: unknown,
-  ) {
-    return this.service.createProduct(a, id, parse(customProductInput, b));
   }
   @Roles("LENDER") @Post("competitions/:id/offer") offer(
     @CurrentUser() a: AuthUser,

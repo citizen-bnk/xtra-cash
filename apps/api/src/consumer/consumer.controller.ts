@@ -62,7 +62,7 @@ export class ConsumerController {
       };
     }
     const { kyc, walletBalanceCents, ...rest } = sanitizeUser(user);
-    return { ...rest, kyc: kyc ?? null, walletBalanceCents, lender: lender ?? null, affiliate };
+    return { ...rest, kyc: kyc ?? null, walletBalanceCents, lender: lender ?? null, affiliate, supportSession: u.supportSessionId ? { adminEmail: u.supportAdminEmail ?? null } : null };
   }
 
   @Put('kyc')

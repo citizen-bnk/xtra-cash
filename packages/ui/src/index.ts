@@ -9,3 +9,4 @@ export * from './lender-ai';
 export * from './routing';
 export * from './loan-actions';
 export * from './loan-competition';
+export * from './lender-review';

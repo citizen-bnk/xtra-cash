@@ -7,7 +7,7 @@ import { Alert, Button, Card, Field, Input, Loading, MoneyInput, Select, StatusB
 import { LoanAmountSlider, LoanTermSlider } from './LoanSliders';
 import { SavedLoanDetails } from './SavedLoanDetails';
 import { conversationalMoney, conversationalTerm } from '@/lib/loan-conversation';
-type Profile = { firstName: string; lastName: string; identityType: 'ID' | 'PASSPORT'; identityNumber: string; identityStatus: string; dateOfBirth: string; province: string; employment: EmploymentStatus | ''; mobile: string; address: string; income: number | null; expenses: number | null; financialUpdatedAt: string | null; draftUpdatedAt?: string | null; draft: Partial<{ idempotencyKey: string; amount: number; term: number; purpose: string; income: number; expenses: number; identityType: 'ID' | 'PASSPORT'; identityNumber: string; dob: string; province: string; employment: EmploymentStatus; mobile: string; address: string }> };
+type Profile = { userId: string; firstName: string; lastName: string; identityType: 'ID' | 'PASSPORT'; identityNumber: string; identityStatus: string; dateOfBirth: string; province: string; employment: EmploymentStatus | ''; mobile: string; address: string; income: number | null; expenses: number | null; financialUpdatedAt: string | null; draftUpdatedAt?: string | null; draft: Partial<{ idempotencyKey: string; amount: number; term: number; purpose: string; income: number; expenses: number; identityType: 'ID' | 'PASSPORT'; identityNumber: string; dob: string; province: string; employment: EmploymentStatus; mobile: string; address: string }> };
 
 const PURPOSES = ['Home & repairs', 'Education', 'Medical', 'Transport', 'Debt consolidation', 'Other'];
 type Step = 'amount' | 'term' | 'purpose' | 'income' | 'expenses' | 'identity' | 'dob' | 'province' | 'employment' | 'mobile' | 'address' | 'identityDoc' | 'addressDoc' | 'review';
@@ -18,9 +18,9 @@ const QUESTIONS: Record<Step, string> = {
 export function PersonalLoanFlow({compact=false,onSubmitted}:{compact?:boolean;onSubmitted?:()=>void} = {}) {
   const { me, client } = useAuth();
   const routingPolicy=useApi(c=>c.request<{mode:string;geography:string}>('GET','/personal-loans/routing/policy'));
-  const verification = useApi(c => c.consumer.personalVerification());
-  const applications = useApi(c => c.consumer.personalApplications());
-  const profile = useApi(c => c.request<Profile>('GET', '/me/service-profile'));
+  const verification = useApi(c => c.consumer.personalVerification(), [me?.id]);
+  const applications = useApi(c => c.consumer.personalApplications(), [me?.id]);
+  const profile = useApi(c => c.request<Profile>('GET', '/me/service-profile'), [me?.id]);
   const [started, setStarted] = useState(false), [financialCurrent, setFinancialCurrent] = useState(false), [reuse, setReuse] = useState(true);
   const [skipped, setSkipped] = useState<Partial<Record<Step, boolean>>>({});
   const [mode, setMode] = useState<'chat' | 'form'>('chat'), [reply, setReply] = useState('');
@@ -37,15 +37,18 @@ export function PersonalLoanFlow({compact=false,onSubmitted}:{compact?:boolean;o
   const [identityDoc, setIdentityDoc] = useState<File | null>(null), [addressDoc, setAddressDoc] = useState<File | null>(null);
   const [step, setStep] = useState(0), [consent, setConsent] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<PersonalLoanApplication | null>(null), [matches, setMatches] = useState<PersonalLoanMatch[] | null>(null), [matchReason, setMatchReason] = useState<string | null>(null);
-  const key = useRef(''), question = useRef<HTMLHeadingElement>(null), initialized = useRef(false);
+  const key = useRef(''), question = useRef<HTMLHeadingElement>(null), initializedUserId = useRef(''), activeUserId = useRef('');
+  activeUserId.current = me?.id ?? '';
   const needsDocuments = verification.data?.status === 'NOT_STARTED' || verification.data?.status === 'REJECTED';
   const allSteps: Step[] = ['amount', 'term', 'purpose', 'income', 'expenses', ...(needsDocuments ? ['identity', ...(identityType === 'PASSPORT' ? ['dob'] : []), 'province', 'employment', 'mobile', 'address', 'identityDoc', 'addressDoc'] as Step[] : []), 'review'];
   const steps = allSteps.filter(s => !skipped[s]);
   const current = steps[Math.min(step, steps.length - 1)];
   useEffect(() => { question.current?.focus(); setReply(''); }, [step]);
   useEffect(() => {
-    if (!me || !profile.data || initialized.current) return;
-    initialized.current = true; key.current = profile.data.draft.idempotencyKey || crypto.randomUUID();
+    if (!me || !profile.data || profile.data.userId !== me.id || initializedUserId.current === me.id) return;
+    initializedUserId.current = me.id;
+    setSaved(null); setMatches(null); setMatchReason(null); setTranscript([]); setSkipped({}); setStep(0); setStarted(false); setConsent(false); setIdentityDoc(null); setAddressDoc(null);
+    key.current = profile.data.draft.idempotencyKey || crypto.randomUUID();
     const p = profile.data, d = p.draft;
     setIncome(d.income ?? p.income); setExpenses(d.expenses ?? p.expenses);
     setProvince(d.province || p.province); setEmployment(d.employment || p.employment); setMobile(d.mobile || p.mobile); setAddress(d.address || p.address);
@@ -66,11 +69,13 @@ export function PersonalLoanFlow({compact=false,onSubmitted}:{compact?:boolean;o
   const answers = () => ({ idempotencyKey: key.current, amount, term, purpose, income, expenses, identityType, identityNumber, dob, province, employment, mobile, address });
   function persist(override: Record<string, unknown> = {}) {
     if (submitting.current) return;
+    const userId = me?.id;
+    if (!userId || activeUserId.current !== userId) return;
     const data = { ...answers(), ...override };
-    saves.current = saves.current.catch(() => undefined).then(async () => { try { await client.request('PUT', '/me/service-profile/draft', { answers: data }); setDraftError(''); } catch { setDraftError('Your latest answers have not saved yet. Keep this page open and retry.'); } });
+    saves.current = saves.current.catch(() => undefined).then(async () => { if (activeUserId.current !== userId) return; try { await client.request('PUT', '/me/service-profile/draft', { answers: data }); if (activeUserId.current === userId) setDraftError(''); } catch { if (activeUserId.current === userId) setDraftError('Your latest answers have not saved yet. Keep this page open and retry.'); } });
   }
   useEffect(() => {
-    if (!started || saved || !initialized.current) return;
+    if (!started || saved || !initializedUserId.current) return;
     const timer = setTimeout(() => persist(), 800);
     return () => clearTimeout(timer);
     // A snapshot is queued in order; consent and uploaded file bytes are never stored as draft answers.
@@ -122,6 +127,7 @@ export function PersonalLoanFlow({compact=false,onSubmitted}:{compact?:boolean;o
   }
   const input = (): PersonalLoanInput => ({ amountCents: amount!, termMonths: term, purpose, monthlyIncomeCents: income!, monthlyExpensesCents: expenses!, consent: true, routingConsent: true, idempotencyKey: key.current });
   async function submit(offerId?: string) {
+    if (!me || profile.data?.userId !== me.id || initializedUserId.current !== me.id) { setError('Your saved profile is still loading. Refresh the form before submitting.'); return; }
     if (!consent && !saved) return;
     if (submitting.current) return;
     submitting.current = true;
@@ -137,6 +143,10 @@ export function PersonalLoanFlow({compact=false,onSubmitted}:{compact?:boolean;o
         Object.entries({ identityType, identityNumber, dateOfBirth: dob, province, employmentStatus: employment, mobile: mobile.replace(/\s/g, ''), address, consent: 'true' }).forEach(([k, v]) => { if (v) body.append(k, v); });
         body.append('identity', identityDoc!); body.append('address', addressDoc!);
         await client.consumer.submitPersonalVerification(body);
+        // Verification creates the KYC profile on first submission. Re-save the
+        // financial answers after that row exists so the profile, not this form
+        // payload, remains the source used by the application API.
+        await client.request('PUT', '/me/service-profile/draft', { answers: answers() });
       }
       const r = await client.consumer.applyPersonalLoan({ ...input(), ...(offerId ? { offerId } : {}) });
       setSaved(r); applications.reload(); verification.reload();
@@ -169,7 +179,7 @@ export function PersonalLoanFlow({compact=false,onSubmitted}:{compact?:boolean;o
             {current === 'address' && <Field label="Full residential address"><Input autoComplete="street-address" value={address} onChange={e => setAddress(e.target.value)} /></Field>}
             {(current === 'identityDoc' || current === 'addressDoc') && <Field label={current === 'identityDoc' ? 'ID or passport document' : 'Proof of residential address'} hint="A readable PDF, JPG or PNG under 1.9 MB. Documents are available only to you and authorised review staff."><Input type="file" accept="application/pdf,image/jpeg,image/png" onChange={e => upload(e.target.files?.[0], current === 'identityDoc' ? setIdentityDoc : setAddressDoc)} className="h-auto py-3" />{(current === 'identityDoc' ? identityDoc : addressDoc) && <p className="mt-2 flex items-center gap-1 text-sm"><FileCheck className="h-4 w-4" /> Document selected</p>}</Field>}
             {current === 'review' && <div className="space-y-4"><dl className="grid grid-cols-2 gap-3 rounded-2xl bg-surface p-4 text-sm"><div><dt className="text-muted">Amount</dt><dd className="font-bold">{formatZAR(amount ?? 0)}</dd></div><div><dt className="text-muted">Period</dt><dd className="font-bold">{term} months</dd></div><div><dt className="text-muted">Purpose</dt><dd>{purpose}</dd></div><div><dt className="text-muted">Monthly income / expenses</dt><dd>{formatZAR(income ?? 0)} / {formatZAR(expenses ?? 0)}</dd></div></dl><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1" /><span>I confirm these details are accurate and consent to XTRA-CASH processing my application and documents, sharing my loan request with active accredited lenders so they can consider making an offer. This consent is captured with my application; it is not a loan agreement.</span></label><p className="text-sm font-semibold">All active accredited lenders receive your request. You choose whether to accept the offer you receive.</p><p className="text-xs text-muted">Your application and documents will be reviewed by staff. Submitting does not guarantee approval. Credit checks, affordability verification and final lender terms are required before credit can be approved.</p></div>}</>;
-  if (verification.loading || profile.loading || !me) return <Loading />;
+  if (verification.loading || profile.loading || !me || profile.data?.userId !== me.id) return <Loading />;
   if (profile.error) return <Alert tone="red">{profile.error}<Button onClick={profile.reload}>Try again</Button></Alert>;
   if (verification.error) return <Alert tone="red">{verification.error}<Button variant="secondary" onClick={verification.reload}>Try again</Button></Alert>;
   return <div className="space-y-8">
@@ -181,7 +191,7 @@ export function PersonalLoanFlow({compact=false,onSubmitted}:{compact?:boolean;o
           {!saved.lenderId && routingPolicy.data?.mode === 'APPLICANT' && matches?.map(m => <Card key={m.offerId}><div className="font-bold">{m.lenderName}</div><div className="text-sm text-muted">{m.offerName}</div><div className="my-3 flex flex-wrap gap-5 text-sm"><span>Monthly <b>{formatZAR(m.monthlyInstallmentCents)}</b></span><span>Total <b>{formatZAR(m.totalRepayableCents)}</b></span><span>Cost of credit <b>{formatZAR(m.costOfCreditCents)}</b></span></div><p className="mb-3 text-xs text-muted">Indicative terms from your declared finances. The lender must verify affordability and provide final terms.</p><Button loading={busy} onClick={() => submit(m.offerId)}>Send to this lender <ArrowRight className="h-4 w-4" /></Button></Card>)}
           {error && <Alert tone="red">{error}</Alert>}<Button variant="secondary" disabled={busy} onClick={() => { setSaved(null); setMatches(null); setMatchReason(null); key.current = crypto.randomUUID(); setStep(0); setConsent(false); setStarted(false); setFinancialCurrent(false); setTranscript([]); setReply(""); setKnownRequest({}); }}>Start another application</Button></div>
         : !started ? <SavedLoanDetails request={knownRequest.amount || knownRequest.term || knownRequest.purpose ? `${formatZAR(amount ?? 0)} · ${term} months${purpose ? ` · ${purpose}` : ""}` : undefined} name={`${me.firstName} ${me.lastName}`.trim()} identity={identityNumber} status={profile.data?.identityStatus || "NOT_STARTED"} province={province} mobile={mobile} address={address} income={income} expenses={expenses} date={profile.data?.financialUpdatedAt || null} reuse={reuse} setReuse={setReuse} financialCurrent={financialCurrent} setFinancialCurrent={setFinancialCurrent} onContinue={start} /> : <form inert={busy} onSubmit={e => { e.preventDefault(); mode === "form" || current === "review" ? submit() : mode === "chat" && reply.trim() ? sendReply() : next(); }}>
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><span className="text-sm font-semibold">{mode === "chat" ? "XTRA-CASH application assistant" : "Your application form"}</span><Button type="button" variant="ghost" size="sm" onClick={() => { setMode(mode === "chat" ? "form" : "chat"); setReply(""); setError(null); }}>{mode === "chat" ? "Use form instead" : "Use chat instead"}</Button></div>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><span className="block text-sm font-semibold">{mode === "chat" ? "XTRA-CASH application assistant" : "Your application form"}</span><span className="text-xs text-muted">Applying as {me.email} · profile details are saved to this account</span></div><Button type="button" variant="ghost" size="sm" onClick={() => { setMode(mode === "chat" ? "form" : "chat"); setReply(""); setError(null); }}>{mode === "chat" ? "Use form instead" : "Use chat instead"}</Button></div>
           {mode === "chat" && transcript.length > 0 && <div className="mb-5 max-h-48 space-y-3 overflow-y-auto" role="log" aria-label="Application conversation">{transcript.map((t, i) => <div key={i}><p className="rounded-xl bg-surface px-3 py-2 text-sm">{t.question}</p><p className="ml-8 mt-2 rounded-xl bg-brand-soft px-3 py-2 text-sm">{t.answer}</p></div>)}</div>}
           <div className="mb-6"><p className="mb-2 text-xs font-semibold text-muted">Question {Math.min(step + 1, steps.length)} of {steps.length}</p><div role="progressbar" aria-label="Application progress" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={step + 1} className="h-1.5 overflow-hidden rounded-full bg-surface"><div className="h-full rounded-full bg-brand transition-all" style={{ width: `${(step + 1) / steps.length * 100}%` }} /></div></div>
           <h2 ref={question} tabIndex={-1} className="mb-6 text-2xl font-bold tracking-tight outline-none" aria-live="polite">{QUESTIONS[current]}</h2>

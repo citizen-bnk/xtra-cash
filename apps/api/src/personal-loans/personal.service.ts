@@ -72,7 +72,11 @@ export class PersonalLoanService {
     if (existingKyc && existingKyc.idNumber !== identityNumber) throw new BadRequestException('This document does not match your submitted identity. Contact support.');
     const taken = await this.db.query.kycProfiles.findFirst({ where: eq(kycProfiles.idNumber, identityNumber) });
     if (taken && taken.userId !== u.id) throw new BadRequestException('This identity cannot be submitted. Contact support.');
-    const [identityFileKey, addressFileKey] = await Promise.all([this.storage.put(idFile.buffer, idFile.originalname), this.storage.put(addressFile.buffer, addressFile.originalname)]);
+    const [identityVaultDoc, addressVaultDoc] = await this.vaults.ingestApplicationDocuments(u, [
+      { type: 'ID_DOCUMENT', file: idFile },
+      { type: 'PROOF_OF_ADDRESS', file: addressFile },
+    ]);
+    const identityFileKey = identityVaultDoc.storageKey, addressFileKey = addressVaultDoc.storageKey;
     await this.db.transaction(async tx => {
       const saved = await tx.insert(personalVerifications).values({ userId: u.id, identityType: dto.identityType, identityNumber: identity.number, mobile: dto.mobile, address: dto.address.trim(), identityFileKey, addressFileKey, consentAt: new Date() }).onConflictDoUpdate({ target: personalVerifications.userId, setWhere: ne(personalVerifications.status, 'VERIFIED'), set: { identityType: dto.identityType, identityNumber: identity.number, mobile: dto.mobile, address: dto.address.trim(), identityFileKey, addressFileKey, status: 'PENDING', reason: null, reviewedById: null, consentAt: new Date() } }).returning({ id: personalVerifications.id });
       if (!saved.length) throw new BadRequestException('Verification has already been completed');
@@ -91,7 +95,6 @@ export class PersonalLoanService {
     if (user?.status !== 'ACTIVE') throw new ForbiddenException('Account unavailable');
     if (!user.profileComplete) throw new BadRequestException('Complete your name and surname first');
     const vaultSnapshot = await this.vaults.loanSnapshot(u.id, dto.vaultValidationId);
-    const kyc = await this.db.query.kycProfiles.findFirst({ where: eq(kycProfiles.userId, u.id) });
     const policy=await this.routing.policy();
     if(dto.offerId) throw new BadRequestException('Lender selection is not part of the XTRA-CASH request flow. Lenders receive the request and make offers directly.');
     if((dto.latitude===undefined)!==(dto.longitude===undefined))throw new BadRequestException('Provide both location coordinates.');
@@ -100,9 +103,22 @@ export class PersonalLoanService {
     const lenderId: string | null = null;
     return this.db.transaction(async tx => {
       await tx.select({ id: users.id }).from(users).where(eq(users.id, u.id)).for('update');
+      const currentKyc = await tx.query.kycProfiles.findFirst({ where: eq(kycProfiles.userId, u.id) });
+      if (!currentKyc) throw new BadRequestException('Complete your verified profile before applying.');
+      // The account profile is canonical. Financial values in older clients' application
+      // payloads are intentionally ignored; the form must save them to the profile first.
+      const monthlyIncomeCents = currentKyc.monthlyIncomeCents;
+      const monthlyExpensesCents = currentKyc.monthlyExpensesCents;
+      if (monthlyIncomeCents <= 0 || monthlyExpensesCents < 0) throw new BadRequestException('Complete your monthly income and expenses in your saved profile before submitting this loan request.');
       const existing = await tx.query.personalLoanApplications.findFirst({ where: and(eq(personalLoanApplications.userId, u.id), eq(personalLoanApplications.idempotencyKey, dto.idempotencyKey)) });
-      if (existing && (!dto.offerId || existing.lenderId || !['SUBMITTED','REFERRED','UNDER_REVIEW'].includes(existing.status))) return existing;
-      const payload = { amountCents: dto.amountCents, termMonths: dto.termMonths, purpose: dto.purpose ?? 'Other', monthlyIncomeCents: dto.monthlyIncomeCents ?? kyc?.monthlyIncomeCents ?? 0, monthlyExpensesCents: dto.monthlyExpensesCents ?? kyc?.monthlyExpensesCents ?? 0, offerId: dto.offerId ?? null, lenderId, status: lenderId ? 'REFERRED' as const : 'SUBMITTED' as const, consentAt: new Date(), vaultSnapshot, vaultValidationId: dto.vaultValidationId ?? null };
+      if (existing) {
+        if (['SUBMITTED','REFERRED','UNDER_REVIEW','ACTION_REQUIRED'].includes(existing.status) && existing.lenderId === null) {
+          const [synced] = await tx.update(personalLoanApplications).set({ monthlyIncomeCents, monthlyExpensesCents, vaultSnapshot, vaultValidationId: dto.vaultValidationId ?? existing.vaultValidationId }).where(eq(personalLoanApplications.id, existing.id)).returning();
+          return synced;
+        }
+        return existing;
+      }
+      const payload = { amountCents: dto.amountCents, termMonths: dto.termMonths, purpose: dto.purpose ?? 'Other', monthlyIncomeCents, monthlyExpensesCents, offerId: dto.offerId ?? null, lenderId, status: lenderId ? 'REFERRED' as const : 'SUBMITTED' as const, consentAt: new Date(), vaultSnapshot, vaultValidationId: dto.vaultValidationId ?? null };
       const [app] = await tx.insert(personalLoanApplications).values({ ...payload, userId: u.id, idempotencyKey: dto.idempotencyKey }).onConflictDoUpdate({ target: [personalLoanApplications.userId, personalLoanApplications.idempotencyKey], set: payload }).returning();
       await this.audit.log(u, 'personal_loan.submitted', 'personal_loan_application', app.id, { referred: !!lenderId }, tx);
       await this.routing.record(app.id,policy.mode,routingConsent,dto.latitude!==undefined?{latitude:dto.latitude,longitude:dto.longitude!}:undefined,tx);
@@ -129,7 +145,7 @@ export class PersonalLoanService {
     if (!staff && (!org || org.accreditationStatus !== 'ACCREDITED')) throw new ForbiddenException();
     return this.db.transaction(async tx => {
       const [app] = await tx.select().from(personalLoanApplications).where(eq(personalLoanApplications.id, id)).for('update');
-      if (!app || (!staff && app.lenderId !== org!.id)) throw new NotFoundException();
+      if (!app || (!staff && app.lenderId !== org!.id && !['SUBMITTED','REFERRED','UNDER_REVIEW','ACTION_REQUIRED'].includes(app.status))) throw new NotFoundException();
       if (!['SUBMITTED','REFERRED','UNDER_REVIEW','ACTION_REQUIRED'].includes(app.status)) throw new BadRequestException('This application already has a decision and cannot be changed by review');
       const [updated] = await tx.update(personalLoanApplications).set({ status: dto.action === 'DECLINE' ? 'DECLINED' : 'UNDER_REVIEW', reviewNotes: dto.notes.trim(), reviewedAt: new Date() }).where(eq(personalLoanApplications.id, id)).returning();
       await this.audit.log(actor, 'personal_loan.reviewed', 'personal_loan_application', id, { action: dto.action }, tx);

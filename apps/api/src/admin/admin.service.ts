@@ -27,9 +27,11 @@ import { LenderService, presentDoc } from '../lender/lender.service';
 import { LoansService, presentLoan } from '../consumer/loans.service';
 import { AuthService } from '../auth/auth.service';
 import * as bcrypt from 'bcryptjs';
+import { createHash, randomBytes } from 'crypto';
+import { lenderSupportSessions } from '../db/schema';
 
 const num = (v: unknown) => Number(v ?? 0);
-const userCols = { columns: { id: true, firstName: true, lastName: true, email: true } } as const;
+const userCols = { columns: { id: true, firstName: true, lastName: true, email: true, status: true } } as const;
 
 @Injectable()
 export class AdminService {
@@ -200,6 +202,16 @@ export class AdminService {
       orderBy: desc(kycProfiles.updatedAt),
       limit: 200,
     });
+  }
+
+  async createLenderSupportSession(actor: AuthUser, lenderId: string) {
+    if (!actor.sessionId) throw new BadRequestException('Sign in again before opening lender support mode.');
+    const lender = await this.db.query.lenderOrgs.findFirst({ where: eq(lenderOrgs.id, lenderId), with: { owner: true } });
+    if (!lender || lender.accreditationStatus !== 'ACCREDITED' || lender.owner.status !== 'ACTIVE' || !lender.owner.roles.includes('LENDER')) throw new BadRequestException('Only an active accredited lender account can be opened.');
+    const code = randomBytes(32).toString('base64url');
+    await this.db.insert(lenderSupportSessions).values({ codeHash: createHash('sha256').update(code).digest('hex'), adminUserId: actor.id, adminSessionId: actor.sessionId, lenderUserId: lender.ownerUserId, expiresAt: new Date(Date.now() + 60_000) });
+    await this.audit.log(actor, 'admin.lender_support_started', 'lender', lenderId, { lenderUserId: lender.ownerUserId, oneTimeHandoff: true });
+    return { code, lenderName: lender.name, expiresAt: new Date(Date.now() + 60_000).toISOString() };
   }
 
   lendersList(status?: string) {

@@ -95,6 +95,19 @@ export const refreshTokens = pgTable('refresh_tokens', {
   replacementEncrypted: text('replacement_encrypted'),
 });
 
+/** Short-lived, auditable admin support access into an accredited lender account. */
+export const lenderSupportSessions = pgTable('lender_support_sessions', {
+  id: text('id').primaryKey().$defaultFn(() => randomUUID()),
+  codeHash: text('code_hash').notNull().unique(),
+  adminUserId: text('admin_user_id').notNull().references(() => users.id),
+  adminSessionId: text('admin_session_id').notNull().references(() => refreshTokens.id),
+  lenderUserId: text('lender_user_id').notNull().references(() => users.id),
+  expiresAt: ts('expires_at').notNull(),
+  redeemedAt: ts('redeemed_at'),
+  revokedAt: ts('revoked_at'),
+  createdAt: createdAt(),
+});
+
 export const passkeys = pgTable('passkeys', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -253,6 +266,12 @@ export const personalLoanApplications = pgTable('personal_loan_applications', {
   vaultValidationId: text('vault_validation_id'),
   idempotencyKey: text('idempotency_key').notNull(), consentAt: ts('consent_at').notNull(), createdAt: createdAt(),
 }, (t) => [uniqueIndex('personal_application_idempotency').on(t.userId, t.idempotencyKey), index('personal_application_lender').on(t.lenderId), index('personal_application_user').on(t.userId)]);
+
+export const vaultDocumentReviews = pgTable('vault_document_reviews', {
+  id: id(), applicationId: text('application_id').notNull().references(() => personalLoanApplications.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), documentId: text('document_id').notNull(),
+  status: text('status').notNull(), comment: text('comment').notNull(), reviewerUserId: text('reviewer_user_id').notNull().references(() => users.id), createdAt: createdAt(),
+}, (t) => [index('vault_document_review_app_doc_created').on(t.applicationId, t.documentId, t.createdAt)]);
 
 export const offerAssistantGenerations = pgTable('offer_assistant_generations', {
   id: id(), lenderId: text('lender_id').notNull().references(() => lenderOrgs.id),

@@ -11,6 +11,7 @@ import {
 } from "@xtra/shared";
 import { useApi, useAuth } from "./api";
 import { DecisionAiWorkspace, ManualDecisionForm } from "./lender-ai";
+import { LenderReviewWorkspace } from "./lender-review";
 import {
   Alert,
   Button,
@@ -18,6 +19,7 @@ import {
   Field,
   Input,
   Loading,
+  Modal,
   MoneyInput,
   PageHeader,
   Select,
@@ -42,8 +44,9 @@ export function PersonalSettlementView({
   const [paymentNote, setPaymentNote] = useState('');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [preparationMode, setPreparationMode] = useState<"AI" | "MANUAL">(
-    "MANUAL",
+    "AI",
   );
+  const [decisionOpen, setDecisionOpen] = useState(false), [quickAction, setQuickAction] = useState<null | 'INFO' | 'HOLD' | 'DECLINE'>(null), [decisionNote, setDecisionNote] = useState('');
   const data = useApi(
     (c) =>
       c.request<PersonalSettlement>(
@@ -69,10 +72,12 @@ export function PersonalSettlementView({
       setPassword("");
       setAck(false);
       data.reload();
+      return true;
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Could not complete this action",
       );
+      return false;
     } finally {
       setBusy(false);
     }
@@ -141,6 +146,7 @@ export function PersonalSettlementView({
       />
       <StatusBadge status={d.application.status} />
       <LoanJourney status={d.application.status} reviewer={reviewer && !isOffice} externalPayment={!!d.externalPayment} />
+      {reviewer && !isOffice && <LenderReviewWorkspace applicationId={applicationId} />}
       {d.depositReference && <Card><h2 className="font-semibold">Bank deposit reference</h2><p className="my-2 font-mono text-lg font-bold">{d.depositReference}</p><p className="text-sm text-muted">The lender must use this exact reference when paying the XTRA-CASH settlement account so the deposit can be matched to this loan.</p></Card>}
       {d.externalPayment && <Card><h2 className="font-semibold">Loan funds credited to your wallet</h2><p className="my-2">{formatZAR(d.externalPayment.amountCents)} · {new Date(d.externalPayment.confirmedAt).toLocaleString('en-ZA')}</p><p>{d.externalPayment.note}</p><p className="mt-2 text-sm text-muted">Deposit reference: {d.externalPayment.depositReference}. You can view the wallet balance and request an EFT to your verified bank account when withdrawals are enabled.</p></Card>}
       {isOffice && <div className="flex items-center justify-between gap-3 rounded-xl border p-3"><p className="text-sm text-muted">Staff oversight · Customer and lender manage this loan.</p><Button variant="secondary" onClick={() => setIntervening(!intervening)}>{intervening ? 'Close intervention' : 'Intervene'}</Button></div>}
@@ -165,21 +171,8 @@ export function PersonalSettlementView({
         (reviewStates.includes(d.application.status) ||
           d.humanReviewPending) && (
           <section className="space-y-3">
-            <div className="flex gap-2">
-              <Button
-                variant={preparationMode === "AI" ? "primary" : "secondary"}
-                onClick={() => setPreparationMode("AI")}
-              >
-                Prepare with AI chat
-              </Button>
-              <Button
-                variant={preparationMode === "MANUAL" ? "primary" : "secondary"}
-                onClick={() => setPreparationMode("MANUAL")}
-              >
-                Guided decision form
-              </Button>
-            </div>
-            {preparationMode === "AI" ? (
+            <Card className="space-y-3"><h2 className="font-bold">Lender decision</h2><p className="text-sm text-muted">Review the four pillars and documents above, then choose the next action.</p><div className="flex flex-wrap gap-2"><Button onClick={() => { setPreparationMode('AI'); setDecisionOpen(true); }}>Approve &amp; make an offer</Button><Button variant="secondary" onClick={() => { setPreparationMode('MANUAL'); setDecisionOpen(true); }}>Guided decision form</Button><Button variant="secondary" onClick={() => { setQuickAction('INFO'); setDecisionNote(''); }}>Request more information</Button><Button variant="secondary" onClick={() => { setQuickAction('HOLD'); setDecisionNote(''); }}>Put on hold</Button><Button variant="secondary" onClick={() => { setQuickAction('DECLINE'); setDecisionNote(''); }}>Decline request</Button></div></Card>
+            {decisionOpen && <div className="space-y-3"><div className="flex justify-end"><Button variant="ghost" onClick={() => setDecisionOpen(false)}>Close decision workspace</Button></div>{preparationMode === "AI" ? (
               <DecisionAiWorkspace
                 applicationId={applicationId}
                 onAdvanced={data.reload}
@@ -194,9 +187,12 @@ export function PersonalSettlementView({
                 applicationId={applicationId}
                 onAdvanced={data.reload}
               />
-            )}
+            )}</div>}
           </section>
         )}
+      <Modal open={!!quickAction} title={quickAction === 'INFO' ? 'Request more information' : quickAction === 'HOLD' ? 'Put request on hold' : 'Decline request'} onClose={() => setQuickAction(null)}>
+        <div className="space-y-4"><p className="text-sm text-muted">Add a clear note. The applicant and lender will see the recorded update in the application timeline.</p><Field label={quickAction === 'INFO' ? 'What should the applicant provide?' : quickAction === 'HOLD' ? 'Reason for holding this request' : 'Reason for declining'}><Textarea value={decisionNote} maxLength={500} onChange={e => setDecisionNote(e.target.value)} /></Field><div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setQuickAction(null)}>Cancel</Button><Button disabled={decisionNote.trim().length < 3} loading={busy} onClick={async () => { const action = quickAction; if (!action) return; const ok = action === 'INFO' ? await act('information', { message: decisionNote.trim() }) : await act('review', { action: action === 'DECLINE' ? 'DECLINE' : 'REVIEW', notes: decisionNote.trim() }); if (ok) { setQuickAction(null); setDecisionNote(''); setDecisionOpen(false); } }}>{quickAction === 'INFO' ? 'Send request' : quickAction === 'HOLD' ? 'Confirm hold' : 'Confirm decline'}</Button></div></div>
+      </Modal>
       {d.humanReviewPending && (
         <Alert tone="amber">
           The applicant has requested human review. Automatic offers and

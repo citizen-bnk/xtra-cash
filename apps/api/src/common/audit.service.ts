@@ -17,12 +17,12 @@ export class AuditService {
     conn: DbOrTx = this.db,
   ) {
     await conn.insert(auditLogs).values({
-      actorId: actor?.id ?? null,
-      actorEmail: actor?.email ?? null,
+      actorId: actor?.supportAdminId ?? actor?.id ?? null,
+      actorEmail: actor?.supportAdminEmail ?? actor?.email ?? null,
       action,
       entityType,
       entityId,
-      meta: meta ?? null,
+      meta: actor?.supportSessionId ? { ...(meta ?? {}), adminSupport: { supportSessionId: actor.supportSessionId, lenderUserId: actor.id } } : meta ?? null,
     });
   }
 }

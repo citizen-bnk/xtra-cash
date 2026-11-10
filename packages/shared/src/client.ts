@@ -305,7 +305,7 @@ export class XtraClient {
       this.request<(KycProfile & { userId: string; user: Pick<User, 'id' | 'firstName' | 'lastName' | 'email'> })[]>('GET', '/admin/kyc', undefined, { status }),
     kycDecision: (userId: string, approve: boolean, reason?: string) =>
       this.request<KycProfile>('POST', `/admin/kyc/${userId}/decision`, { approve, reason }),
-    lenders: (status?: string) => this.request<(LenderOrg & { owner: Pick<User, 'id' | 'email' | 'firstName' | 'lastName'> })[]>('GET', '/admin/lenders', undefined, { status }),
+    lenders: (status?: string) => this.request<(LenderOrg & { owner: Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'status'> })[]>('GET', '/admin/lenders', undefined, { status }),
     lender: (id: string) => this.request<LenderOrg & { stats: LenderStats; offers: LoanOffer[]; funding: LenderFunding[] }>('GET', `/admin/lenders/${id}`),
     reviewLender: (id: string, status: string, notes?: string) => this.request<LenderOrg>('POST', `/admin/lenders/${id}/review`, { status, notes }),
     reviewDocument: (lenderId: string, docId: string, status: 'ACCEPTED' | 'REJECTED') =>

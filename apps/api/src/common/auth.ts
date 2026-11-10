@@ -13,7 +13,7 @@ import type { Role } from '@xtra/shared';
 import { eq } from 'drizzle-orm';
 import { InjectDb } from './db.module';
 import type { Db } from '../db/client';
-import { refreshTokens, users } from '../db/schema';
+import { lenderSupportSessions, refreshTokens, users } from '../db/schema';
 
 export interface AuthUser {
   id: string;
@@ -21,6 +21,9 @@ export interface AuthUser {
   roles: Role[];
   authenticatedAt?: number;
   sessionId?: string;
+  supportSessionId?: string;
+  supportAdminId?: string;
+  supportAdminEmail?: string | null;
 }
 
 export const IS_PUBLIC = 'isPublic';
@@ -48,13 +51,21 @@ export class AuthGuard implements CanActivate {
     if (!header?.startsWith('Bearer ')) throw new UnauthorizedException('Missing access token');
     try {
       const payload = this.jwt.verify(header.slice(7));
-      req.user = { id: payload.sub, email: payload.email, roles: payload.roles, authenticatedAt: payload.auth_time, sessionId: payload.sid } satisfies AuthUser;
+      req.user = { id: payload.sub, email: payload.email, roles: payload.roles, authenticatedAt: payload.auth_time, sessionId: payload.sid, supportSessionId: payload.support_id } satisfies AuthUser;
     } catch {
       throw new UnauthorizedException('Invalid or expired access token');
     }
     const account = await this.db.query.users.findFirst({ where: eq(users.id, req.user.id) });
     if (!account || account.status !== 'ACTIVE') throw new UnauthorizedException('Account unavailable');
     req.user.roles = account.roles;
+    if (req.user.supportSessionId) {
+      const support = await this.db.query.lenderSupportSessions.findFirst({ where: eq(lenderSupportSessions.id, req.user.supportSessionId) });
+      const admin = support ? await this.db.query.users.findFirst({ where: eq(users.id, support.adminUserId) }) : null;
+      const adminSession = support ? await this.db.query.refreshTokens.findFirst({ where: eq(refreshTokens.id, support.adminSessionId) }) : null;
+      if (!support || support.lenderUserId !== account.id || !support.redeemedAt || support.revokedAt || support.expiresAt <= new Date() || !admin || admin.status !== 'ACTIVE' || !admin.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN') || !adminSession || adminSession.revokedAt || adminSession.expiresAt <= new Date()) throw new UnauthorizedException('Lender support session has ended.');
+      req.user.supportAdminId = admin.id;
+      req.user.supportAdminEmail = admin.email;
+    }
     if (req.user.sessionId) {
       const session = await this.db.query.refreshTokens.findFirst({ where: eq(refreshTokens.id, req.user.sessionId) });
       if (!session || session.userId !== account.id || session.revokedAt || session.expiresAt < new Date()) throw new UnauthorizedException('Session ended. Please sign in again.');

@@ -12,7 +12,6 @@ import {
   PersonalSettlementView,
   WalletTransferView,
 } from "./personal-settlement";
-import { CompetitionOfferForm } from "./loan-competition";
 type Notification = {
   key: string;
   applicationId: string;
@@ -58,6 +57,7 @@ export function LoanActionCentre() {
         key: n.key,
       });
       data.reload();
+      if (n.kind === 'VAULT') { window.location.assign('/app/data-vault'); return; }
     } catch {
       setNotice(
         "The task may have changed. Refresh notifications before acting.",
@@ -137,18 +137,7 @@ export function LoanActionCentre() {
           data.reload();
         }}
       >
-        {active?.kind === "COMPETITION" ? (
-          <CompetitionOfferForm
-            applicationId={active.applicationId}
-            onComplete={() => {
-              setActive(null);
-              setNotice(
-                "Your offer was submitted. XTRA-CASH will rank the applicant’s three best current offers before the applicant selects one.",
-              );
-              data.reload();
-            }}
-          />
-        ) : active?.kind === "WALLET" ? (
+        {active?.kind === "WALLET" ? (
           <WalletTransferView />
         ) : (
           active && (

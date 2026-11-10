@@ -127,6 +127,13 @@
       "when": 1794299830726,
       "tag": "0017_last_kree",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794340000000,
+      "tag": "0018_lender_support_and_vault_reviews",
+      "breakpoints": true
     }
   ]
 }

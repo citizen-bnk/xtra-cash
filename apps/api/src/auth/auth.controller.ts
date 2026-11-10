@@ -1,9 +1,12 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { IsString, MaxLength, MinLength } from 'class-validator';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/auth';
 import { AuthService } from './auth.service';
 import { DemoService } from './demo.service';
 import { DemoLoginDto, LoginDto, QuickRegisterDto, RefreshDto, RegisterDto } from './auth.dto';
+
+class SupportExchangeDto { @IsString() @MinLength(32) @MaxLength(100) code: string; }
 
 @Public()
 @Controller('auth')
@@ -39,6 +42,11 @@ export class AuthController {
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto.identifier, dto.password);
   }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @HttpCode(200)
+  @Post('support/lender/exchange')
+  exchangeSupport(@Body() dto: SupportExchangeDto) { return this.auth.exchangeLenderSupportCode(dto.code); }
 
   @HttpCode(200)
   @Post('refresh')

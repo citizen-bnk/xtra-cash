@@ -7,7 +7,7 @@ import type { Role } from '@xtra/shared';
 import { InjectDb } from '../common/db.module';
 import { Db, DbOrTx } from '../db/client';
 import { decryptIdentity, encryptIdentity } from './identity-crypto';
-import { affiliateProfiles, lenderOrgs, refreshTokens, users } from '../db/schema';
+import { affiliateProfiles, lenderOrgs, refreshTokens, users, lenderSupportSessions } from '../db/schema';
 import { sanitizeUser } from '../common/pagination';
 import { AuditService } from '../common/audit.service';
 import { QuickRegisterDto, RegisterDto } from './auth.dto';
@@ -94,6 +94,26 @@ export class AuthService {
     if (!user || !ok) throw new UnauthorizedException('Incorrect email/phone or password');
     if (user.status === 'SUSPENDED') throw new UnauthorizedException('This account is suspended. Please contact support.');
     return { user: sanitizeUser(user), ...(await this.issueTokens(user)) };
+  }
+
+  async exchangeLenderSupportCode(code: string) {
+    const codeHash = sha256(code);
+    return this.db.transaction(async tx => {
+      const [support] = await tx.select().from(lenderSupportSessions).where(eq(lenderSupportSessions.codeHash, codeHash)).for('update');
+      if (!support || support.redeemedAt || support.revokedAt || support.expiresAt <= new Date()) throw new UnauthorizedException('This support link has expired. Ask an administrator to create a new one.');
+      const [admin, adminSession, lender] = await Promise.all([
+        tx.query.users.findFirst({ where: eq(users.id, support.adminUserId) }),
+        tx.query.refreshTokens.findFirst({ where: eq(refreshTokens.id, support.adminSessionId) }),
+        tx.query.users.findFirst({ where: eq(users.id, support.lenderUserId) }),
+      ]);
+      if (!admin || admin.status !== 'ACTIVE' || !admin.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN') || !adminSession || adminSession.userId !== admin.id || adminSession.revokedAt || adminSession.expiresAt <= new Date()) throw new UnauthorizedException('The administrator session is no longer active.');
+      if (!lender || lender.status !== 'ACTIVE' || !lender.roles.includes('LENDER')) throw new UnauthorizedException('This lender account is unavailable.');
+      const [org] = await tx.select().from(lenderOrgs).where(eq(lenderOrgs.ownerUserId, lender.id));
+      if (!org || org.accreditationStatus !== 'ACCREDITED') throw new UnauthorizedException('Only active accredited lenders can be opened.');
+      await tx.update(lenderSupportSessions).set({ redeemedAt: new Date(), expiresAt: new Date(Date.now() + 4 * 60 * 60_000) }).where(eq(lenderSupportSessions.id, support.id));
+      await this.audit.log({ id: admin.id, email: admin.email, roles: admin.roles, sessionId: adminSession.id }, 'admin.lender_support_redeemed', 'lender', org.id, { lenderUserId: lender.id, supportSessionId: support.id }, tx);
+      return { accessToken: this.jwt.sign({ sub: lender.id, email: lender.email ?? '', roles: lender.roles, support_id: support.id, auth_time: Math.floor(Date.now() / 1000) }, { expiresIn: '4h' }), refreshToken: `support-${support.id}` };
+    });
   }
 
   async refresh(refreshToken: string) {

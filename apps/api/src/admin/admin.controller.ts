@@ -104,6 +104,9 @@ export class AdminController {
   @Get('lenders/:id') lender(@Param('id') id: string) {
     return this.admin.lender(id);
   }
+  @HttpCode(200) @Post('lenders/:id/support-session') supportSession(@CurrentUser() a: AuthUser, @Param('id') id: string) {
+    return this.admin.createLenderSupportSession(a, id);
+  }
   @HttpCode(200) @Post('lenders/:id/review') review(@CurrentUser() a: AuthUser, @Param('id') id: string, @Body() dto: LenderReviewDto) {
     return this.admin.reviewLender(a, id, dto.status, dto.notes);
   }

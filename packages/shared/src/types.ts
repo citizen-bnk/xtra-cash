@@ -67,6 +67,7 @@ export interface Me extends User {
   walletBalanceCents: number;
   lender: LenderOrg | null;
   affiliate: AffiliateSummary | null;
+  supportSession?: { adminEmail: string | null } | null;
 }
 
 export interface OfferCriteria {
@@ -142,7 +143,7 @@ export interface ApplicantVaultStatus {
     fraud: { status: string; score: number | null; homeBase: { sampleCount: number; confidenceBps: number; addressConsistent: boolean | null } };
   };
   locationMonitoring: { enabled: boolean; consentAt: string | null };
-  documents: { id: string; type: string; status: string; createdAt: string; observedFrom: string | null; observedTo: string | null }[];
+  documents: { id: string; type: string; originalName: string; status: string; processingNote: string | null; createdAt: string; observedFrom: string | null; observedTo: string | null }[];
 }
 export interface OfferAssistantResponse {
   advertisingArea?: { query: string; radiusMeters: number } | null;
