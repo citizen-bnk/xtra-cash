@@ -21,6 +21,13 @@ export class PersonalApplicationDto {
   @IsOptional() @IsString() @MaxLength(80) offerId?: string;
   @IsOptional() @IsString() @MaxLength(80) vaultValidationId?: string;
 }
+export class AmendPersonalApplicationDto {
+  @IsOptional() @IsInt() @Min(50000) @Max(10000000) amountCents?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(24) termMonths?: number;
+  @IsOptional() @IsIn(['Home & repairs', 'Education', 'Medical', 'Transport', 'Debt consolidation', 'Other']) purpose?: string;
+  @IsOptional() @IsInt() @Min(0) @Max(100000000) monthlyIncomeCents?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(100000000) monthlyExpensesCents?: number;
+}
 export class VerificationDto {
   @IsIn(['ID', 'PASSPORT']) identityType: 'ID' | 'PASSPORT';
   @IsString() @MinLength(6) @MaxLength(20) identityNumber: string;

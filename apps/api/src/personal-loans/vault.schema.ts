@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
-import { users } from '../db/schema';
+import { personalLoanApplications, users } from '../db/schema';
 
 const id = () => text('id').primaryKey().$defaultFn(() => randomUUID());
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
@@ -43,6 +43,14 @@ export const vaultDocuments = pgTable('vault_documents', {
   uniqueIndex('vault_document_user_hash').on(t.userId, t.contentHash),
   index('vault_document_user_type').on(t.userId, t.type, t.createdAt),
 ]);
+
+/** Documents explicitly submitted as evidence for a particular loan request. */
+export const applicationVaultDocuments = pgTable('personal_application_vault_documents', {
+  applicationId: text('application_id').notNull().references(() => personalLoanApplications.id, { onDelete: 'cascade' }),
+  documentId: text('document_id').notNull().references(() => vaultDocuments.id, { onDelete: 'cascade' }),
+  linkedBy: text('linked_by').notNull().references(() => users.id),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex('personal_app_vault_document').on(t.applicationId, t.documentId), index('personal_app_vault_app').on(t.applicationId)]);
 
 export const vaultProcessingJobs = pgTable('vault_processing_jobs', {
   id: id(),

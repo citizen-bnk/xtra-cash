@@ -17,6 +17,9 @@ import { Db, DbOrTx } from "../db/client";
 import {
   users,
   personalLoanApplications as applications,
+  applicationVaultDocuments,
+  vaultDocuments,
+  vaultDocumentReviews,
   personalVerifications,
   kycProfiles,
   lenderOrgs,
@@ -190,11 +193,17 @@ export class SettlementService {
       : null;
     const [humanReview]=await this.db.select().from(lenderAgentRuns).where(and(eq(lenderAgentRuns.applicationId,id),eq(lenderAgentRuns.step,"HUMAN_REVIEW"),eq(lenderAgentRuns.result,"OPEN")));
     const [externalPayment] = await this.db.select().from(externalLoanPayments).where(eq(externalLoanPayments.applicationId, id));
+    const linkedDocuments = await this.db.select({ document: vaultDocuments }).from(applicationVaultDocuments)
+      .innerJoin(vaultDocuments, eq(vaultDocuments.id, applicationVaultDocuments.documentId))
+      .where(eq(applicationVaultDocuments.applicationId, id)).orderBy(applicationVaultDocuments.createdAt);
+    const docReviews = linkedDocuments.length ? await this.db.select().from(vaultDocumentReviews)
+      .where(and(eq(vaultDocumentReviews.applicationId, id), inArray(vaultDocumentReviews.documentId, linkedDocuments.map(x => x.document.id)))) : [];
     return {
       depositReference: agreement?.terms.depositReference ?? (agreement ? loanDepositReference(id) : undefined),
       externalPayment: externalPayment ? { depositReference: externalPayment.depositReference, amountCents: externalPayment.amountCents, note: externalPayment.note, confirmedAt: externalPayment.confirmedAt } : null,
       humanReviewPending:!!humanReview,
       application: app,
+      documents: linkedDocuments.map(({ document }) => ({ id: document.id, type: document.type, originalName: document.originalName, status: document.status, processingNote: document.processingNote, createdAt: document.createdAt, reviews: docReviews.filter(review => review.documentId === document.id).map(review => ({ status: review.status, comment: review.comment, createdAt: review.createdAt })) })),
       agreement: visible,
       timeline,
       funding: funding.map(safeMovement),

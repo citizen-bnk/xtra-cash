@@ -60,6 +60,8 @@ export function PersonalSettlementView({
     [password, setPassword] = useState(""),
     [ack, setAck] = useState(false),
     [message, setMessage] = useState("");
+  const [editOpen, setEditOpen] = useState(false), [editAmount, setEditAmount] = useState(''), [editTerm, setEditTerm] = useState(''), [editPurpose, setEditPurpose] = useState('Other'), [editIncome, setEditIncome] = useState(''), [editExpenses, setEditExpenses] = useState('');
+  const [documentType, setDocumentType] = useState('BANK_STATEMENT'), [documentBusy, setDocumentBusy] = useState(false), [documentError, setDocumentError] = useState(''), [documentConsent, setDocumentConsent] = useState(false), [selectedDocument, setSelectedDocument] = useState<File | null>(null);
   async function act(action: string, body: unknown = {}) {
     setBusy(true);
     setError("");
@@ -81,6 +83,25 @@ export function PersonalSettlementView({
     } finally {
       setBusy(false);
     }
+  }
+  async function saveAmendment() {
+    setBusy(true); setError('');
+    try {
+      await client.request('PUT', `/personal-loans/applications/${applicationId}`, { amountCents: Math.round(Number(editAmount) * 100), termMonths: Number(editTerm), purpose: editPurpose, ...(isOffice ? { monthlyIncomeCents: Math.round(Number(editIncome) * 100), monthlyExpensesCents: Math.round(Number(editExpenses) * 100) } : {}) });
+      setEditOpen(false); data.reload();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not save these changes'); }
+    finally { setBusy(false); }
+  }
+  async function uploadApplicationDocument(file?: File) {
+    if (!file) return;
+    setDocumentBusy(true); setDocumentError('');
+    try { const form = new FormData(); form.set('file', file); form.set('type', documentType); form.set('consent', 'true'); await client.request('POST', `/personal-loans/applications/${applicationId}/documents`, form); data.reload(); }
+    catch (e) { setDocumentError(e instanceof Error ? e.message : 'Could not attach this document'); }
+    finally { setDocumentBusy(false); }
+  }
+  async function viewApplicationDocument(documentId: string) {
+    try { const blob = await client.blob(`/personal-loans/applications/${applicationId}/documents/${documentId}/file`); const url = URL.createObjectURL(blob); window.open(url, '_blank', 'noopener'); setTimeout(() => URL.revokeObjectURL(url), 60_000); }
+    catch (e) { setDocumentError(e instanceof Error ? e.message : 'Could not open this document'); }
   }
   if (data.loading && !data.data) return <Loading />;
   if (!data.data)
@@ -145,8 +166,14 @@ export function PersonalSettlementView({
         }
       />
       <StatusBadge status={d.application.status} />
+      <Card className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-bold">Application details</h2>{reviewStates.includes(d.application.status) && (!reviewer || isOffice) && <Button variant="secondary" onClick={() => { setEditAmount((d.application.amountCents / 100).toFixed(2)); setEditTerm(String(d.application.termMonths)); setEditPurpose(d.application.purpose); setEditIncome((d.application.monthlyIncomeCents / 100).toFixed(2)); setEditExpenses((d.application.monthlyExpensesCents / 100).toFixed(2)); setEditOpen(true); }}>{isOffice ? 'Amend application' : 'Edit application'}</Button>}</div>
+        <dl className="grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-muted">Requested amount</dt><dd className="font-semibold">{formatZAR(d.application.amountCents)}</dd></div><div><dt className="text-muted">Repayment term</dt><dd className="font-semibold">{d.application.termMonths} months</dd></div><div><dt className="text-muted">Purpose</dt><dd className="font-semibold">{d.application.purpose}</dd></div><div><dt className="text-muted">Submitted</dt><dd className="font-semibold">{new Date(d.application.createdAt).toLocaleString('en-ZA')}</dd></div><div><dt className="text-muted">Monthly income used</dt><dd className="font-semibold">{formatZAR(d.application.monthlyIncomeCents)}</dd></div><div><dt className="text-muted">Monthly expenses used</dt><dd className="font-semibold">{formatZAR(d.application.monthlyExpensesCents)}</dd></div><div><dt className="text-muted">Application reference</dt><dd className="break-all font-mono text-xs">{d.application.id}</dd></div></dl>
+      </Card>
+      <Card className="space-y-3"><div><h2 className="text-lg font-bold">Documents submitted for this application</h2><p className="text-sm text-muted">These files are saved in the applicant’s profile data vault and linked to this loan request.</p></div>{d.documents.map(doc => <div key={doc.id} className="rounded-xl border border-line p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">{doc.originalName}</p><p className="text-xs text-muted">{doc.type.replaceAll('_',' ')} · {new Date(doc.createdAt).toLocaleDateString('en-ZA')} · {doc.status}</p></div><Button variant="secondary" onClick={() => void viewApplicationDocument(doc.id)}>View document</Button></div>{doc.processingNote && <p className="mt-2 text-sm text-muted">{doc.processingNote}</p>}{doc.reviews.map((review,i) => <p key={i} className="mt-2 text-xs text-muted">{review.status} · {new Date(review.createdAt).toLocaleString('en-ZA')}: {review.comment}</p>)}</div>)}{!d.documents.length && <Alert tone="blue">No documents have been attached to this application yet.</Alert>}{(!reviewer || isOffice) && reviewStates.includes(d.application.status) && <div className="space-y-2"><div className="grid gap-2 sm:grid-cols-[1fr_1fr] sm:items-end"><Field label="Document type"><Select value={documentType} onChange={e=>setDocumentType(e.target.value)}><option value="BANK_STATEMENT">Bank statement</option><option value="PROOF_OF_INCOME">Proof of income</option><option value="ID_DOCUMENT">Identity document</option><option value="PROOF_OF_ADDRESS">Proof of address</option></Select></Field><Field label="Choose PDF, JPG or PNG"><input className="block w-full rounded-xl border border-line p-2 text-sm" type="file" accept="application/pdf,image/jpeg,image/png" disabled={documentBusy} onChange={e=>setSelectedDocument(e.target.files?.[0] ?? null)} /></Field></div><label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={documentConsent} onChange={e=>setDocumentConsent(e.target.checked)} /><span>I confirm this file may be attached to this application and stored in the applicant’s profile data vault.</span></label><Button loading={documentBusy} disabled={!selectedDocument || !documentConsent} onClick={async()=>{await uploadApplicationDocument(selectedDocument ?? undefined);setSelectedDocument(null);setDocumentConsent(false);}}>Attach document</Button><p className="text-xs text-muted">Maximum 10 MB</p></div>}{documentBusy && <p className="text-sm text-muted">Adding file to this application and the profile vault…</p>}{documentError && <Alert tone="red">{documentError}</Alert>}</Card>
+      <Card className="space-y-3"><h2 className="text-lg font-bold">Application activity</h2>{d.timeline.length ? d.timeline.map(event => <div key={event.id} className="border-l-2 border-brand/30 pl-3"><p className="text-xs text-muted">{new Date(event.createdAt).toLocaleString('en-ZA')} · {event.status}</p><p className="text-sm">{event.message}</p></div>) : <p className="text-sm text-muted">No updates yet.</p>}</Card>
       <LoanJourney status={d.application.status} reviewer={reviewer && !isOffice} externalPayment={!!d.externalPayment} />
-      {reviewer && !isOffice && <LenderReviewWorkspace applicationId={applicationId} />}
+      {reviewer && (!isOffice || intervening) && <LenderReviewWorkspace applicationId={applicationId} />}
       {d.depositReference && <Card><h2 className="font-semibold">Bank deposit reference</h2><p className="my-2 font-mono text-lg font-bold">{d.depositReference}</p><p className="text-sm text-muted">The lender must use this exact reference when paying the XTRA-CASH settlement account so the deposit can be matched to this loan.</p></Card>}
       {d.externalPayment && <Card><h2 className="font-semibold">Loan funds credited to your wallet</h2><p className="my-2">{formatZAR(d.externalPayment.amountCents)} · {new Date(d.externalPayment.confirmedAt).toLocaleString('en-ZA')}</p><p>{d.externalPayment.note}</p><p className="mt-2 text-sm text-muted">Deposit reference: {d.externalPayment.depositReference}. You can view the wallet balance and request an EFT to your verified bank account when withdrawals are enabled.</p></Card>}
       {isOffice && <div className="flex items-center justify-between gap-3 rounded-xl border p-3"><p className="text-sm text-muted">Staff oversight · Customer and lender manage this loan.</p><Button variant="secondary" onClick={() => setIntervening(!intervening)}>{intervening ? 'Close intervention' : 'Intervene'}</Button></div>}
@@ -167,7 +194,7 @@ export function PersonalSettlementView({
       )}
       {!reviewer && !ag && reviewStates.includes(d.application.status) && <CandidateOffers applicationId={applicationId} onSelected={data.reload} />}
       {isOffice && intervening && reviewStates.includes(d.application.status) && <Card className="space-y-3"><Field label="Intervention message"><Textarea value={message} maxLength={500} onChange={e => setMessage(e.target.value)}/></Field><Button loading={busy} disabled={message.trim().length < 3} onClick={() => act('information', {message})}>Request clarification</Button></Card>}
-      {reviewer && !isOffice &&
+      {reviewer && (!isOffice || intervening) &&
         (reviewStates.includes(d.application.status) ||
           d.humanReviewPending) && (
           <section className="space-y-3">
@@ -192,6 +219,9 @@ export function PersonalSettlementView({
         )}
       <Modal open={!!quickAction} title={quickAction === 'INFO' ? 'Request more information' : quickAction === 'HOLD' ? 'Put request on hold' : 'Decline request'} onClose={() => setQuickAction(null)}>
         <div className="space-y-4"><p className="text-sm text-muted">Add a clear note. The applicant and lender will see the recorded update in the application timeline.</p><Field label={quickAction === 'INFO' ? 'What should the applicant provide?' : quickAction === 'HOLD' ? 'Reason for holding this request' : 'Reason for declining'}><Textarea value={decisionNote} maxLength={500} onChange={e => setDecisionNote(e.target.value)} /></Field><div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setQuickAction(null)}>Cancel</Button><Button disabled={decisionNote.trim().length < 3} loading={busy} onClick={async () => { const action = quickAction; if (!action) return; const ok = action === 'INFO' ? await act('information', { message: decisionNote.trim() }) : await act('review', { action: action === 'DECLINE' ? 'DECLINE' : 'REVIEW', notes: decisionNote.trim() }); if (ok) { setQuickAction(null); setDecisionNote(''); setDecisionOpen(false); } }}>{quickAction === 'INFO' ? 'Send request' : quickAction === 'HOLD' ? 'Confirm hold' : 'Confirm decline'}</Button></div></div>
+      </Modal>
+      <Modal open={editOpen} title={isOffice ? 'Amend loan application' : 'Edit loan application'} onClose={() => setEditOpen(false)}>
+        <div className="space-y-4"><Alert tone={isOffice ? 'amber' : 'blue'}>{isOffice ? 'Admin amendments are recorded in the application history. Financial profile edits are saved to the applicant’s profile and used by future applications.' : 'You can update the requested amount, term and purpose while the lender is reviewing your request.'}</Alert><Field label="Requested amount (ZAR)"><Input type="number" min="500" max="100000" step="50" value={editAmount} onChange={e=>setEditAmount(e.target.value)} /></Field><Field label="Repayment term (months)"><Select value={editTerm} onChange={e=>setEditTerm(e.target.value)}>{Array.from({length:24},(_,i)=><option key={i+1} value={i+1}>{i+1} months</option>)}</Select></Field><Field label="Purpose"><Select value={editPurpose} onChange={e=>setEditPurpose(e.target.value)}>{['Home & repairs','Education','Medical','Transport','Debt consolidation','Other'].map(x=><option key={x}>{x}</option>)}</Select></Field>{isOffice && <><Field label="Applicant monthly income (ZAR)"><Input type="number" min="1" step="50" value={editIncome} onChange={e=>setEditIncome(e.target.value)} /></Field><Field label="Applicant monthly expenses (ZAR)"><Input type="number" min="0" step="50" value={editExpenses} onChange={e=>setEditExpenses(e.target.value)} /></Field></>}<div className="flex justify-end gap-2"><Button variant="secondary" onClick={()=>setEditOpen(false)}>Cancel</Button><Button loading={busy} disabled={!Number.isFinite(Number(editAmount)) || Number(editAmount)<500 || Number(editAmount)>100000 || (isOffice && (!Number.isFinite(Number(editIncome)) || Number(editIncome)<=0 || !Number.isFinite(Number(editExpenses)) || Number(editExpenses)<0))} onClick={()=>void saveAmendment()}>Save changes</Button></div></div>
       </Modal>
       {d.humanReviewPending && (
         <Alert tone="amber">

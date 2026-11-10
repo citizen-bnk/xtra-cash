@@ -24,6 +24,15 @@ export interface PersonalSettlement {
   sharedReadOnly?:boolean;
   humanReviewPending?:boolean;
   application: PersonalLoanApplication;
+  documents: {
+    id: string;
+    type: string;
+    originalName: string;
+    status: string;
+    processingNote: string | null;
+    createdAt: string;
+    reviews: { status: string; comment: string; createdAt: string }[];
+  }[];
   agreement: null | {
     id: string;
     content: string;

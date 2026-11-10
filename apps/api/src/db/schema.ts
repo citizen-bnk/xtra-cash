@@ -578,6 +578,7 @@ export const paydayEmployees = pgTable('payday_employees', {
 export {
   applicantVaults,
   vaultDocuments,
+  applicationVaultDocuments,
   vaultFacts,
   vaultLocationSamples,
   vaultProcessingJobs,

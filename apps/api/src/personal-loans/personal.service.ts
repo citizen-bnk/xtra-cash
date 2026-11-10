@@ -5,7 +5,7 @@ import {RoutingService} from './routing';
 import { ageOn, parseSaId, quoteLoan } from '@xtra/shared';
 import { InjectDb } from '../common/db.module';
 import { Db } from '../db/client';
-import { kycProfiles, lenderOrgs, loanOffers, personalLoanApplications, personalVerifications, users } from '../db/schema';
+import { applicationVaultDocuments, kycProfiles, lenderOrgs, loanOffers, personalLoanApplications, personalVerifications, users, vaultDocuments } from '../db/schema';
 import { CreditService } from '../consumer/credit.service';
 import { offerCapacity } from '../consumer/credit-engine';
 import { AuditService } from '../common/audit.service';
@@ -13,7 +13,7 @@ import type { AuthUser } from '../common/auth';
 import { CREDIT_BUREAU, FILE_STORAGE } from '../integrations/integrations.module';
 import type { CreditBureau } from '../integrations/credit-bureau';
 import type { FileStorage } from '../integrations/storage';
-import { ApplicationReviewDto, PersonalApplicationDto, PrecheckDto, VerificationDecisionDto, VerificationDto } from './personal.dto';
+import { AmendPersonalApplicationDto, ApplicationReviewDto, PersonalApplicationDto, PrecheckDto, VerificationDecisionDto, VerificationDto } from './personal.dto';
 import { decryptIdentity } from '../auth/identity-crypto';
 import { applicationEvents } from './settlement.schema';
 import { VaultService } from './vault.service';
@@ -124,12 +124,38 @@ export class PersonalLoanService {
       await this.routing.record(app.id,policy.mode,routingConsent,dto.latitude!==undefined?{latitude:dto.latitude,longitude:dto.longitude!}:undefined,tx);
       if (routingConsent) await tx.insert(competitionConsents).values({ applicationId: app.id, userId: u.id }).onConflictDoNothing();
       await tx.insert(loanCompetitions).values({ applicationId: app.id, releasedBy: u.id, authorityReference: 'APPLICANT_SUBMISSION' }).onConflictDoNothing();
+      const evidence = await tx.select({ id: vaultDocuments.id }).from(vaultDocuments).where(and(eq(vaultDocuments.userId, u.id), lte(vaultDocuments.createdAt, app.createdAt)));
+      if (evidence.length) await tx.insert(applicationVaultDocuments).values(evidence.map(doc => ({ applicationId: app.id, documentId: doc.id, linkedBy: u.id }))).onConflictDoNothing();
       await tx.insert(applicationEvents).values({applicationId:app.id,actorId:u.id,status:app.status,message:lenderId?'Your application was sent to the selected lender for review.':'Your application was submitted for review.'});
       return app;
     }).then(async app=>(await this.db.query.personalLoanApplications.findFirst({where:eq(personalLoanApplications.id,app.id)}))!);
   }
 
   list(userId: string) { return this.db.query.personalLoanApplications.findMany({ where: eq(personalLoanApplications.userId, userId), orderBy: desc(personalLoanApplications.createdAt), limit: 30 }); }
+  async amendApplication(actor: AuthUser, id: string, dto: AmendPersonalApplicationDto) {
+    const isAdmin = actor.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN');
+    return this.db.transaction(async tx => {
+      const [app] = await tx.select().from(personalLoanApplications).where(eq(personalLoanApplications.id, id)).for('update');
+      if (!app || (app.userId !== actor.id && !isAdmin)) throw new NotFoundException();
+      if (!['SUBMITTED', 'REFERRED', 'UNDER_REVIEW', 'ACTION_REQUIRED'].includes(app.status)) throw new BadRequestException('This application can no longer be amended. Contact support if something is incorrect.');
+      if (!Object.keys(dto).length) throw new BadRequestException('Enter at least one change.');
+      if (!isAdmin && ('monthlyIncomeCents' in dto || 'monthlyExpensesCents' in dto)) throw new ForbiddenException('Update income and expenses in your profile so all applications use the same source of truth.');
+      const [profile] = await tx.select().from(kycProfiles).where(eq(kycProfiles.userId, app.userId)).for('update');
+      if (isAdmin && (dto.monthlyIncomeCents !== undefined || dto.monthlyExpensesCents !== undefined) && !profile) throw new BadRequestException('Applicant profile financial record is missing.');
+      if (isAdmin && profile && (dto.monthlyIncomeCents !== undefined || dto.monthlyExpensesCents !== undefined)) {
+        await tx.update(kycProfiles).set({ monthlyIncomeCents: dto.monthlyIncomeCents ?? profile.monthlyIncomeCents, monthlyExpensesCents: dto.monthlyExpensesCents ?? profile.monthlyExpensesCents }).where(eq(kycProfiles.userId, app.userId));
+      }
+      const monthlyIncomeCents = isAdmin ? dto.monthlyIncomeCents ?? profile?.monthlyIncomeCents ?? app.monthlyIncomeCents : app.monthlyIncomeCents;
+      const monthlyExpensesCents = isAdmin ? dto.monthlyExpensesCents ?? profile?.monthlyExpensesCents ?? app.monthlyExpensesCents : app.monthlyExpensesCents;
+      if (monthlyIncomeCents <= 0 || monthlyExpensesCents < 0) throw new BadRequestException('Income and expenses must remain valid profile values.');
+      const values = { amountCents: dto.amountCents ?? app.amountCents, termMonths: dto.termMonths ?? app.termMonths, purpose: dto.purpose ?? app.purpose, monthlyIncomeCents, monthlyExpensesCents };
+      const [updated] = await tx.update(personalLoanApplications).set({ ...values, offerId: null, vaultValidationId: null }).where(eq(personalLoanApplications.id, id)).returning();
+      const changes = Object.fromEntries(Object.entries(values).filter(([key, value]) => value !== (app as any)[key]).map(([key, value]) => [key, { from: (app as any)[key], to: value }]));
+      await tx.insert(applicationEvents).values({ applicationId: id, actorId: actor.id, status: app.status, message: `${isAdmin ? 'XTRA-CASH admin' : 'Applicant'} amended the application${Object.keys(changes).length ? `: ${Object.keys(changes).join(', ')}` : ''}.` });
+      await this.audit.log(actor, 'personal_loan.amended', 'personal_loan_application', id, { adminIntervention: isAdmin, changes }, tx);
+      return updated;
+    });
+  }
   async lenderList(u: AuthUser) {
     const org = await this.db.query.lenderOrgs.findFirst({ where: eq(lenderOrgs.ownerUserId, u.id) });
     if (!org) throw new NotFoundException();

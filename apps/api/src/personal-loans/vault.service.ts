@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { InjectDb } from '../common/db.module';
 import { Db } from '../db/client';
-import { lenderOrgs, personalLoanApplications, personalVerifications, users, vaultDocumentReviews } from '../db/schema';
+import { applicationVaultDocuments, lenderOrgs, personalLoanApplications, personalVerifications, users, vaultDocumentReviews } from '../db/schema';
 import { SettingsService } from '../common/settings.service';
 import { AuditService } from '../common/audit.service';
 import type { AuthUser } from '../common/auth';
@@ -52,8 +52,13 @@ export class VaultService {
   }
 
   private async lenderApplication(actor: AuthUser, applicationId: string) {
-    if (!actor.roles.includes('LENDER')) throw new ForbiddenException('Lender access is required.');
+    const admin = actor.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN');
+    if (!actor.roles.includes('LENDER') && !admin) throw new ForbiddenException('Lender or administrator access is required.');
     const [app] = await this.db.select().from(personalLoanApplications).where(eq(personalLoanApplications.id, applicationId));
+    if (admin) {
+      if (!app) throw new NotFoundException();
+      return { app, org: null };
+    }
     const [org] = await this.db.select().from(lenderOrgs).where(and(eq(lenderOrgs.ownerUserId, actor.id), eq(lenderOrgs.accreditationStatus, 'ACCREDITED')));
     if (!app || !org) throw new NotFoundException();
     const [grant] = await this.db.select().from(applicationLenderAccess).where(and(eq(applicationLenderAccess.applicationId, applicationId), eq(applicationLenderAccess.lenderId, org.id), eq(applicationLenderAccess.active, 1)));
@@ -64,15 +69,12 @@ export class VaultService {
 
   async lenderReviewPack(actor: AuthUser, applicationId: string) {
     const { app } = await this.lenderApplication(actor, applicationId);
-    const [status, docs, reviews, verification] = await Promise.all([
+    const [status, docs, reviews] = await Promise.all([
       this.status(app.userId),
-      this.db.select().from(vaultDocuments).where(eq(vaultDocuments.userId, app.userId)).orderBy(desc(vaultDocuments.createdAt)),
+      this.db.select({ document: vaultDocuments }).from(applicationVaultDocuments).innerJoin(vaultDocuments, eq(vaultDocuments.id, applicationVaultDocuments.documentId)).where(eq(applicationVaultDocuments.applicationId, applicationId)).orderBy(desc(vaultDocuments.createdAt)).then(rows => rows.map(r => r.document)),
       this.db.select().from(vaultDocumentReviews).where(eq(vaultDocumentReviews.applicationId, applicationId)).orderBy(desc(vaultDocumentReviews.createdAt)),
-      this.db.query.personalVerifications.findFirst({ where: eq(personalVerifications.userId, app.userId) }),
     ]);
-    const evidence = [...docs.map(d => ({ id: d.id, type: d.type, name: d.originalName, status: d.status, processingNote: d.processingNote, createdAt: d.createdAt })),
-      ...(verification?.identityFileKey && !docs.some(d => d.type === 'ID_DOCUMENT') ? [{ id: 'verification:identity', type: 'ID_DOCUMENT', name: 'Identity document', status: verification.status, processingNote: verification.reason, createdAt: verification.createdAt }] : []),
-      ...(verification?.addressFileKey && !docs.some(d => d.type === 'PROOF_OF_ADDRESS') ? [{ id: 'verification:address', type: 'PROOF_OF_ADDRESS', name: 'Proof of address', status: verification.status, processingNote: verification.reason, createdAt: verification.createdAt }] : [])];
+    const evidence = docs.map(d => ({ id: d.id, type: d.type, name: d.originalName, status: d.status, processingNote: d.processingNote, createdAt: d.createdAt }));
     return { application: { id: app.id, status: app.status, amountCents: app.amountCents, termMonths: app.termMonths }, pillars: status.pillars,
       documents: evidence.map(d => ({ ...d, reviews: reviews.filter(r => r.documentId === d.id) })) };
   }
@@ -92,16 +94,74 @@ export class VaultService {
     return { doc: { originalName: fileName }, buffer: await this.storage.get(storageKey) };
   }
 
+  private async editableApplication(actor: AuthUser, applicationId: string) {
+    const app = await this.db.query.personalLoanApplications.findFirst({ where: eq(personalLoanApplications.id, applicationId) });
+    const admin = actor.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN');
+    if (!app || (app.userId !== actor.id && !admin)) throw new NotFoundException();
+    if (!['SUBMITTED', 'REFERRED', 'UNDER_REVIEW', 'ACTION_REQUIRED'].includes(app.status)) throw new BadRequestException('Documents can only be added while the application is under review.');
+    return app;
+  }
+
+  async uploadForApplication(actor: AuthUser, applicationId: string, type: VaultDocumentType, consent: string, file: Express.Multer.File) {
+    const app = await this.editableApplication(actor, applicationId);
+    if (consent !== 'true') throw new BadRequestException('Confirm consent to attach this document to the application.');
+    if (!file) throw new BadRequestException('Choose a document to upload');
+    if (!ACCEPTED_MIME.includes(file.mimetype) || file.size > 10_000_000) throw new BadRequestException('Use a PDF, JPG or PNG under 10 MB');
+    const prefix = file.buffer.subarray(0, 8).toString('hex');
+    const valid = file.mimetype === 'application/pdf' ? file.buffer.subarray(0, 5).toString() === '%PDF-' : file.mimetype === 'image/png' ? prefix === '89504e470d0a1a0a' : prefix.startsWith('ffd8ff');
+    if (!valid) throw new BadRequestException('The document content does not match its file type');
+    const contentHash = createHash('sha256').update(file.buffer).digest('hex');
+    let document = await this.db.query.vaultDocuments.findFirst({ where: and(eq(vaultDocuments.userId, app.userId), eq(vaultDocuments.contentHash, contentHash)) });
+    if (!document) {
+      const storageKey = await this.storage.put(file.buffer, file.originalname);
+      document = await this.db.transaction(async tx => {
+        const [created] = await tx.insert(vaultDocuments).values({ userId: app.userId, type, originalName: file.originalname.slice(0, 200), storageKey, contentHash, status: 'PROCESSING', processingNote: 'Securely received and attached to this application. Automated extraction is awaiting the OCR provider.' }).onConflictDoNothing().returning();
+        if (!created) return tx.query.vaultDocuments.findFirst({ where: and(eq(vaultDocuments.userId, app.userId), eq(vaultDocuments.contentHash, contentHash)) });
+        await tx.insert(vaultProcessingJobs).values({ documentId: created.id, kind: type === 'BANK_STATEMENT' ? 'TRANSACTION_ANALYSIS' : 'OCR', status: 'AWAITING_PROVIDER' });
+        await this.audit.log(actor, 'vault.application_document_received', 'vault_document', created.id, { type, sizeBytes: file.size, applicationId }, tx);
+        return created;
+      });
+    }
+    if (!document) throw new NotFoundException('Uploaded document was not found in the profile vault.');
+    await this.db.insert(applicationVaultDocuments).values({ applicationId, documentId: document.id, linkedBy: actor.id }).onConflictDoNothing();
+    await this.audit.log(actor, 'personal_loan.document_attached', 'personal_loan_application', applicationId, { documentId: document.id, type });
+    return this.status(app.userId);
+  }
+
+  async applicationDocuments(actor: AuthUser, applicationId: string) {
+    const app = await this.db.query.personalLoanApplications.findFirst({ where: eq(personalLoanApplications.id, applicationId) });
+    const admin = actor.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN');
+    if (!app || (app.userId !== actor.id && !admin)) throw new NotFoundException();
+    const linked = await this.db.select({ document: vaultDocuments }).from(applicationVaultDocuments)
+      .innerJoin(vaultDocuments, eq(vaultDocuments.id, applicationVaultDocuments.documentId))
+      .where(eq(applicationVaultDocuments.applicationId, applicationId));
+    return linked.map(({ document }) => ({ id: document.id, type: document.type, originalName: document.originalName, status: document.status, processingNote: document.processingNote, createdAt: document.createdAt }));
+  }
+
+  async applicationDocumentFile(actor: AuthUser, applicationId: string, documentId: string) {
+    const [app] = await this.db.select().from(personalLoanApplications).where(eq(personalLoanApplications.id, applicationId));
+    const [link] = await this.db.select().from(applicationVaultDocuments).where(and(eq(applicationVaultDocuments.applicationId, applicationId), eq(applicationVaultDocuments.documentId, documentId)));
+    if (!app || !link) throw new NotFoundException();
+    const admin = actor.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN');
+    if (app.userId !== actor.id && !admin) {
+      await this.lenderApplication(actor, applicationId);
+    }
+    const doc = await this.db.query.vaultDocuments.findFirst({ where: and(eq(vaultDocuments.id, documentId), eq(vaultDocuments.userId, app.userId)) });
+    if (!doc) throw new NotFoundException();
+    await this.audit.log(actor, 'personal_loan.document_viewed', 'personal_loan_application', applicationId, { documentId });
+    return { doc, buffer: await this.storage.get(doc.storageKey) };
+  }
+
   async lenderDocumentReview(actor: AuthUser, applicationId: string, documentId: string, status: 'ACCEPTED' | 'REJECTED' | 'REVOKED', comment: string) {
     const { app } = await this.lenderApplication(actor, applicationId);
+    const [linked] = await this.db.select().from(applicationVaultDocuments).where(and(eq(applicationVaultDocuments.applicationId, applicationId), eq(applicationVaultDocuments.documentId, documentId)));
+    if (!linked) throw new NotFoundException();
     let doc = await this.db.query.vaultDocuments.findFirst({ where: and(eq(vaultDocuments.id, documentId), eq(vaultDocuments.userId, app.userId)) });
-    if (!doc && documentId === 'verification:identity') doc = await this.db.query.vaultDocuments.findFirst({ where: and(eq(vaultDocuments.userId, app.userId), eq(vaultDocuments.type, 'ID_DOCUMENT')) });
-    if (!doc && documentId === 'verification:address') doc = await this.db.query.vaultDocuments.findFirst({ where: and(eq(vaultDocuments.userId, app.userId), eq(vaultDocuments.type, 'PROOF_OF_ADDRESS')) });
-    if (!doc && !['verification:identity', 'verification:address'].includes(documentId)) throw new NotFoundException();
+    if (!doc) throw new NotFoundException();
     await this.db.transaction(async tx => {
-      const reviewDocumentId = doc?.id ?? documentId;
+      const reviewDocumentId = doc.id;
       await tx.insert(vaultDocumentReviews).values({ applicationId, userId: app.userId, documentId: reviewDocumentId, status, comment: comment.trim(), reviewerUserId: actor.id });
-      if (doc) await tx.update(vaultDocuments).set({ status, processingNote: comment.trim() }).where(eq(vaultDocuments.id, doc.id));
+      await tx.update(vaultDocuments).set({ status, processingNote: comment.trim() }).where(eq(vaultDocuments.id, doc.id));
       await this.audit.log(actor, `vault.document_${status.toLowerCase()}`, 'vault_document', reviewDocumentId, { applicationId, comment: comment.trim() }, tx);
     });
     return this.lenderReviewPack(actor, applicationId);

@@ -134,6 +134,13 @@
       "when": 1794340000000,
       "tag": "0018_lender_support_and_vault_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794340001000,
+      "tag": "0019_application_document_links",
+      "breakpoints": true
     }
   ]
 }
