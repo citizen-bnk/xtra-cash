@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ServiceProfile } from '@/components/ServiceProfile';
 import { NearbyOffers } from '@/components/NearbyOffers';
-import { Copy, Landmark, LogOut, Users } from 'lucide-react';
+import { Copy, Database, Landmark, LogOut, Users } from 'lucide-react';
 import { EMPLOYMENT_LABELS, formatZAR } from '@xtra/shared';
 import { Button, Card, PageHeader, SecuritySettings, StatusBadge, useAuth, useToast } from '@xtra/ui';
 
@@ -20,6 +20,7 @@ export default function ProfilePage() {
     <div className="space-y-4">
       <PageHeader title="Profile" />
       <Link href="/install" className="inline-block text-sm font-semibold text-brand-purple underline">Get the XTRA-CASH app</Link>
+      {me.roles.includes('CONSUMER') && <Link href="/app/data-vault"><Card className="flex items-center gap-3"><Database className="h-5 w-5 text-brand" /><div className="flex-1"><div className="font-semibold">My data vault</div><div className="text-sm text-muted">Prepare identity, income, risk and fraud evidence before applying.</div></div></Card></Link>}
       <SecuritySettings />
       {me.roles.includes('CONSUMER') && <NearbyOffers />}
       <Card className="grid gap-3 text-sm sm:grid-cols-2">

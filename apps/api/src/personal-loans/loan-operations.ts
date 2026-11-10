@@ -9,7 +9,7 @@ import {
   Param,
   Post,
 } from "@nestjs/common";
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { CurrentUser, Roles, type AuthUser } from "../common/auth";
 import { InjectDb } from "../common/db.module";
@@ -25,13 +25,13 @@ import {
 } from "../db/schema";
 import {
   loanCompetitions,
-  loanDemoCases,
   loanNotificationReceipts,
   routingRequests,
   lenderAssessments,
   decisionSessions,
   lenderAgentPolicies,
   competitionConsents,
+  applicationCandidateOffers,
 } from "./lender-ai.schema";
 import { applicationEvents, agreements, externalLoanPayments } from "./settlement.schema";
 import { SettlementService } from "./settlement.service";
@@ -42,6 +42,7 @@ import { LenderService } from "../lender/lender.service";
 import { parse } from "../payday/payday.dto";
 import { approveInput } from "./settlement.dto";
 import { decryptIdentity, encryptIdentity } from "../auth/identity-crypto";
+import { quoteLoan } from "@xtra/shared";
 const openStates: (typeof applications.$inferSelect.status)[] = [
   "SUBMITTED",
   "REFERRED",
@@ -242,12 +243,16 @@ export class LoanOperationsService {
     const app = await this.db.query.personalLoanApplications.findFirst({
       where: eq(applications.id, id),
     });
-    if (!app || (!office(a) && app.userId !== a.id))
-      throw new NotFoundException();
     const [competition] = await this.db
       .select()
       .from(loanCompetitions)
       .where(eq(loanCompetitions.applicationId, id));
+    const isApplicant = app?.userId === a.id;
+    const canSeeAsLender = !office(a) && !isApplicant && a.roles.includes("LENDER") && competition?.status === "OPEN"
+      ? !!(await this.org(a))
+      : false;
+    if (!app || (!office(a) && !isApplicant && !canSeeAsLender))
+      throw new NotFoundException();
     const [r] = await this.db
       .select()
       .from(competitionConsents)
@@ -424,28 +429,51 @@ export class LoanOperationsService {
             "Outside the configured lender vicinity.",
           );
       }
-      await tx
-        .update(applications)
-        .set({ lenderId: org.id, offerId: product.id })
-        .where(eq(applications.id, id));
-      const result = await this.settlement.approve(a, id, input, tx);
-      await tx
-        .update(loanCompetitions)
-        .set({
-          status: "CLOSED",
-          winnerLenderId: org.id,
-          version: competition.version + 1,
-        })
-        .where(eq(loanCompetitions.applicationId, id));
+      const quote = quoteLoan(app.amountCents, product);
+      const [result] = await tx.insert(applicationCandidateOffers).values({
+        applicationId: id,
+        lenderId: org.id,
+        offerId: product.id,
+        decisionPayload: input,
+        monthlyInstallmentCents: quote.monthlyInstallmentCents,
+        totalRepayableCents: quote.totalRepayableCents,
+        costOfCreditCents: quote.costOfCreditCents,
+      }).onConflictDoUpdate({ target: [applicationCandidateOffers.applicationId, applicationCandidateOffers.lenderId], set: { offerId: product.id, decisionPayload: input, monthlyInstallmentCents: quote.monthlyInstallmentCents, totalRepayableCents: quote.totalRepayableCents, costOfCreditCents: quote.costOfCreditCents, status: 'SUBMITTED', updatedAt: new Date() } }).returning();
       await this.audit.log(
         a,
-        "personal_loan.competition_won",
+        "personal_loan.candidate_offer_submitted",
         "personal_loan_application",
         id,
-        { offerId: product.id, agreementId: result.id },
+        { offerId: product.id, candidateOfferId: result.id },
         tx,
       );
       return result;
+    });
+  }
+
+  async candidateOffers(a: AuthUser, id: string) {
+    const app = await this.db.query.personalLoanApplications.findFirst({ where: and(eq(applications.id, id), eq(applications.userId, a.id)) });
+    if (!app) throw new NotFoundException();
+    const rows = await this.db.select({ candidate: applicationCandidateOffers, lenderName: lenderOrgs.name, offerName: loanOffers.name, monthlyInterestRateBps: loanOffers.monthlyInterestRateBps, initiationFeeCents: loanOffers.initiationFeeCents, monthlyServiceFeeCents: loanOffers.monthlyServiceFeeCents }).from(applicationCandidateOffers).innerJoin(lenderOrgs, eq(lenderOrgs.id, applicationCandidateOffers.lenderId)).innerJoin(loanOffers, eq(loanOffers.id, applicationCandidateOffers.offerId)).where(and(eq(applicationCandidateOffers.applicationId, id), eq(applicationCandidateOffers.status, 'SUBMITTED'))).orderBy(asc(applicationCandidateOffers.totalRepayableCents), asc(applicationCandidateOffers.createdAt)).limit(3);
+    return rows.map((r, index) => ({ id: r.candidate.id, rank: index + 1, lenderName: r.lenderName, offerName: r.offerName, monthlyInterestRateBps: r.monthlyInterestRateBps, initiationFeeCents: r.initiationFeeCents, monthlyServiceFeeCents: r.monthlyServiceFeeCents, monthlyInstallmentCents: r.candidate.monthlyInstallmentCents, totalRepayableCents: r.candidate.totalRepayableCents, costOfCreditCents: r.candidate.costOfCreditCents, createdAt: r.candidate.createdAt }));
+  }
+
+  async selectCandidate(a: AuthUser, id: string, candidateId: string) {
+    return this.db.transaction(async (tx) => {
+      const [app] = await tx.select().from(applications).where(and(eq(applications.id, id), eq(applications.userId, a.id))).for('update');
+      if (!app || !openStates.includes(app.status)) throw new ConflictException('This request can no longer select an offer.');
+      const [row] = await tx.select({ candidate: applicationCandidateOffers, ownerUserId: lenderOrgs.ownerUserId }).from(applicationCandidateOffers).innerJoin(lenderOrgs, eq(lenderOrgs.id, applicationCandidateOffers.lenderId)).where(and(eq(applicationCandidateOffers.id, candidateId), eq(applicationCandidateOffers.applicationId, id), eq(applicationCandidateOffers.status, 'SUBMITTED')));
+      if (!row) throw new NotFoundException();
+      const available = await tx.select({ id: applicationCandidateOffers.id }).from(applicationCandidateOffers).where(and(eq(applicationCandidateOffers.applicationId, id), eq(applicationCandidateOffers.status, 'SUBMITTED')));
+      if (available.length < 3) throw new ConflictException('Three lender offers are required before the applicant can compare and select.');
+      const topThree = await tx.select({ id: applicationCandidateOffers.id }).from(applicationCandidateOffers).where(and(eq(applicationCandidateOffers.applicationId, id), eq(applicationCandidateOffers.status, 'SUBMITTED'))).orderBy(asc(applicationCandidateOffers.totalRepayableCents), asc(applicationCandidateOffers.createdAt)).limit(3);
+      if (!topThree.some((offer) => offer.id === candidateId)) throw new ConflictException('Only one of the three best current offers can be selected.');
+      await tx.update(applications).set({ lenderId: row.candidate.lenderId, offerId: row.candidate.offerId, status: 'REFERRED' }).where(eq(applications.id, id));
+      const agreement = await this.settlement.approve({ id: row.ownerUserId, email: null, roles: ['LENDER'] }, id, approveInput.parse(row.candidate.decisionPayload), tx);
+      await tx.update(applicationCandidateOffers).set({ status: sql`CASE WHEN ${applicationCandidateOffers.id} = ${candidateId} THEN 'SELECTED' ELSE 'NOT_SELECTED' END`, updatedAt: new Date() }).where(eq(applicationCandidateOffers.applicationId, id));
+      await tx.update(loanCompetitions).set({ status: 'CLOSED', winnerLenderId: row.candidate.lenderId, version: sql`${loanCompetitions.version} + 1` }).where(eq(loanCompetitions.applicationId, id));
+      await this.audit.log(a, 'personal_loan.candidate_offer_selected', 'personal_loan_application', id, { candidateOfferId: candidateId, agreementId: agreement.id }, tx);
+      return agreement;
     });
   }
   async notifications(a: AuthUser) {
@@ -508,7 +536,7 @@ export class LoanOperationsService {
       } else if (a.roles.includes("LENDER") && openStates.includes(app.status)) {
         title = "Complete the lending assessment";
         description =
-          "Review this customer request and make an offer if it fits your lending criteria. The first lender to offer proceeds to the customer for acceptance.";
+          "Review this customer request and submit an offer if it fits your lending criteria. XTRA-CASH ranks the customer’s three best current offers.";
         cta = "Review and make offer";
         owner = "Lender";
       } else if (app.userId === a.id && app.status === "ACTION_REQUIRED") {
@@ -550,6 +578,11 @@ export class LoanOperationsService {
           owner,
         });
     }
+    if (!office(a) && !a.roles.includes('LENDER') && rows.length) {
+      const candidateRows = await this.db.select({ applicationId: applicationCandidateOffers.applicationId }).from(applicationCandidateOffers).where(and(inArray(applicationCandidateOffers.applicationId, rows.map((r) => r.id)), eq(applicationCandidateOffers.status, 'SUBMITTED')));
+      const counts = candidateRows.reduce((map, row) => map.set(row.applicationId, (map.get(row.applicationId) ?? 0) + 1), new Map<string, number>());
+      for (const [applicationId, count] of counts) if (count >= 3) notifications.unshift({ key: `application:${applicationId}:TOP_OFFERS:${count}`, applicationId, title: 'Your top loan offers are ready', description: 'Compare the three lowest-cost current offers. Select one to generate the agreement; no funds move until you accept and sign.', cta: 'Compare top offers', kind: 'APPLICATION', owner: 'Applicant' });
+    }
     const receipts = await this.db
       .select()
       .from(loanNotificationReceipts)
@@ -572,124 +605,6 @@ export class LoanOperationsService {
       .values({ userId: a.id, notificationKey: key })
       .onConflictDoNothing();
     return { ok: true };
-  }
-  async seedDemo(a: AuthUser) {
-    const cases = [
-      [
-        "SUBMITTED",
-        "Awaiting document review",
-        "Admin",
-        "Review identity and address",
-        "No lender sees this private request yet.",
-      ],
-      [
-        "UNDER_REVIEW",
-        "Admin matching",
-        "Admin",
-        "Match a lender",
-        "Choose an eligible lender or shortlist several.",
-      ],
-      [
-        "NO_MATCH",
-        "No existing matching product",
-        "Admin",
-        "Release for matching offers",
-        "With applicant consent, invite all accredited lenders to create a suitable product.",
-      ],
-      [
-        "CONSENT_REQUIRED",
-        "Consent needed",
-        "Applicant",
-        "Confirm competition consent",
-        "The request remains private until consent and admin release.",
-      ],
-      [
-        "COMPETITION_OPEN",
-        "Open offer competition",
-        "Lender",
-        "Create or select a product",
-        "The first valid authorised offer wins; opening a request does not win it.",
-      ],
-      [
-        "ACTION_REQUIRED",
-        "Information requested",
-        "Applicant",
-        "Reply to the request",
-        "The applicant supplies the missing information through the approved process.",
-      ],
-      [
-        "OFFERED",
-        "Offer ready to read",
-        "Applicant",
-        "Read the agreement",
-        "A final quote exists. The applicant decides whether to accept.",
-      ],
-      [
-        "ACCEPTED",
-        "Accepted — funding pending activation",
-        "Finance admin",
-        "Review funding release",
-        "A different administrator must release funding. No demo funds move.",
-      ],
-      [
-        "FUNDING_PENDING",
-        "Provider confirmation pending",
-        "Finance admin",
-        "Check funding status",
-        "Never credit a wallet before the provider confirms success.",
-      ],
-      [
-        "DISBURSED",
-        "Wallet funded — demonstration",
-        "Applicant",
-        "Manage wallet or request EFT",
-        "This is a training scenario, not an actual funded wallet.",
-      ],
-      [
-        "WITHDRAWAL_PENDING",
-        "EFT in progress — demonstration",
-        "Applicant",
-        "View transfer status",
-        "A pending transfer keeps its cash hold until the provider confirms the outcome.",
-      ],
-      [
-        "DECLINED",
-        "Human decline decision",
-        "Applicant",
-        "Read the decision",
-        "A human reason is recorded; AI does not automatically decline.",
-      ],
-    ];
-    for (let i = 0; i < cases.length; i++) {
-      const [stage, title, nextActor, action, description] = cases[i];
-      await this.db
-        .insert(loanDemoCases)
-        .values({
-          id: `loan-training-${String(i + 1).padStart(2, "0")}`,
-          title,
-          stage,
-          payload: {
-            amountCents: (i + 1) * 50000,
-            termMonths: [3, 6, 12][i % 3],
-            purpose: ["Transport", "Education", "Home & repairs"][i % 3],
-            nextActor,
-            action,
-            description,
-          },
-        })
-        .onConflictDoNothing();
-    }
-    await this.audit.log(
-      a,
-      "personal_loan.demo_scenarios_seeded",
-      "loan_demo_cases",
-      null,
-      { count: cases.length, financialRecordsCreated: false },
-    );
-    return { count: cases.length, scope: "TRAINING_ONLY" };
-  }
-  async demos() {
-    return this.db.select().from(loanDemoCases).orderBy(loanDemoCases.id);
   }
   async close(a: AuthUser, id: string, input: z.infer<typeof releaseInput>) {
     return this.db.transaction(async (tx) => {
@@ -824,18 +739,6 @@ export class LoanOperationsService {
 }
 @Controller("loan-operations")
 export class LoanOperationsController {
-  @Roles("ADMIN", "SUPER_ADMIN") @Post("competitions/:id/close") close(
-    @CurrentUser() a: AuthUser,
-    @Param("id") id: string,
-    @Body() b: unknown,
-  ) {
-    return this.service.close(a, id, parse(releaseInput, b));
-  }
-  @Roles("ADMIN", "SUPER_ADMIN")
-  @Post("competitions/:id/request-consent")
-  requestConsent(@CurrentUser() a: AuthUser, @Param("id") id: string) {
-    return this.service.requestConsent(a, id);
-  }
   constructor(private service: LoanOperationsService) {}
   @Get("notifications") notifications(@CurrentUser() a: AuthUser) {
     return this.service.notifications(a);
@@ -849,40 +752,17 @@ export class LoanOperationsController {
       parse(z.object({ key: z.string().min(1).max(250) }).strict(), b).key,
     );
   }
-  @Get("demo-cases") demos() {
-    return this.service.demos();
-  }
   @Roles("ADMIN", "SUPER_ADMIN", "LENDER") @Get("evidence/:id") evidence(
     @CurrentUser() a: AuthUser,
     @Param("id") id: string,
   ) {
     return this.service.evidence(a, id);
   }
-  @Roles("ADMIN", "SUPER_ADMIN") @Post("demo-cases/seed") seed(
-    @CurrentUser() a: AuthUser,
-  ) {
-    return this.service.seedDemo(a);
-  }
-  @Roles("ADMIN", "SUPER_ADMIN") @Post("competitions/:id/release") release(
-    @CurrentUser() a: AuthUser,
-    @Param("id") id: string,
-    @Body() b: unknown,
-  ) {
-    return this.service.release(a, id, parse(releaseInput, b));
-  }
   @Get("competitions/:id/state") state(
     @CurrentUser() a: AuthUser,
     @Param("id") id: string,
   ) {
     return this.service.state(a, id);
-  }
-  @Post("competitions/:id/consent") consent(
-    @CurrentUser() a: AuthUser,
-    @Param("id") id: string,
-    @Body() b: unknown,
-  ) {
-    parse(z.object({ confirmed: z.literal(true) }).strict(), b);
-    return this.service.consent(a, id);
   }
   @Roles("LENDER") @Get("competitions") queue(@CurrentUser() a: AuthUser) {
     return this.service.queue(a);
@@ -906,5 +786,11 @@ export class LoanOperationsController {
     @Body() b: unknown,
   ) {
     return this.service.offer(a, id, parse(approveInput, b));
+  }
+  @Get("competitions/:id/offers") candidateOffers(@CurrentUser() a: AuthUser, @Param("id") id: string) {
+    return this.service.candidateOffers(a, id);
+  }
+  @Post("competitions/:id/offers/:candidateId/select") selectCandidate(@CurrentUser() a: AuthUser, @Param("id") id: string, @Param("candidateId") candidateId: string) {
+    return this.service.selectCandidate(a, id, candidateId);
   }
 }

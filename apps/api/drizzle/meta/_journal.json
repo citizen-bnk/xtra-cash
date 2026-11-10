@@ -113,6 +113,20 @@
       "when": 1793911847139,
       "tag": "0015_eminent_wasp",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793939178622,
+      "tag": "0016_smart_nomad",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794299830726,
+      "tag": "0017_last_kree",
+      "breakpoints": true
     }
   ]
 }

@@ -29,6 +29,7 @@ import {
   WorkAssistantService,
   WorkAssistantModel,
 } from "./work-assistant";
+import { VaultService } from './vault.service';
 @Module({
   imports: [ConsumerModule,LenderModule],
   controllers: [
@@ -57,6 +58,7 @@ import {
     LenderAiModel,
     WorkAssistantService,
     WorkAssistantModel,
+    VaultService,
   ],
 })
 export class PersonalLoanModule {}

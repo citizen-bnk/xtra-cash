@@ -36,6 +36,7 @@ class ActiveDto {
   @IsBoolean() active: boolean;
 }
 class SettingsDto {
+  @IsOptional() @IsInt() @Min(0) @Max(365) applicantProbationDays?: number;
   @IsOptional() @IsInt() @Min(500) @Max(8000) affordabilityRatioBps?: number;
   @IsOptional() @IsInt() @Min(0) @Max(2000) maxRateBps?: number;
   @IsOptional() @IsInt() @Min(0) @Max(100_000) maxMonthlyServiceFeeCents?: number;

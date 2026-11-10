@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { LoanJourney } from "./loan-competition";
+import { CandidateOffers, LoanJourney } from "./loan-competition";
 import {
   formatZAR,
   type LoanOffer,
@@ -131,9 +131,7 @@ export function PersonalSettlementView({
   return (
     <div className="space-y-5">
       <PageHeader
-        title={
-          reviewer ? "Review request and make an offer" : "Your loan application"
-        }
+        title={isOffice ? "Loan progress and intervention" : reviewer ? "Review request and make an offer" : "Your loan application"}
         subtitle={`${formatZAR(d.application.amountCents)} · ${d.application.termMonths} months · ${d.application.purpose}`}
         actions={
           <Button variant="secondary" onClick={data.reload}>
@@ -142,7 +140,7 @@ export function PersonalSettlementView({
         }
       />
       <StatusBadge status={d.application.status} />
-      <LoanJourney status={d.application.status} reviewer={reviewer} externalPayment={!!d.externalPayment} />
+      <LoanJourney status={d.application.status} reviewer={reviewer && !isOffice} externalPayment={!!d.externalPayment} />
       {d.depositReference && <Card><h2 className="font-semibold">Bank deposit reference</h2><p className="my-2 font-mono text-lg font-bold">{d.depositReference}</p><p className="text-sm text-muted">Use this exact reference when paying the customer, so the deposit can be matched to this loan on bank statements.</p></Card>}
       {d.externalPayment && <Card><h2 className="font-semibold">External payment confirmed</h2><p className="my-2">{formatZAR(d.externalPayment.amountCents)} · {new Date(d.externalPayment.confirmedAt).toLocaleString('en-ZA')}</p><p>{d.externalPayment.note}</p><p className="mt-2 text-sm text-muted">Paid outside XTRA-CASH. This payment does not increase the wallet balance.</p></Card>}
       {isOffice && <div className="flex items-center justify-between gap-3 rounded-xl border p-3"><p className="text-sm text-muted">Staff oversight · Customer and lender manage this loan.</p><Button variant="secondary" onClick={() => setIntervening(!intervening)}>{intervening ? 'Close intervention' : 'Intervene'}</Button></div>}
@@ -161,6 +159,7 @@ export function PersonalSettlementView({
           <p className="mt-2">{d.application.reviewNotes}</p>
         </Card>
       )}
+      {!reviewer && !ag && reviewStates.includes(d.application.status) && <CandidateOffers applicationId={applicationId} onSelected={data.reload} />}
       {isOffice && intervening && reviewStates.includes(d.application.status) && <Card className="space-y-3"><Field label="Intervention message"><Textarea value={message} maxLength={500} onChange={e => setMessage(e.target.value)}/></Field><Button loading={busy} disabled={message.trim().length < 3} onClick={() => act('information', {message})}>Request clarification</Button></Card>}
       {reviewer && !isOffice &&
         (reviewStates.includes(d.application.status) ||

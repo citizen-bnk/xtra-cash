@@ -10,6 +10,7 @@ import { InjectDb } from './db.module';
  * They MUST be confirmed by a compliance officer before go-live and are editable by SUPER_ADMIN.
  */
 export const DEFAULT_SETTINGS: PlatformSettings = {
+  applicantProbationDays: 90, // default three-month profile-building period
   affordabilityRatioBps: 3000, // up to 30% of (income - expenses) may go to XTRA-CASH installments
   maxRateBps: 500, // 5% per month (short-term credit cap, first loan)
   maxMonthlyServiceFeeCents: 6900, // R69 per month

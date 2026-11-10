@@ -435,6 +435,21 @@ export function CompetitionOfferForm({
     </div>
   );
 }
+
+type CandidateOffer = { id: string; rank: number; lenderName: string; offerName: string; monthlyInterestRateBps: number; initiationFeeCents: number; monthlyServiceFeeCents: number; monthlyInstallmentCents: number; totalRepayableCents: number; costOfCreditCents: number };
+export function CandidateOffers({ applicationId, onSelected }: { applicationId: string; onSelected: () => void }) {
+  const { client } = useAuth();
+  const offers = useApi((c) => c.request<CandidateOffer[]>('GET', `/loan-operations/competitions/${applicationId}/offers`), [applicationId]);
+  const [busy, setBusy] = useState(''), [error, setError] = useState('');
+  if (!offers.data?.length && !offers.error) return <Alert tone="blue">Your request is with active accredited lenders. XTRA-CASH will notify you when three comparable offers are ready.</Alert>;
+  async function select(id: string) {
+    setBusy(id); setError('');
+    try { await client.request('POST', `/loan-operations/competitions/${applicationId}/offers/${id}/select`, {}); onSelected(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Could not select this offer'); }
+    finally { setBusy(''); }
+  }
+  return <section className="space-y-3"><div><h2 className="text-xl font-bold">Your top offers</h2><p className="text-sm text-muted">Ranked by lowest total repayment. Selecting an offer creates the agreement; it does not move money.</p></div>{offers.data && offers.data.length < 3 ? <Alert tone="blue">{offers.data.length} of 3 offers received. We’ll notify you when comparison is ready.</Alert> : null}{(error || offers.error) ? <Alert tone="red">{error || offers.error}</Alert> : null}<div className="grid gap-3 lg:grid-cols-3">{offers.data?.map((offer) => <Card key={offer.id} className={offer.rank === 1 ? 'border-brand/40' : ''}><div className="flex items-center justify-between"><strong>#{offer.rank} {offer.offerName}</strong>{offer.rank === 1 ? <span className="rounded-full bg-brand-soft px-2 py-1 text-xs font-semibold">Lowest cost</span> : null}</div><p className="mt-1 text-sm text-muted">{offer.lenderName}</p><dl className="mt-4 space-y-2 text-sm"><div className="flex justify-between"><dt>Monthly instalment</dt><dd className="font-bold">{formatZAR(offer.monthlyInstallmentCents)}</dd></div><div className="flex justify-between"><dt>Total repayment</dt><dd className="font-bold">{formatZAR(offer.totalRepayableCents)}</dd></div><div className="flex justify-between"><dt>Cost of credit</dt><dd>{formatZAR(offer.costOfCreditCents)}</dd></div><div className="flex justify-between"><dt>Interest / month</dt><dd>{(offer.monthlyInterestRateBps / 100).toFixed(2)}%</dd></div></dl><Button className="mt-4 w-full" loading={busy === offer.id} disabled={(offers.data?.length ?? 0) < 3 || !!busy} onClick={() => select(offer.id)}>Choose this offer</Button></Card>)}</div></section>;
+}
 export function LoanJourney({
   status,
   reviewer,

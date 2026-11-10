@@ -25,7 +25,7 @@ import type {
   User,
   XtraBalance,
   OfferCriteria,
-  PersonalLoanInput, PersonalLoanApplication, PersonalLoanMatch, PersonalVerification, OfferAssistantResponse,
+  PersonalLoanInput, PersonalLoanApplication, PersonalLoanMatch, PersonalVerification, OfferAssistantResponse, ApplicantVaultStatus,
 } from './types';
 import type { EmploymentStatus, TxChannel, DocumentType, Role } from './enums';
 
@@ -219,6 +219,15 @@ export class XtraClient {
 
   // ---------- consumer ----------
   consumer = {
+    applicantVault: () => this.request<ApplicantVaultStatus>('GET', '/personal-loans/vault'),
+    uploadVaultDocument: (type: 'ID_DOCUMENT' | 'PROOF_OF_ADDRESS' | 'BANK_STATEMENT' | 'PROOF_OF_INCOME', file: Blob, observedFrom?: string, observedTo?: string) => {
+      const fd = new FormData(); fd.append('type', type); fd.append('consent', 'true');
+      if (observedFrom) fd.append('observedFrom', observedFrom); if (observedTo) fd.append('observedTo', observedTo);
+      fd.append('file', file, (file as File).name ?? 'evidence');
+      return this.request<ApplicantVaultStatus>('POST', '/personal-loans/vault/documents', fd);
+    },
+    setVaultLocationConsent: (enabled: boolean) => this.request<ApplicantVaultStatus>('PUT', '/personal-loans/vault/location-consent', { enabled }),
+    recordVaultLocation: (input: { latitude: number; longitude: number; accuracyMeters: number; observedAt: string; source: 'FOREGROUND' | 'BACKGROUND_DAILY' }) => this.request<ApplicantVaultStatus>('POST', '/personal-loans/vault/location', input),
     personalVerification: () => this.request<PersonalVerification>('GET', '/personal-loans/verification'),
     submitPersonalVerification: (body: FormData) => this.request<PersonalVerification>('POST', '/personal-loans/verification', body),
     personalMatches: (input: PersonalLoanInput) => this.request<{ locked: boolean; reason: string | null; matches: PersonalLoanMatch[] }>('POST', '/personal-loans/matches', input),

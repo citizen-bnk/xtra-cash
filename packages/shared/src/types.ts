@@ -111,6 +111,7 @@ export interface PersonalLoanInput {
   routingConsent?:boolean;
   latitude?:number;
   longitude?:number;
+  vaultValidationId?: string;
 }
 
 export interface PersonalLoanMatch {
@@ -128,6 +129,20 @@ export interface PersonalVerification {
   identityType?: 'ID' | 'PASSPORT'; maskedIdentity?: string; mobile?: string;
   reason?: string | null; userId?: string; firstName?: string; lastName?: string;
   address?: string; createdAt?: string;
+}
+export interface ApplicantVaultStatus {
+  eligible: boolean;
+  eligibilityBasis: 'PROBATION_COMPLETE' | 'FAST_TRACK_EVIDENCE' | 'PROBATION';
+  probation: { days: number; startedAt: string; endsAt: string; complete: boolean; daysRemaining: number };
+  fastTrack: { ready: boolean; required: { key: string; label: string; supplied: boolean; status: string }[] };
+  pillars: {
+    id: { status: string; confidenceBps: number };
+    risk: { status: string; score: number | null; confidenceBps: number };
+    income: { status: string; trueDisposableIncomeCents: number | null; confidenceBps: number };
+    fraud: { status: string; score: number | null; homeBase: { sampleCount: number; confidenceBps: number; addressConsistent: boolean | null } };
+  };
+  locationMonitoring: { enabled: boolean; consentAt: string | null };
+  documents: { id: string; type: string; status: string; createdAt: string; observedFrom: string | null; observedTo: string | null }[];
 }
 export interface OfferAssistantResponse {
   advertisingArea?: { query: string; radiusMeters: number } | null;
@@ -370,6 +385,7 @@ export interface AuditEntry {
 }
 
 export interface PlatformSettings {
+  applicantProbationDays: number;
   affordabilityRatioBps: number;
   maxRateBps: number;
   maxMonthlyServiceFeeCents: number;

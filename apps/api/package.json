@@ -23,6 +23,7 @@
     "test:marketing": "node test/marketing-flow.cjs",
     "test:payday": "node test/payday-flow.cjs",
     "test:settlement": "node test/settlement-flow.cjs",
+    "test:vault": "node test/vault-flow.cjs",
     "test:lender-ai": "node test/lender-ai-flow.cjs"
   },
   "dependencies": {

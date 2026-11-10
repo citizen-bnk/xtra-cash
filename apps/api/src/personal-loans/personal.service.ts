@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, gte, lte, ne, or, inArray } from 'drizzle-orm';
-import { applicationLenderAccess, competitionConsents } from './lender-ai.schema';
+import { applicationLenderAccess, competitionConsents, loanCompetitions } from './lender-ai.schema';
 import {RoutingService} from './routing';
 import { ageOn, parseSaId, quoteLoan } from '@xtra/shared';
 import { InjectDb } from '../common/db.module';
@@ -16,6 +16,7 @@ import type { FileStorage } from '../integrations/storage';
 import { ApplicationReviewDto, PersonalApplicationDto, PrecheckDto, VerificationDecisionDto, VerificationDto } from './personal.dto';
 import { decryptIdentity } from '../auth/identity-crypto';
 import { applicationEvents } from './settlement.schema';
+import { VaultService } from './vault.service';
 
 export function validateIdentity(type: 'ID' | 'PASSPORT', value: string, dob?: string) {
   const number = value.trim().toUpperCase();
@@ -36,7 +37,7 @@ export function presentVerification(v: typeof personalVerifications.$inferSelect
 
 @Injectable()
 export class PersonalLoanService {
-  constructor(@InjectDb() private db: Db, private credit: CreditService, private audit: AuditService, @Inject(FILE_STORAGE) private storage: FileStorage, @Inject(CREDIT_BUREAU) private bureau: CreditBureau,private routing:RoutingService) {}
+  constructor(@InjectDb() private db: Db, private credit: CreditService, private audit: AuditService, @Inject(FILE_STORAGE) private storage: FileStorage, @Inject(CREDIT_BUREAU) private bureau: CreditBureau,private routing:RoutingService, private vaults: VaultService) {}
 
   async precheck(dto: PrecheckDto) {
     validateIdentity(dto.identityType, dto.identityNumber);
@@ -89,6 +90,8 @@ export class PersonalLoanService {
     const user = await this.db.query.users.findFirst({ where: eq(users.id, u.id) });
     if (user?.status !== 'ACTIVE') throw new ForbiddenException('Account unavailable');
     if (!user.profileComplete) throw new BadRequestException('Complete your name and surname first');
+    const vaultSnapshot = await this.vaults.loanSnapshot(u.id, dto.vaultValidationId);
+    const kyc = await this.db.query.kycProfiles.findFirst({ where: eq(kycProfiles.userId, u.id) });
     const policy=await this.routing.policy();
     if(dto.offerId) throw new BadRequestException('Lender selection is not part of the XTRA-CASH request flow. Lenders receive the request and make offers directly.');
     if((dto.latitude===undefined)!==(dto.longitude===undefined))throw new BadRequestException('Provide both location coordinates.');
@@ -99,11 +102,12 @@ export class PersonalLoanService {
       await tx.select({ id: users.id }).from(users).where(eq(users.id, u.id)).for('update');
       const existing = await tx.query.personalLoanApplications.findFirst({ where: and(eq(personalLoanApplications.userId, u.id), eq(personalLoanApplications.idempotencyKey, dto.idempotencyKey)) });
       if (existing && (!dto.offerId || existing.lenderId || !['SUBMITTED','REFERRED','UNDER_REVIEW'].includes(existing.status))) return existing;
-      const payload = { amountCents: dto.amountCents, termMonths: dto.termMonths, purpose: dto.purpose, monthlyIncomeCents: dto.monthlyIncomeCents, monthlyExpensesCents: dto.monthlyExpensesCents, offerId: dto.offerId ?? null, lenderId, status: lenderId ? 'REFERRED' as const : 'SUBMITTED' as const, consentAt: new Date() };
+      const payload = { amountCents: dto.amountCents, termMonths: dto.termMonths, purpose: dto.purpose ?? 'Other', monthlyIncomeCents: dto.monthlyIncomeCents ?? kyc?.monthlyIncomeCents ?? 0, monthlyExpensesCents: dto.monthlyExpensesCents ?? kyc?.monthlyExpensesCents ?? 0, offerId: dto.offerId ?? null, lenderId, status: lenderId ? 'REFERRED' as const : 'SUBMITTED' as const, consentAt: new Date(), vaultSnapshot, vaultValidationId: dto.vaultValidationId ?? null };
       const [app] = await tx.insert(personalLoanApplications).values({ ...payload, userId: u.id, idempotencyKey: dto.idempotencyKey }).onConflictDoUpdate({ target: [personalLoanApplications.userId, personalLoanApplications.idempotencyKey], set: payload }).returning();
       await this.audit.log(u, 'personal_loan.submitted', 'personal_loan_application', app.id, { referred: !!lenderId }, tx);
       await this.routing.record(app.id,policy.mode,routingConsent,dto.latitude!==undefined?{latitude:dto.latitude,longitude:dto.longitude!}:undefined,tx);
       if (routingConsent) await tx.insert(competitionConsents).values({ applicationId: app.id, userId: u.id }).onConflictDoNothing();
+      await tx.insert(loanCompetitions).values({ applicationId: app.id, releasedBy: u.id, authorityReference: 'APPLICANT_SUBMISSION' }).onConflictDoNothing();
       await tx.insert(applicationEvents).values({applicationId:app.id,actorId:u.id,status:app.status,message:lenderId?'Your application was sent to the selected lender for review.':'Your application was submitted for review.'});
       return app;
     }).then(async app=>(await this.db.query.personalLoanApplications.findFirst({where:eq(personalLoanApplications.id,app.id)}))!);

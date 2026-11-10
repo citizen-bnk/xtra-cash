@@ -43,6 +43,19 @@ export const loanCompetitions=pgTable('loan_competitions',{
  version:integer('version').notNull().default(1),
  createdAt:time('created_at').notNull().defaultNow(),
 });
+export const applicationCandidateOffers=pgTable('application_candidate_offers',{
+ id:text('id').primaryKey().$defaultFn(()=>randomUUID()),
+ applicationId:text('application_id').notNull().references(()=>personalLoanApplications.id),
+ lenderId:text('lender_id').notNull().references(()=>lenderOrgs.id),
+ offerId:text('offer_id').notNull().references(()=>loanOffers.id),
+ decisionPayload:jsonb('decision_payload').$type<Record<string,unknown>>().notNull(),
+ monthlyInstallmentCents:integer('monthly_installment_cents').notNull(),
+ totalRepayableCents:integer('total_repayable_cents').notNull(),
+ costOfCreditCents:integer('cost_of_credit_cents').notNull(),
+ status:text('status').notNull().default('SUBMITTED'),
+ createdAt:time('created_at').notNull().defaultNow(),
+ updatedAt:time('updated_at').notNull().defaultNow(),
+},t=>[uniqueIndex('candidate_offer_application_lender').on(t.applicationId,t.lenderId)]);
 export const competitionConsents=pgTable('loan_competition_consents',{
  applicationId:text('application_id').primaryKey().references(()=>personalLoanApplications.id),
  userId:text('user_id').notNull().references(()=>users.id),

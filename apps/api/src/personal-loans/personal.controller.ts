@@ -1,13 +1,15 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { Body, Controller, Get, HttpCode, Param, Post, Put, Res, UploadedFile, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { CurrentUser, Public, Roles, type AuthUser } from '../common/auth';
 import { PersonalLoanService } from './personal.service';
 import { ApplicationReviewDto, PersonalApplicationDto, PrecheckDto, VerificationDecisionDto, VerificationDto } from './personal.dto';
+import { VaultService } from './vault.service';
+import { CompleteVaultValidationDto, StartVaultValidationDto, VaultDocumentDto, VaultLocationConsentDto, VaultLocationDto } from './vault.dto';
 @Controller('personal-loans')
 export class PersonalLoanController {
-  constructor(private personal: PersonalLoanService) {}
+  constructor(private personal: PersonalLoanService, private vaults: VaultService) {}
   @Public() @Post('precheck') @HttpCode(200) @Throttle({ default: { limit: 10, ttl: 60000 } })
   precheck(@Body() dto: PrecheckDto) { return this.personal.precheck(dto); }
   @Get('verification') verification(@CurrentUser() u: AuthUser) { return this.personal.verification(u.id); }
@@ -17,6 +19,13 @@ export class PersonalLoanController {
   @Post('matches') @HttpCode(200) matches(@CurrentUser() u: AuthUser, @Body() dto: PersonalApplicationDto) { return this.personal.matches(u.id, dto); }
   @Get('applications') applications(@CurrentUser() u: AuthUser) { return this.personal.list(u.id); }
   @Post('applications') apply(@CurrentUser() u: AuthUser, @Body() dto: PersonalApplicationDto) { return this.personal.apply(u, dto); }
+  @Get('vault') vault(@CurrentUser() u: AuthUser) { return this.vaults.status(u.id); }
+  @Post('vault/documents') @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10000000, files: 1, fieldSize: 2000 } }))
+  uploadVaultDocument(@CurrentUser() u: AuthUser, @Body() dto: VaultDocumentDto, @UploadedFile() file: Express.Multer.File) { return this.vaults.upload(u, dto.type, file, dto.observedFrom, dto.observedTo); }
+  @Put('vault/location-consent') locationConsent(@CurrentUser() u: AuthUser, @Body() dto: VaultLocationConsentDto) { return this.vaults.setLocationConsent(u, dto.enabled); }
+  @Post('vault/location') location(@CurrentUser() u: AuthUser, @Body() dto: VaultLocationDto) { return this.vaults.location(u, dto); }
+  @Post('vault/application-validations') startVaultValidation(@CurrentUser() u: AuthUser, @Body() dto: StartVaultValidationDto) { return this.vaults.startValidation(u, dto); }
+  @Put('vault/application-validations/:id') completeVaultValidation(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: CompleteVaultValidationDto) { return this.vaults.completeValidation(u, id, dto); }
   @Get('documents/:userId/:kind') async document(@CurrentUser() u: AuthUser, @Param('userId') userId: string, @Param('kind') kind: string, @Res() res: Response) {
     const buffer = await this.personal.document(u, userId, kind);
     const pdf = buffer.subarray(0, 5).toString() === '%PDF-', png = buffer.subarray(0, 4).toString('hex') === '89504e47';

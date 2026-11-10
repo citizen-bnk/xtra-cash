@@ -249,6 +249,8 @@ export const personalLoanApplications = pgTable('personal_loan_applications', {
   status: text('status').$type<'SUBMITTED' | 'REFERRED' | 'UNDER_REVIEW' | 'ACTION_REQUIRED' | 'OFFERED' | 'ACCEPTED' | 'FUNDING_PENDING' | 'DISBURSED' | 'FUNDING_FAILED' | 'DECLINED' | 'CANCELLED'>().notNull().default('SUBMITTED'),
   reviewNotes: text('review_notes'), reviewedAt: ts('reviewed_at'),
   lenderId: text('lender_id').references(() => lenderOrgs.id), offerId: text('offer_id').references(() => loanOffers.id),
+  vaultSnapshot: jsonb('vault_snapshot').$type<Record<string, unknown>>(),
+  vaultValidationId: text('vault_validation_id'),
   idempotencyKey: text('idempotency_key').notNull(), consentAt: ts('consent_at').notNull(), createdAt: createdAt(),
 }, (t) => [uniqueIndex('personal_application_idempotency').on(t.userId, t.idempotencyKey), index('personal_application_lender').on(t.lenderId), index('personal_application_user').on(t.userId)]);
 
@@ -552,6 +554,16 @@ export const paydayEmployees = pgTable('payday_employees', {
   passwordChangeRequired: boolean('password_change_required').notNull().default(false),
   onboardingAcknowledgedAt: ts('onboarding_acknowledged_at'), createdAt: createdAt(),
 });
+
+// Keep the database schema bundle complete for Drizzle relational queries and isolated tests.
+export {
+  applicantVaults,
+  vaultDocuments,
+  vaultFacts,
+  vaultLocationSamples,
+  vaultProcessingJobs,
+  vaultApplicationValidations,
+} from '../personal-loans/vault.schema';
 export const paydayTraining = pgTable('payday_training', {
   id: id(), title: text('title').notNull(), content: text('content').notNull(),
   required: boolean('required').notNull().default(true), active: boolean('active').notNull().default(true),

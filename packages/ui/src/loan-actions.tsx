@@ -143,7 +143,7 @@ export function LoanActionCentre() {
             onComplete={() => {
               setActive(null);
               setNotice(
-                "Your offer was authorised and won this request. The applicant must now read and accept the agreement.",
+                "Your offer was submitted. XTRA-CASH will rank the applicant’s three best current offers before the applicant selects one.",
               );
               data.reload();
             }}
