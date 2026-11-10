@@ -141,8 +141,8 @@ export function PersonalSettlementView({
       />
       <StatusBadge status={d.application.status} />
       <LoanJourney status={d.application.status} reviewer={reviewer && !isOffice} externalPayment={!!d.externalPayment} />
-      {d.depositReference && <Card><h2 className="font-semibold">Bank deposit reference</h2><p className="my-2 font-mono text-lg font-bold">{d.depositReference}</p><p className="text-sm text-muted">Use this exact reference when paying the customer, so the deposit can be matched to this loan on bank statements.</p></Card>}
-      {d.externalPayment && <Card><h2 className="font-semibold">External payment confirmed</h2><p className="my-2">{formatZAR(d.externalPayment.amountCents)} · {new Date(d.externalPayment.confirmedAt).toLocaleString('en-ZA')}</p><p>{d.externalPayment.note}</p><p className="mt-2 text-sm text-muted">Paid outside XTRA-CASH. This payment does not increase the wallet balance.</p></Card>}
+      {d.depositReference && <Card><h2 className="font-semibold">Bank deposit reference</h2><p className="my-2 font-mono text-lg font-bold">{d.depositReference}</p><p className="text-sm text-muted">The lender must use this exact reference when paying the XTRA-CASH settlement account so the deposit can be matched to this loan.</p></Card>}
+      {d.externalPayment && <Card><h2 className="font-semibold">Loan funds credited to your wallet</h2><p className="my-2">{formatZAR(d.externalPayment.amountCents)} · {new Date(d.externalPayment.confirmedAt).toLocaleString('en-ZA')}</p><p>{d.externalPayment.note}</p><p className="mt-2 text-sm text-muted">Deposit reference: {d.externalPayment.depositReference}. You can view the wallet balance and request an EFT to your verified bank account when withdrawals are enabled.</p></Card>}
       {isOffice && <div className="flex items-center justify-between gap-3 rounded-xl border p-3"><p className="text-sm text-muted">Staff oversight · Customer and lender manage this loan.</p><Button variant="secondary" onClick={() => setIntervening(!intervening)}>{intervening ? 'Close intervention' : 'Intervene'}</Button></div>}
       {isOffice && d.application.status === "ACCEPTED" && (
         <Alert tone="blue">The applicant accepted the agreement. Once the lender has paid the customer, record the external payment confirmation below.</Alert>
@@ -150,7 +150,7 @@ export function PersonalSettlementView({
       {(error || data.error) && <Alert tone="red">{error || data.error}</Alert>}
       {!d.configuration.enabled && !d.externalPayment && (
         <Alert tone="amber">
-          Payment can be made outside XTRA-CASH using the deposit reference. Administration records confirmation after the funds have been sent.
+          The lender pays the loan amount into the XTRA-CASH settlement account using the deposit reference. After an administrator confirms receipt, the full loan amount is credited to the applicant’s XTRA-CASH wallet.
         </Alert>
       )}
       {d.application.reviewNotes && (
@@ -291,7 +291,7 @@ export function PersonalSettlementView({
               </Button>
             </div>
           )}
-          {reviewer && isOffice && d.application.status === 'ACCEPTED' && <div className="space-y-3 rounded-xl border p-4"><h3 className="font-semibold">Confirm funds sent outside XTRA-CASH</h3><p className="text-sm">Amount: {formatZAR(ag.terms.principalCents)}. Deposit reference: <strong>{d.depositReference}</strong></p><Field label="Payment note" hint="Record the payment details for reconciliation. Do not include full bank account numbers."><Textarea maxLength={1000} value={paymentNote} onChange={e=>setPaymentNote(e.target.value)}/></Field><label className="flex gap-2 text-sm"><input type="checkbox" checked={paymentConfirmed} onChange={e=>setPaymentConfirmed(e.target.checked)}/>I confirm the lender's funds have already been sent to the customer outside the platform.</label><Button loading={busy} disabled={!paymentConfirmed || paymentNote.trim().length < 3} onClick={()=>act('external-payment',{confirmed:true,note:paymentNote})}>Confirm payment sent</Button>{d.configuration.enabled && intervening && <Button variant="secondary" loading={busy} disabled={ag.approvedBy === me?.id} onClick={()=>act('fund')}>Use integrated wallet funding</Button>}</div>}
+          {reviewer && isOffice && d.application.status === 'ACCEPTED' && <div className="space-y-3 rounded-xl border p-4"><h3 className="font-semibold">Confirm deposit and credit wallet</h3><p className="text-sm">Amount to credit: {formatZAR(ag.terms.principalCents)}. Deposit reference: <strong>{d.depositReference}</strong></p><Field label="Receipt note" hint="Record the settlement account receipt details for reconciliation. Do not include full bank account numbers."><Textarea maxLength={1000} value={paymentNote} onChange={e=>setPaymentNote(e.target.value)}/></Field><label className="flex gap-2 text-sm"><input type="checkbox" checked={paymentConfirmed} onChange={e=>setPaymentConfirmed(e.target.checked)}/>I confirm this lender deposit has been received in the XTRA-CASH settlement account and authorise crediting the applicant’s wallet.</label><Button loading={busy} disabled={!paymentConfirmed || paymentNote.trim().length < 3} onClick={()=>act('external-payment',{confirmed:true,note:paymentNote})}>Confirm receipt and credit wallet</Button>{d.configuration.enabled && intervening && <Button variant="secondary" loading={busy} disabled={ag.approvedBy === me?.id} onClick={()=>act('fund')}>Use integrated wallet funding</Button>}</div>}
           {ag.loanId && (
             <a
               className="block font-semibold underline"

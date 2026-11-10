@@ -537,10 +537,10 @@ export class LoanOperationsService {
         cta = "View application";
         owner = "Platform admin";
       } else if (office(a) && app.status === "ACCEPTED") {
-        title = "Release wallet funding";
+        title = "Confirm deposit and credit wallet";
         description =
-          "The applicant accepted. A separate authorised administrator must release funding when banking is active.";
-        cta = "Review funding";
+          "The applicant accepted. Confirm the lender's deposit has reached the XTRA-CASH settlement account, then credit the applicant's wallet.";
+        cta = "Confirm receipt";
         owner = "Finance admin";
       } else if (a.roles.includes("LENDER") && openStates.includes(app.status)) {
         title = "Complete the lending assessment";
@@ -567,7 +567,7 @@ export class LoanOperationsService {
       } else if (app.userId === a.id && app.status === "DISBURSED") {
         title = paidExternally.has(app.id) ? 'Your loan payment was sent' : "Manage your wallet";
         description =
-          paidExternally.has(app.id) ? 'Administration confirmed the external bank payment. View the payment reference and repayment schedule.' : "Confirmed loan proceeds are in your wallet. EFT requires an activated banking connection and a verified own-name bank account.";
+          paidExternally.has(app.id) ? 'The lender deposit was received and credited to your XTRA-CASH wallet. View the payment reference and repayment schedule.' : "Confirmed loan proceeds are in your wallet. EFT requires an activated banking connection and a verified own-name bank account.";
         cta = paidExternally.has(app.id) ? 'View payment and loan' : "Open wallet";
         owner = "Applicant";
       } else if (

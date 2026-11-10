@@ -345,8 +345,8 @@ export class SettlementService {
           applicationId: id,
           userId: app.userId,
           lenderId: lender.id,
-          content: content + `\n\nBANK DEPOSIT REFERENCE: ${terms.depositReference}\nUse this reference for the loan payment and bank statement reconciliation. Payment may be made externally; wallet funding requires the banking connection.`,
-          digest: digest(content + `\n\nBANK DEPOSIT REFERENCE: ${terms.depositReference}\nUse this reference for the loan payment and bank statement reconciliation. Payment may be made externally; wallet funding requires the banking connection.`),
+          content: content + `\n\nBANK DEPOSIT REFERENCE: ${terms.depositReference}\nThe lender pays the loan principal to the XTRA-CASH settlement account using this reference. After receipt is confirmed, the funds are credited to the applicant's XTRA-CASH wallet.`,
+          digest: digest(content + `\n\nBANK DEPOSIT REFERENCE: ${terms.depositReference}\nThe lender pays the loan principal to the XTRA-CASH settlement account using this reference. After receipt is confirmed, the funds are credited to the applicant's XTRA-CASH wallet.`),
           terms,
           assessmentReference: input.assessmentReference?.trim() || `assessment-${id.slice(0, 8)}`,
           mandateReference: input.mandateReference?.trim() || `mandate-pending-${id.slice(0, 8)}`,
@@ -502,11 +502,16 @@ export class SettlementService {
       const [loan] = await tx.insert(loans).values({userId:app.userId, offerId:t.offerId, lenderId:ag.lenderId, principalCents:t.principalCents, termMonths:t.termMonths, monthlyInterestRateBps:t.monthlyInterestRateBps, initiationFeeCents:t.initiationFeeCents, monthlyServiceFeeCents:t.monthlyServiceFeeCents, totalRepayableCents:q.totalRepayableCents, outstandingCents:q.totalRepayableCents}).returning();
       await tx.insert(installments).values(q.schedule.map(i=>({loanId:loan.id,seq:i.seq,dueDate:addMonths(paidAt,i.seq),amountCents:i.amountCents})));
       const reference = t.depositReference ?? loanDepositReference(id);
-      await tx.insert(externalLoanPayments).values({applicationId:id,agreementId:ag.id,depositReference:reference,amountCents:t.principalCents,note:input.note,confirmedBy:a.id});
+      const [payment] = await tx.insert(externalLoanPayments).values({applicationId:id,agreementId:ag.id,depositReference:reference,amountCents:t.principalCents,note:input.note,confirmedBy:a.id}).returning();
+      await tx.update(users).set({ walletBalanceCents: sql`${users.walletBalanceCents}+${t.principalCents}` }).where(eq(users.id, app.userId));
+      await this.ledger.post(tx, { type: 'personal_wallet_funded_external', refType: 'external_loan_payment', refId: payment.id, memo: `Deposit ${reference} received and credited to applicant wallet` }, [
+        { account: Accounts.bank, amountCents: t.principalCents },
+        { account: Accounts.consumerWallet(app.userId), amountCents: -t.principalCents },
+      ]);
       await tx.update(agreements).set({status:'FUNDED',loanId:loan.id}).where(eq(agreements.id,ag.id));
-      await tx.update(applications).set({status:'DISBURSED',reviewNotes:`Payment confirmed outside XTRA-CASH. Deposit reference: ${reference}.`}).where(eq(applications.id,id));
-      await this.event(tx,id,a.id,'DISBURSED',`External bank payment confirmed. Reference ${reference}. Your loan repayment schedule is ready.`);
-      await this.audit.log(a,'personal_loan.external_payment_confirmed','personal_loan_application',id,{depositReference:reference,amountCents:t.principalCents,note:input.note,loanId:loan.id},tx);
+      await tx.update(applications).set({status:'DISBURSED',reviewNotes:`Lender deposit received and credited to XTRA-CASH wallet. Deposit reference: ${reference}.`}).where(eq(applications.id,id));
+      await this.event(tx,id,a.id,'DISBURSED',`Lender deposit received and credited to your XTRA-CASH wallet. Reference ${reference}. Your loan repayment schedule is ready.`);
+      await this.audit.log(a,'personal_loan.external_payment_confirmed','personal_loan_application',id,{depositReference:reference,amountCents:t.principalCents,note:input.note,loanId:loan.id,walletCredited:true},tx);
       return {ok:true,depositReference:reference};
     });
   }
