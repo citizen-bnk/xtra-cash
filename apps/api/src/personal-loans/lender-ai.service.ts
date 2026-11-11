@@ -157,6 +157,7 @@ export class LenderAiService {
       .filter(
         (x) =>
           (!app.lenderId || x.lender.id === app.lenderId) &&
+          (!app.offerId || x.offer.id === app.offerId) &&
           (admin(a) || x.lender.ownerUserId === a.id) &&
           x.offer.termMonths === app.termMonths &&
           x.offer.minAmountCents <= app.amountCents &&
@@ -305,10 +306,6 @@ export class LenderAiService {
       .from(personalVerifications)
       .where(eq(personalVerifications.userId, app.userId));
     const view = this.view(session, c, products, v?.status === "VERIFIED");
-    if (!app.lenderId || !app.offerId) {
-      view.missing.push("Applicant must select one matched lender");
-      view.ready = false;
-    }
     const p = products.find((x) => x.id === c.draft.offerId);
     return {
       ...view,
