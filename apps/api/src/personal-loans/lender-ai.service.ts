@@ -133,7 +133,11 @@ export class LenderAiService {
     if (!app || app.userId === a.id) throw new NotFoundException();
     if (!admin(a)) {
       const l = await this.org(a, tx);
-      if (app.lenderId !== l.id) throw new NotFoundException();
+      // Referred applications may remain in the open lender pool until the
+      // first valid offer is authorised. Match SettlementService.app so a
+      // lender can prepare that offer before this application has a lenderId.
+      const openForOffer = !app.lenderId && reviewable.includes(app.status);
+      if (!openForOffer && app.lenderId !== l.id) throw new NotFoundException();
     }
     return app;
   }
