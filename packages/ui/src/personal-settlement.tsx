@@ -459,22 +459,16 @@ export function WalletTransferView() {
         }
       />
       {(error || data.error) && <Alert tone="red">{error || data.error}</Alert>}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Card>
-          <p className="text-sm text-muted">Available cash</p>
-          <p className="text-3xl font-bold">{formatZAR(d.availableCents)}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">Reserved for bank transfers</p>
-          <p className="text-3xl font-bold">{formatZAR(d.heldCents)}</p>
-        </Card>
-      </div>
+      <Card className="space-y-3 bg-brand-purple text-white">
+        <div><p className="text-sm text-white/75">Available cash</p><p className="mt-1 text-3xl font-black tabular-nums">{formatZAR(d.availableCents)}</p></div>
+        <div className="flex items-center justify-between border-t border-white/20 pt-3 text-sm"><span className="text-white/75">Reserved for bank transfers</span><strong className="tabular-nums">{formatZAR(d.heldCents)}</strong></div>
+      </Card>
       {!d.configuration.enabled && (
         <Alert tone="amber">
-          Bank verification and EFT transfers are awaiting activation. No bank
-          transfer can be submitted yet.
+          Bank verification and EFT withdrawals are not active yet. Your wallet balance is available to view; transfers cannot be submitted until this service is enabled.
         </Alert>
       )}
+      {d.configuration.enabled && <>
       <Card className="space-y-3">
         <h2 className="text-xl font-bold">Your bank accounts</h2>
         {d.beneficiaries.map((b) => (
@@ -624,25 +618,18 @@ export function WalletTransferView() {
           Confirm {formatZAR(amount ?? 0)} transfer
         </Button>
       </Card>
+      </>}
       <Card>
-        <h2 className="mb-3 text-xl font-bold">Money movements</h2>
-        <div className="space-y-3">
+        <h2 className="mb-3 font-bold">Recent money movements</h2>
+        <div className="divide-y divide-line">
           {d.movements.map((m) => (
-            <div key={m.id} className="rounded-lg border p-3">
-              <div className="flex flex-wrap justify-between gap-2">
-                <span>
-                  {m.kind === "FUNDING" ? "Loan funding" : "Bank transfer"} ·{" "}
-                  {formatZAR(m.amountCents)}
-                </span>
-                <StatusBadge status={m.status} />
-              </div>
-              <p className="mt-1 text-xs text-muted">
-                {new Date(m.createdAt).toLocaleString("en-ZA")} · Reference{" "}
-                {m.id}
-              </p>
+            <div key={m.id} className="flex min-w-0 items-center gap-3 py-3 first:pt-0 last:pb-0">
+              <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{m.kind === "FUNDING" ? "Loan funding" : "Bank transfer"}</p><p className="truncate text-xs text-muted">{new Date(m.createdAt).toLocaleDateString("en-ZA")} · Ref {m.id}</p></div>
+              <strong className="shrink-0 text-sm tabular-nums">{formatZAR(m.amountCents)}</strong>
+              <StatusBadge status={m.status} />
             </div>
           ))}
-          {!d.movements.length && <p>No money movements yet.</p>}
+          {!d.movements.length && <p className="py-2 text-sm text-muted">No money movements yet.</p>}
         </div>
       </Card>
     </div>
