@@ -58,6 +58,7 @@ export interface RegisterInput {
   firstName: string;
   lastName: string;
   accountType: 'CONSUMER' | 'LENDER' | 'AFFILIATE';
+  consent: boolean;
   referralCode?: string;
   lenderName?: string;
 }

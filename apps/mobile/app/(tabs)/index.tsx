@@ -26,6 +26,8 @@ export default function Home() {
   return (
     <Screen refreshing={balance.loading} onRefresh={reload}>
       <Muted>Sawubona, {me?.firstName}</Muted>
+      <Button title="Personal loans" variant="secondary" onPress={() => router.push('/(tabs)/loans')} />
+      <Button title="My data vault" variant="secondary" onPress={() => router.push('/data-vault')} />
       {(!kyc || kyc.status !== 'VERIFIED') && (
         <Notice title={kyc?.status === 'PENDING' ? 'Verification in progress' : 'Unlock XTRA-CASH credit'}>
           <Text style={{ color: colors.ink }}>{kyc?.status === 'PENDING' ? "We're reviewing your details." : kyc?.status === 'REJECTED' ? kyc.rejectionReason : 'Verify your ID, income and expenses to get your card and matched offers.'}</Text>
