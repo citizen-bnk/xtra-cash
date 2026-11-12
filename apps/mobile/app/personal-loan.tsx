@@ -13,10 +13,10 @@ type Check = { id: string; steps: CheckStep[]; result?: { steps: CheckStep[] } }
 const PILLARS: Pillar[] = ['ID', 'RISK', 'INCOME', 'FRAUD'];
 
 export default function PersonalLoan() {
-  const { applicationId } = useLocalSearchParams<{ applicationId?: string }>();
+  const { applicationId, amountCents: presetAmountCents, termMonths: presetTermMonths } = useLocalSearchParams<{ applicationId?: string; amountCents?: string; termMonths?: string }>();
   const { client } = useAuth();
-  const [amount, setAmount] = useState('3000');
-  const [term, setTerm] = useState(6);
+  const [amount, setAmount] = useState(() => presetAmountCents && Number.isFinite(Number(presetAmountCents)) ? (Number(presetAmountCents) / 100).toFixed(2) : '3000');
+  const [term, setTerm] = useState(() => [3, 6, 9, 12, 18, 24].includes(Number(presetTermMonths)) ? Number(presetTermMonths) : 6);
   const [check, setCheck] = useState<Check | null>(null);
   const [step, setStep] = useState(0);
   const [responses, setResponses] = useState<Response[]>([]);
