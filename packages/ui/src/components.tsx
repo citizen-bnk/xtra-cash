@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUpRight, Loader2, X } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, Loader2, X } from 'lucide-react';
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
 
@@ -180,6 +180,30 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   );
 }
 
+/** Compact, consistent record row for active workflow queues and searchable lists. */
+export function RecordLine({ title, description, value, status, progress, actions }: {
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  value?: React.ReactNode;
+  status?: string;
+  progress?: number;
+  actions?: React.ReactNode;
+}) {
+  const pct = progress == null ? null : Math.max(0, Math.min(100, progress));
+  return <article className="flex min-h-14 min-w-0 items-center gap-2 border-b border-line px-3 py-2.5 last:border-0 sm:gap-3 sm:px-4">
+    <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</div>
+        {description && <div className="hidden max-w-[32%] truncate text-xs text-muted sm:block">{description}</div>}
+      </div>
+      {pct != null && <div className="mt-1.5 h-1 w-full max-w-52 overflow-hidden rounded-full bg-surface" role="progressbar" aria-label="Record progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><div className="h-full rounded-full bg-brand-purple transition-[width]" style={{ width: `${pct}%` }} /></div>}
+    </div>
+    {value != null && <div className="shrink-0 text-right text-xs font-bold tabular-nums sm:text-sm">{value}</div>}
+    {status && <StatusBadge status={status} />}
+    {actions && <div className="shrink-0">{actions}</div>}
+  </article>;
+}
+
 export function Alert({ tone = 'amber', title, children }: { tone?: 'amber' | 'red' | 'green' | 'blue'; title?: string; children?: React.ReactNode }) {
   const map = {
     amber: 'bg-amber-50 border-amber-200 text-amber-900',
@@ -225,9 +249,43 @@ export interface Column<T> {
 }
 
 export function Table<T>({ rows, columns, onRowClick, empty = 'Nothing here yet' }: { rows: T[]; columns: Column<T>[]; onRowClick?: (r: T) => void; empty?: string }) {
+  const [expanded, setExpanded] = React.useState<Set<number>>(() => new Set());
   if (!rows.length) return <Empty title={empty} />;
+  const primaryIndex = Math.max(0, columns.findIndex((c) => /applicant|customer|merchant|employer|lender|borrower|person|user|name|reference|offer|transaction|account|loan/i.test(c.header)));
+  const amountIndex = columns.findIndex((c) => /amount|outstanding|balance|borrowed|revenue|net|total|value/i.test(c.header));
+  const statusIndex = columns.findIndex((c) => /status|stage|state/i.test(c.header));
+  const actionIndex = columns.findIndex((c) => /action/i.test(c.header));
+  const compactIndices = new Set([primaryIndex, amountIndex, statusIndex, actionIndex].filter((i) => i >= 0));
   return (
-    <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+    <div className="overflow-hidden rounded-2xl border border-line bg-white">
+      <div className="divide-y divide-line lg:hidden">
+        {rows.map((row, i) => {
+          const isExpanded = expanded.has(i);
+          const toggle = () => setExpanded((current) => {
+            const next = new Set(current);
+            if (next.has(i)) next.delete(i); else next.add(i);
+            return next;
+          });
+          return <article key={i} className="min-w-0">
+            <div className="flex min-h-14 min-w-0 items-center gap-2 px-3 py-2.5">
+              {onRowClick ? <button type="button" onClick={() => onRowClick(row)} className="min-w-0 flex-1 truncate text-left text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-purple">{columns[primaryIndex].cell(row)}</button> : <div className="min-w-0 flex-1 truncate text-sm font-semibold">{columns[primaryIndex].cell(row)}</div>}
+              {amountIndex >= 0 && amountIndex !== primaryIndex && <div className="shrink-0 text-right text-xs font-bold tabular-nums">{columns[amountIndex].cell(row)}</div>}
+              {statusIndex >= 0 && statusIndex !== primaryIndex && <div className="max-w-[7rem] shrink-0 truncate">{columns[statusIndex].cell(row)}</div>}
+              {actionIndex >= 0 && actionIndex !== primaryIndex && <div className="shrink-0">{columns[actionIndex].cell(row)}</div>}
+              <button type="button" onClick={toggle} aria-expanded={isExpanded} aria-label={`${isExpanded ? 'Hide' : 'Show'} details for record ${i + 1}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-purple">
+                <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+            {isExpanded && <dl className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-line bg-surface/60 px-3 py-3 text-xs">
+              {columns.map((column, columnIndex) => compactIndices.has(columnIndex) ? null : <div key={column.header} className="min-w-0">
+                <dt className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">{column.header}</dt>
+                <dd className="min-w-0 break-words">{column.cell(row)}</dd>
+              </div>)}
+            </dl>}
+          </article>;
+        })}
+      </div>
+      <div className="hidden overflow-x-auto lg:block">
       <table className="xc-record-table w-full text-sm">
         <thead>
           <tr className="border-b border-line bg-surface/60 text-left text-xs uppercase tracking-wide text-muted">
@@ -254,6 +312,7 @@ export function Table<T>({ rows, columns, onRowClick, empty = 'Nothing here yet'
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -282,6 +341,17 @@ export function Modal({ open, onClose, title, children, footer }: { open: boolea
       </div>
       </div>, document.body
     );
+}
+
+export function PasswordResetLink({ staff = false }: { staff?: boolean }) {
+  const [open, setOpen] = React.useState(false);
+  return <>
+    <button type="button" onClick={() => setOpen(true)} className="text-xs font-semibold text-brand-purple underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-purple">Reset password</button>
+    <Modal open={open} onClose={() => setOpen(false)} title="Reset your password">
+      <p className="text-sm leading-relaxed text-muted">{staff ? 'Self-service staff password reset is not enabled. Ask your system administrator to reset your account.' : 'Self-service password reset is not enabled yet. Please contact XTRA-CASH support to restore access.'}</p>
+      <div className="mt-4 flex justify-end"><Button onClick={() => setOpen(false)}>Close</Button></div>
+    </Modal>
+  </>;
 }
 
 export function Tabs<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { value: T; label: string; count?: number }[] }) {
