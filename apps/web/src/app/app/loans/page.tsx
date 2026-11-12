@@ -12,7 +12,7 @@ export default function LoansPage() {
   const owed = open.reduce((s, l) => s + l.outstandingCents, 0);
   return (
     <div>
-      <PersonalLoanWorkspace title="My loans"/>
+      <PersonalLoanWorkspace title="Loans"/>
       {!!loans.data?.length && <section className="mt-8"><PageHeader title="Repayment schedules" subtitle={`You owe ${formatZAR(owed)} across ${open.length} active XTRA-CASH advance${open.length === 1 ? '' : 's'}.`} />
       <Table
         rows={loans.data ?? []}
