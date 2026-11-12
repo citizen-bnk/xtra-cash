@@ -86,7 +86,17 @@ export default function DataVault() {
       </View>
       <Notice title="Processing happens in the background">You can continue using XTRA-CASH while a document is being checked. We’ll show the result here when processing finishes.</Notice>
       {error ? <Notice title="Could not add this document" tone="red">{error}</Notice> : null}
-      {data.documents.length ? <Card><Text style={{ color: colors.ink, fontWeight: '800' }}>Latest upload</Text><Muted>{data.documents[0].originalName} · {data.documents[0].type.replaceAll('_', ' ')}</Muted><Status status={data.documents[0].status} /></Card> : null}
+      <Text style={{ color: colors.ink, fontSize: 18, fontWeight: '800' }}>All uploaded documents</Text>
+      {data.documents.length ? data.documents.map((document) => <Card key={document.id} style={{ gap: 7 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text style={{ color: colors.ink, fontWeight: '800' }}>{document.originalName}</Text>
+            <Muted style={{ fontSize: 12 }}>{document.type.replaceAll('_', ' ')} · uploaded {new Date(document.createdAt).toLocaleDateString('en-ZA')}</Muted>
+          </View>
+          <Status status={document.status} />
+        </View>
+        {document.processingNote ? <Notice title="Processing update" tone={document.status === 'REJECTED' ? 'red' : 'blue'}>{document.processingNote}</Notice> : null}
+      </Card>) : <Card><Muted>No files uploaded yet. Add evidence above to build your profile vault.</Muted></Card>}
       <Pressable accessibilityRole="button" onPress={() => void vault.reload()} style={{ padding: 8, alignItems: 'center' }}><Text style={{ color: colors.brandDark, fontWeight: '700' }}>Refresh profile status</Text></Pressable>
     </Screen>
   );
