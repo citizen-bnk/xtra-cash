@@ -1,111 +1,79 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { ServiceProfile } from '@/components/ServiceProfile';
-import { NearbyOffers } from '@/components/NearbyOffers';
-import { Copy, Database, Landmark, LogOut, Users } from 'lucide-react';
-import { EMPLOYMENT_LABELS, formatZAR } from '@xtra/shared';
-import { Button, Card, PageHeader, SecuritySettings, StatusBadge, useAuth, useToast } from '@xtra/ui';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, Bell, Check, ChevronRight, CircleHelp, CreditCard, Fingerprint, Landmark, LockKeyhole, LogOut, Mail, MapPin, ShieldCheck, UserRound, Wallet, X } from 'lucide-react';
+import { formatZAR } from '@xtra/shared';
+import { Alert, Button, Card, Field, Input, SecuritySettings, StatusBadge, useAuth, useToast } from '@xtra/ui';
+
+type Screen = 'home' | 'personal' | 'photo' | 'contact' | 'security' | 'notifications' | 'privacy' | 'linked' | 'logout' | 'success';
+type Preferences = { marketing: boolean; locationEnabled: boolean; devices?: unknown[]; webPush?: boolean; nativePush?: boolean };
+const rows: { id: Screen; title: string; subtitle: string; icon: typeof UserRound }[] = [
+  { id: 'personal', title: 'Personal information', subtitle: 'View and update your details', icon: UserRound },
+  { id: 'linked', title: 'Linked accounts', subtitle: 'Cards, wallet and payment accounts', icon: CreditCard },
+  { id: 'notifications', title: 'Notifications', subtitle: 'Manage alerts and messages', icon: Bell },
+  { id: 'privacy', title: 'Privacy', subtitle: 'Control your data and permissions', icon: LockKeyhole },
+  { id: 'security', title: 'Security', subtitle: 'Passkeys and active sessions', icon: ShieldCheck },
+];
 
 export default function ProfilePage() {
   const { me, client, logout, refreshMe } = useAuth();
-  const router = useRouter();
-  const toast = useToast();
-  const [joining, setJoining] = useState(false);
+  const router = useRouter(); const toast = useToast();
+  const [screen, setScreen] = useState<Screen>('home');
+  const [firstName, setFirstName] = useState(''); const [lastName, setLastName] = useState('');
+  const [preferences, setPreferences] = useState<Preferences>({ marketing: false, locationEnabled: false });
+  const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  useEffect(() => { if (me) { setFirstName(me.firstName ?? ''); setLastName(me.lastName ?? ''); } }, [me]);
+  useEffect(() => { client.request<Preferences>('GET', '/marketing/preferences').then(setPreferences).catch(() => undefined); }, [client]);
   if (!me) return null;
-  if (joining && me.profileComplete === false) return <ServiceProfile afterSave={async () => { await client.affiliate.join(); await refreshMe(); setJoining(false); toast('Welcome to the affiliate programme!'); }} />;
-  const link = typeof window !== 'undefined' ? `${window.location.origin}/register?ref=${me.referralCode}` : '';
-  return (
-    <div className="space-y-4">
-      <PageHeader title="Profile" />
-      <Link href="/install" className="inline-block text-sm font-semibold text-brand-purple underline">Get the XTRA-CASH app</Link>
-      {me.roles.includes('CONSUMER') && <Link href="/app/data-vault"><Card className="flex items-center gap-3"><Database className="h-5 w-5 text-brand" /><div className="flex-1"><div className="font-semibold">My data vault</div><div className="text-sm text-muted">Prepare identity, income, risk and fraud evidence before applying.</div></div></Card></Link>}
-      <SecuritySettings />
-      {me.roles.includes('CONSUMER') && <NearbyOffers />}
-      <Card className="grid gap-3 text-sm sm:grid-cols-2">
-        <Row k="Name" v={`${me.firstName} ${me.lastName}`} />
-        <Row k="Email" v={me.email} />
-        <Row k="Mobile" v={me.phone} />
-        <Row k="Wallet" v={formatZAR(me.walletBalanceCents)} />
-        <Row k="Verification" v={<StatusBadge status={me.kyc?.status ?? 'NOT_STARTED'} />} />
-        {me.kyc && <Row k="Employment" v={EMPLOYMENT_LABELS[me.kyc.employmentStatus]} />}
-        {me.kyc && <Row k="Declared income" v={formatZAR(me.kyc.monthlyIncomeCents)} />}
-        {me.kyc && <Row k="Province" v={me.kyc.province} />}
-        <div className="sm:col-span-2">
-          <Link href="/app/kyc" className="text-sm font-semibold underline">
-            Update income & expenses
-          </Link>
-        </div>
-      </Card>
+  const fullName = `${me.firstName ?? ''} ${me.lastName ?? ''}`.trim() || 'XTRA-CASH customer';
+  const initials = `${me.firstName?.[0] ?? 'X'}${me.lastName?.[0] ?? 'C'}`.toUpperCase();
+  const verification = me.kyc?.status ?? 'NOT_STARTED';
 
-      <Card>
-        <div className="flex items-start gap-3">
-          <Users className="mt-0.5 h-5 w-5 text-brand" />
-          <div className="flex-1">
-            <div className="font-semibold">Invite friends, earn commission</div>
-            {me.affiliate ? (
-              <>
-                <p className="mt-1 text-sm text-muted">Share your link. You earn when people you invite activate and use XTRA-CASH.</p>
-                <div className="mt-3 flex gap-2">
-                  <code className="flex-1 truncate rounded-lg bg-surface px-3 py-2 text-xs">{link}</code>
-                  <Button size="sm" variant="secondary" onClick={() => navigator.clipboard.writeText(link).then(() => toast('Link copied'))}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Link href="/affiliate" className="mt-3 inline-block text-sm font-semibold underline">
-                  Open affiliate dashboard
-                </Link>
-              </>
-            ) : (
-              <>
-                <p className="mt-1 text-sm text-muted">Join the XTRA-CASH affiliate programme to earn from every shopper, trader and lender you onboard.</p>
-                <Button
-                  size="sm"
-                  className="mt-3"
-                  onClick={async () => {
-                    if (me.profileComplete === false) { setJoining(true); return; }
-                    await client.affiliate.join();
-                    await refreshMe();
-                    toast('Welcome to the affiliate programme!');
-                  }}
-                >
-                  Become an affiliate
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-      </Card>
+  async function saveName() {
+    setBusy(true); setError('');
+    try { await client.request('PUT', '/auth/passwordless/profile', { firstName, lastName }); await refreshMe(); setScreen('success'); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Could not save your profile.'); }
+    finally { setBusy(false); }
+  }
+  async function savePreferences(next: Preferences) {
+    setBusy(true); setError('');
+    try { const saved = await client.request<Preferences>('PUT', '/marketing/preferences', next); setPreferences(saved); toast('Your preferences have been saved.'); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Could not save preferences.'); }
+    finally { setBusy(false); }
+  }
+  async function signOut() { await logout(); router.replace('/'); }
 
-      {me.roles.includes('LENDER') && (
-        <Card className="flex items-center gap-3">
-          <Landmark className="h-5 w-5 text-brand" />
-          <div className="flex-1 text-sm font-medium">You also run a Credit Mall stall.</div>
-          <Link href="/lender">
-            <Button size="sm" variant="secondary">Lender portal</Button>
-          </Link>
-        </Card>
-      )}
+  const header = (title: string, subtitle?: string) => <div className="mb-4 flex items-center gap-3"><button onClick={() => { setScreen('home'); setError(''); }} aria-label="Back to profile" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-violet-200 bg-white text-violet-800 shadow-sm"><ArrowLeft className="h-5 w-5" /></button><div><h1 className="text-xl font-bold text-[#2a1640]">{title}</h1>{subtitle && <p className="text-sm text-muted">{subtitle}</p>}</div></div>;
+  const toggle = (label: string, description: string, checked: boolean, change: () => void, disabled = false) => <div className="flex items-center gap-3 border-b border-violet-100 py-4 last:border-0"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-fuchsia-50 text-fuchsia-700"><Bell className="h-5 w-5" /></span><div className="min-w-0 flex-1"><div className="font-semibold">{label}</div><div className="text-xs text-muted">{description}</div></div><button type="button" role="switch" aria-checked={checked} disabled={busy || disabled} onClick={change} className={`relative h-7 w-12 shrink-0 rounded-full transition ${checked ? 'bg-emerald-500' : 'bg-slate-300'} disabled:opacity-50`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${checked ? 'left-6' : 'left-1'}`} /></button></div>;
 
-      <Button
-        variant="ghost"
-        onClick={async () => {
-          await logout();
-          router.replace('/');
-        }}
-      >
-        <LogOut className="h-4 w-4" /> Sign out
-      </Button>
-    </div>
-  );
-}
+  return <div className="mx-auto max-w-xl space-y-4 pb-4">
+    {screen === 'home' && <>
+      <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#25003f] via-[#6700a5] to-[#e50070] p-5 text-white shadow-xl shadow-purple-900/20 sm:p-6">
+        <div className="pointer-events-none absolute -right-10 -top-12 h-48 w-48 rounded-full bg-fuchsia-400/25 blur-2xl" />
+        <div className="relative flex items-center justify-between"><Link href="/app" className="text-sm font-semibold text-white/80">‹ Home</Link><span className="rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-semibold">My account</span></div>
+        <div className="relative mt-6 flex items-center gap-4"><div className="grid h-[76px] w-[76px] shrink-0 place-items-center rounded-full border-[3px] border-white/80 bg-gradient-to-br from-orange-300 to-fuchsia-500 text-2xl font-bold shadow-lg">{initials}</div><div className="min-w-0"><div className="truncate text-xl font-bold">{fullName}</div><div className="mt-1 flex items-center gap-1.5 text-sm text-white/80"><span>Customer</span><span>·</span><span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/20 px-2 py-0.5 text-xs text-emerald-100"><Check className="h-3 w-3" />{verification === 'VERIFIED' ? 'Verified' : 'Verification in progress'}</span></div></div></div>
+        <Link href="/app/wallet" className="relative mt-5 flex items-center justify-between rounded-2xl border border-white/20 bg-white/95 px-4 py-3 text-[#28123a] shadow-lg"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-orange-400 to-fuchsia-600 text-white"><Wallet className="h-6 w-6" /></span><div><div className="text-xs font-medium text-slate-600">My wallet</div><div className="text-xl font-bold">{formatZAR(me.walletBalanceCents)}</div></div></div><ChevronRight className="h-5 w-5" /></Link>
+      </section>
+      <div className="grid grid-cols-3 gap-2.5">{[
+        { label: 'Active loan', value: 'View loans', href: '/app/loans', icon: CreditCard },
+        { label: 'BNPL', value: 'Shop now', href: '/app/bnpl', icon: Wallet },
+        { label: 'Account', value: verification === 'VERIFIED' ? 'Secure' : 'Complete profile', href: '/app/kyc', icon: ShieldCheck },
+      ].map(item => <Link key={item.label} href={item.href} className="rounded-2xl border border-violet-100 bg-white p-3 shadow-sm"><item.icon className="h-5 w-5 text-fuchsia-700"/><div className="mt-2 text-[11px] text-muted">{item.label}</div><div className="truncate text-xs font-bold">{item.value}</div></Link>)}</div>
+      <section className="space-y-2">{rows.map(item => <button key={item.id} onClick={() => { setError(''); setScreen(item.id); }} className="flex w-full items-center gap-3 rounded-2xl border border-violet-100 bg-white px-4 py-3 text-left shadow-sm transition hover:border-fuchsia-300"><span className="grid h-10 w-10 place-items-center rounded-xl bg-fuchsia-50 text-fuchsia-700"><item.icon className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block font-semibold">{item.title}</span><span className="block truncate text-xs text-muted">{item.subtitle}</span></span><ChevronRight className="h-5 w-5 text-violet-500"/></button>)}</section>
+      <button onClick={() => setScreen('logout')} className="flex w-full items-center gap-3 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-left font-semibold text-rose-700"><LogOut className="h-5 w-5"/>Log out<span className="ml-auto"><ChevronRight className="h-5 w-5"/></span></button>
+      <p className="text-center text-xs text-muted">XTRA-CASH · Your account, in your control</p>
+    </>}
 
-function Row({ k, v }: { k: string; v: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-line pb-2 sm:border-0 sm:pb-0">
-      <span className="text-muted">{k}</span>
-      <span className="text-right font-medium">{v}</span>
-    </div>
-  );
+    {screen === 'personal' && <>{header('Personal information', 'Update your details shared across XTRA-CASH')}<Card className="space-y-4"><Field label="Full name"><Input value={firstName} onChange={e=>setFirstName(e.target.value)} autoComplete="given-name" /></Field><Field label="Surname"><Input value={lastName} onChange={e=>setLastName(e.target.value)} autoComplete="family-name" /></Field><Field label="ID number"><Input value={me.kyc?.idNumber ? `••••••••${me.kyc.idNumber.slice(-4)}` : 'Complete identity verification'} disabled /></Field><Field label="Date of birth"><Input value={me.kyc?.dateOfBirth ? new Date(me.kyc.dateOfBirth).toLocaleDateString() : 'Add through identity verification'} disabled /></Field><div className="rounded-xl bg-violet-50 p-3 text-xs text-violet-900">To keep verified identity details consistent, update your address and documents in your data vault.</div>{error && <Alert tone="red">{error}</Alert>}<Button className="w-full bg-gradient-to-r from-[#7100c4] to-[#e50070]" loading={busy} onClick={saveName}>Save changes</Button></Card><Link href="/app/data-vault" className="block rounded-2xl border border-violet-100 bg-white p-4 text-sm font-semibold text-violet-800">Manage identity and address documents <ChevronRight className="inline h-4 w-4"/></Link></>}
+
+    {screen === 'photo' && <>{header('Profile photo')}<Card className="space-y-3 text-center"><div className="mx-auto grid h-28 w-28 place-items-center rounded-full bg-gradient-to-br from-orange-300 to-fuchsia-600 text-3xl font-bold text-white">{initials}</div><h2 className="font-bold">Profile photos are not enabled yet</h2><p className="text-sm text-muted">Your initials are shown until secure photo upload is available.</p></Card></>}
+    {screen === 'contact' && <>{header('Contact details', 'Verified contact information on your account')}<Card className="space-y-4"><div className="flex gap-3"><Mail className="h-5 w-5 text-fuchsia-700"/><div><div className="text-sm font-semibold">Email address</div><div className="text-sm">{me.email || 'Not provided'}</div></div></div><div className="flex gap-3"><UserRound className="h-5 w-5 text-fuchsia-700"/><div><div className="text-sm font-semibold">Mobile number</div><div className="text-sm">{me.phone || 'Not provided'}</div></div></div><p className="rounded-xl bg-violet-50 p-3 text-xs text-violet-900">Secure email and mobile OTP update is not available yet. Contact support to change these details.</p></Card></>}
+    {screen === 'security' && <>{header('Security', 'Keep your account safe and in your control')}<SecuritySettings/><Card className="space-y-3"><div className="flex items-center gap-3"><Fingerprint className="h-5 w-5 text-fuchsia-700"/><div className="font-semibold">Two-factor authentication</div></div><p className="text-sm text-muted">SMS and authenticator-app verification are not enabled yet. Passkeys and active-session controls are available above.</p></Card></>}
+    {screen === 'notifications' && <>{header('Notifications', 'Choose what you want to receive')}<Card>{toggle('Offers and promotions','Nearby offers and product marketing',preferences.marketing,()=>savePreferences({...preferences,marketing:!preferences.marketing,locationEnabled:!preferences.marketing?preferences.locationEnabled:false}))}<div className="flex items-center gap-3 border-b border-violet-100 py-4"><span className="grid h-10 w-10 place-items-center rounded-xl bg-fuchsia-50 text-fuchsia-700"><CreditCard className="h-5 w-5"/></span><div className="flex-1"><div className="font-semibold">Loan and transaction updates</div><div className="text-xs text-muted">Operational alerts are managed in your app notifications.</div></div><Link href="/app/activity" aria-label="View notifications" className="text-xs font-bold text-fuchsia-700">View</Link></div><p className="pt-3 text-xs text-muted">Turning off offers also disables marketing push subscriptions. Essential account and loan updates remain available in the notification centre.</p>{error&&<Alert tone="red">{error}</Alert>}</Card></>}
+    {screen === 'privacy' && <>{header('Privacy controls', 'Manage how your information is used')}<Card>{toggle('Personalised offers','Use your activity to show relevant offers',preferences.marketing,()=>savePreferences({...preferences,marketing:!preferences.marketing,locationEnabled:!preferences.marketing?preferences.locationEnabled:false}))}{toggle('Location services','Allow location for nearby offers',preferences.locationEnabled,()=>savePreferences({...preferences,locationEnabled:!preferences.locationEnabled}),!preferences.marketing)}<div className="flex items-start gap-3 border-t border-violet-100 py-4"><MapPin className="mt-1 h-5 w-5 text-fuchsia-700"/><div className="flex-1"><div className="font-semibold">Data vault</div><p className="text-xs text-muted">Review identity, income, and supporting documents.</p><Link href="/app/data-vault" className="mt-2 inline-block text-sm font-bold text-fuchsia-700">Open my data vault →</Link></div></div><div className="flex items-center gap-3 border-t border-violet-100 py-4"><CircleHelp className="h-5 w-5 text-fuchsia-700"/><p className="text-xs text-muted">Data download and account deletion are not available in-app yet. Contact support for assistance.</p></div>{error&&<Alert tone="red">{error}</Alert>}</Card></>}
+    {screen === 'linked' && <>{header('Linked accounts', 'Payment accounts connected to XTRA-CASH')}<Card className="space-y-1"><Link href="/app/card" className="flex items-center gap-3 border-b border-violet-100 py-4"><span className="grid h-11 w-11 place-items-center rounded-xl bg-violet-100 text-violet-800"><CreditCard className="h-5 w-5"/></span><span className="flex-1"><span className="block font-semibold">XTRA-CASH card</span><span className="text-xs text-muted">View card and card status</span></span><ChevronRight className="h-5 w-5"/></Link><Link href="/app/wallet" className="flex items-center gap-3 border-b border-violet-100 py-4"><span className="grid h-11 w-11 place-items-center rounded-xl bg-fuchsia-100 text-fuchsia-800"><Wallet className="h-5 w-5"/></span><span className="flex-1"><span className="block font-semibold">XTRA-CASH wallet</span><span className="text-xs text-muted">{formatZAR(me.walletBalanceCents)}</span></span><ChevronRight className="h-5 w-5"/></Link><div className="flex items-center gap-3 py-4"><span className="grid h-11 w-11 place-items-center rounded-xl bg-orange-50 text-orange-700"><Landmark className="h-5 w-5"/></span><span><span className="block font-semibold">Bank and payroll accounts</span><span className="text-xs text-muted">Linking is not enabled yet</span></span></div><p className="rounded-xl bg-violet-50 p-3 text-xs text-violet-900">Bank EFT and employer payroll linking will appear here when those integrations are activated.</p></Card></>}
+    {screen === 'success' && <>{header('Changes saved')}<Card className="space-y-3 text-center"><span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-100 text-emerald-700"><Check className="h-9 w-9"/></span><h2 className="text-xl font-bold">Your profile is up to date</h2><p className="text-sm text-muted">Your saved information is available across XTRA-CASH.</p><Button className="w-full" onClick={()=>setScreen('home')}>Continue to my account</Button></Card></>}
+    {screen === 'logout' && <>{header('Log out')}<Card className="space-y-4 text-center"><span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-fuchsia-100 text-fuchsia-700"><LogOut className="h-8 w-8"/></span><h2 className="text-xl font-bold">Log out of your account?</h2><p className="text-sm text-muted">You will need to sign in again to access XTRA-CASH.</p><Button className="w-full bg-gradient-to-r from-[#7100c4] to-[#e50070]" onClick={signOut}>Yes, log out</Button><Button variant="secondary" className="w-full" onClick={()=>setScreen('home')}>Cancel</Button></Card></>}
+  </div>;
 }
