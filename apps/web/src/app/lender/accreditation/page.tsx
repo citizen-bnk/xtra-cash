@@ -156,9 +156,12 @@ function Documents({ org, onChange }: { org: LenderOrg; onChange: () => void }) 
                   {DOCUMENT_LABELS[t]} {REQUIRED_DOCUMENTS.includes(t) && <span className="text-red-600">*</span>}
                 </div>
                 {d && (
-                  <button className="truncate text-xs text-muted underline" onClick={() => client.blob(d.url).then(openBlob)}>
-                    {d.fileName}
-                  </button>
+                  <div className="min-w-0">
+                    <button className="block max-w-full truncate text-xs text-muted underline" onClick={() => client.blob(d.url).then(openBlob)}>
+                      {d.fileName}
+                    </button>
+                    {d.reviewComment && <p className="mt-1 max-w-72 text-xs text-rose-700">Review: {d.reviewComment}</p>}
+                  </div>
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">

@@ -271,7 +271,7 @@ export class AdminService {
     if (status === 'REJECTED' && !comment?.trim()) throw new BadRequestException('A comment is required when rejecting a document');
     const [d] = await this.db
       .update(accreditationDocuments)
-      .set({ status })
+      .set({ status, reviewComment: comment?.trim() || null })
       .where(and(eq(accreditationDocuments.id, docId), eq(accreditationDocuments.lenderId, lenderId)))
       .returning();
     if (!d) throw new NotFoundException();

@@ -243,6 +243,7 @@ export interface LenderDocument {
   fileName: string;
   url: string;
   status: 'UPLOADED' | 'ACCEPTED' | 'REJECTED';
+  reviewComment?: string | null;
   createdAt: string;
 }
 

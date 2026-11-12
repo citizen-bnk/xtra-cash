@@ -183,6 +183,7 @@ export const accreditationDocuments = pgTable('accreditation_documents', {
   fileName: text('file_name').notNull(),
   storageKey: text('storage_key').notNull(),
   status: documentStatusEnum('status').notNull().default('UPLOADED'),
+  reviewComment: text('review_comment'),
   createdAt: createdAt(),
 });
 
