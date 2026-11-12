@@ -267,14 +267,15 @@ export class AdminService {
     return l;
   }
 
-  async reviewDocument(actor: AuthUser, lenderId: string, docId: string, status: 'ACCEPTED' | 'REJECTED') {
+  async reviewDocument(actor: AuthUser, lenderId: string, docId: string, status: 'ACCEPTED' | 'REJECTED', comment?: string) {
+    if (status === 'REJECTED' && !comment?.trim()) throw new BadRequestException('A comment is required when rejecting a document');
     const [d] = await this.db
       .update(accreditationDocuments)
-      .set({ status })
+      .set({ status, reviewComment: comment?.trim() || null })
       .where(and(eq(accreditationDocuments.id, docId), eq(accreditationDocuments.lenderId, lenderId)))
       .returning();
     if (!d) throw new NotFoundException();
-    await this.audit.log(actor, `document.${status.toLowerCase()}`, 'document', docId, { lenderId });
+    await this.audit.log(actor, `document.${status.toLowerCase()}`, 'document', docId, { lenderId, comment: comment?.trim() || undefined });
     return presentDoc(d);
   }
 
