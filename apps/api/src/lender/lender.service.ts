@@ -190,7 +190,7 @@ export class LenderService {
   }
 
   /** Admin: confirm an EFT load was received / a withdrawal was paid out, or reject it. */
-  async decideFunding(actor: AuthUser, fundingId: string, approve: boolean) {
+  async decideFunding(actor: AuthUser, fundingId: string, approve: boolean, reason?: string) {
     return this.db.transaction(async (tx) => {
       const [f] = await tx.select().from(lenderFunding).where(eq(lenderFunding.id, fundingId)).for('update');
       if (!f) throw new NotFoundException();
@@ -224,7 +224,7 @@ export class LenderService {
           await tx.update(lenderOrgs).set({ availableCents: sql`${lenderOrgs.availableCents} + ${f.amountCents}` }).where(eq(lenderOrgs.id, f.lenderId));
         }
       }
-      await this.audit.log(actor, `funding.${status.toLowerCase()}`, 'funding', f.id, { type: f.type, amountCents: f.amountCents }, tx);
+      await this.audit.log(actor, `funding.${status.toLowerCase()}`, 'funding', f.id, { type: f.type, amountCents: f.amountCents, reason: reason?.trim() || null }, tx);
       return updated;
     });
   }
