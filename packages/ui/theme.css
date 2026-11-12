@@ -4,7 +4,7 @@
  *   Orange #FB9320 = calls to action     Deep purple #5C2394 = primary, headings
  *   Violet #891D95 · Magenta #B51D8A = accent, highlights · Coral #E55B51 · Ink #2A1640 = text
  *   Chart: purple #7B3FB8, orange #E07A10, magenta #B51D8A, teal #2A9D8F (positive)
- *   Type: Fredoka for headings, big numbers and wordmark; Inter for body, tables, captions, UI.
+ *   Type: Poppins for app/portal headings and controls; Inter for body, tables, captions and UI.
  */
 @theme {
   --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -40,15 +40,15 @@ body {
  * the public marketing website retains its existing brand treatment. */
 .xc-app-theme {
   --color-ink: #1b1030;
-  --color-ink-2: #35204d;
-  --color-brand: #d91f63;
+  --color-ink-2: #39244f;
+  --color-brand: #a617d3;
   --color-brand-dark: #5c2394;
   --color-brand-purple: #5c2394;
   --color-brand-violet: #a617d3;
   --color-brand-coral: #d91f63;
   --color-brand-orange: #fb9320;
   --color-brand-orange-dark: #df7b10;
-  --color-brand-soft: #f5e8fb;
+  --color-brand-soft: #f3e7f8;
   --color-chart-1: #5c2394;
   --color-chart-2: #fb9320;
   --color-chart-3: #d91f63;
@@ -56,8 +56,25 @@ body {
   --color-surface: #faf8fc;
   --color-line: #ebe6f0;
   --color-muted: #6b6180;
+  --font-display: "Poppins", var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
 }
-/* Fredoka for headings; deep purple on light surfaces, white wherever a section sets its own colour. */
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/poppins-regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/poppins-bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+/* Display face is scoped through .xc-app-theme; other site surfaces retain their prior font. */
 h1, h2, h3, h4 {
   font-family: var(--font-display);
   letter-spacing: 0;
