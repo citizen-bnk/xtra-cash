@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Pencil, Plus, Users } from 'lucide-react';
+import { Plus, Users } from 'lucide-react';
 import { bpsToPercent, EMPLOYMENT_LABELS, EmploymentStatus, formatZAR, PROVINCES, quoteLoan, type LoanOffer, type OfferInput } from '@xtra/shared';
-import { Alert, Badge, Button, Card, cx, Empty, Field, Input, Loading, Modal, MoneyInput, PageHeader, Textarea, useAction, useApi, useAuth, useToast } from '@xtra/ui';
+import { Alert, Badge, Button, Card, cx, Empty, Field, Input, Loading, Modal, MoneyInput, PageHeader, RecordActions, Textarea, useAction, useApi, useAuth, useToast } from '@xtra/ui';
 import { OfferAssistant } from '@/components/OfferAssistant';
 import { LocationTargetPicker } from '@/components/LocationTargetPicker';
 
@@ -30,6 +30,11 @@ export default function OffersPage() {
   const toast = useToast();
   const offers = useApi((c) => c.lender.offers());
   const org = useApi((c) => c.lender.org());
+  const toggle = useAction(async (offer: LoanOffer) => {
+    await client.lender.updateOffer(offer.id, { active: !offer.active });
+    toast(offer.active ? 'Offer paused' : 'Offer activated');
+    offers.reload();
+  });
   const [editing, setEditing] = useState<LoanOffer | 'new' | null>(null);
   const [draft, setDraft] = useState<OfferInput | null>(null);
 
@@ -44,6 +49,7 @@ export default function OffersPage() {
         actions={<Button variant="secondary" onClick={() => { setDraft(null); setEditing('new'); }}><Plus className="h-4 w-4" /> Open offer form</Button>}
       />
       {!live && <div className="mb-4"><Alert tone="amber">Offers go live for shoppers once your stall is accredited.</Alert></div>}
+      {toggle.error && <div className="mb-4"><Alert tone="red">{toggle.error}</Alert></div>}
       <OfferAssistant onManual={() => { setDraft(null); setEditing('new'); }} onReview={d => { setDraft(d); setEditing('new'); }} />
       <h2 className="mb-4 text-lg font-bold">Your offers</h2>
       {offers.data.length === 0 ? (
@@ -60,7 +66,10 @@ export default function OffersPage() {
                   </div>
                   {o.description && <p className="mt-1 text-sm text-muted">{o.description}</p>}
                 </div>
-                <Button aria-label={`Edit ${o.name}`} size="sm" variant="ghost" onClick={() => { setDraft(null); setEditing(o); }}><Pencil className="h-4 w-4" /></Button>
+                <RecordActions label={`Actions for ${o.name}`} actions={[
+                  { label: 'Edit offer', onSelect: () => { setDraft(null); setEditing(o); } },
+                  { label: o.active ? 'Pause offer' : 'Activate offer', disabled: toggle.loading, onSelect: () => toggle.run(o) },
+                ]} />
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                 <Kv k="Interest" v={`${bpsToPercent(o.monthlyInterestRateBps)} / month`} />
@@ -76,19 +85,6 @@ export default function OffersPage() {
                 {o.locationTarget && <Badge tone="brand">{o.locationTarget.label} · {o.locationTarget.radiusMeters} m adverts</Badge>}
                 {(o.employmentStatuses.length ? o.employmentStatuses.map((e) => EMPLOYMENT_LABELS[e]) : ['Any employment']).map((x) => <Badge key={x}>{x}</Badge>)}
                 {(o.provinces.length ? o.provinces : ['All provinces']).map((x) => <Badge key={x} tone="blue">{x}</Badge>)}
-              </div>
-              <div className="mt-4 flex justify-end">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={async () => {
-                    await client.lender.updateOffer(o.id, { active: !o.active });
-                    toast(o.active ? 'Offer paused' : 'Offer activated');
-                    offers.reload();
-                  }}
-                >
-                  {o.active ? 'Pause' : 'Activate'}
-                </Button>
               </div>
             </Card>
           ))}
