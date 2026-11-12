@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Users } from 'lucide-react';
 import { bpsToPercent, EMPLOYMENT_LABELS, EmploymentStatus, formatZAR, PROVINCES, quoteLoan, type LoanOffer, type OfferInput } from '@xtra/shared';
-import { Alert, Badge, Button, Card, cx, Empty, Field, Input, Loading, Modal, MoneyInput, PageHeader, RecordActions, Textarea, useAction, useApi, useAuth, useToast } from '@xtra/ui';
+import { Alert, Button, Card, cx, Empty, Field, Input, Loading, Modal, MoneyInput, PageHeader, RecordActions, RecordLine, Textarea, useAction, useApi, useAuth, useToast } from '@xtra/ui';
 import { OfferAssistant } from '@/components/OfferAssistant';
 import { LocationTargetPicker } from '@/components/LocationTargetPicker';
 
@@ -55,38 +55,25 @@ export default function OffersPage() {
       {offers.data.length === 0 ? (
         <Empty title="No offers yet">Create your first offer: set pricing and who you want to lend to.</Empty>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="overflow-hidden rounded-2xl border border-line bg-white">
           {offers.data.map((o) => (
-            <Card key={o.id}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2 font-bold">
-                    {o.name} <Badge tone={o.active ? 'green' : 'gray'}>{o.active ? 'Active' : 'Paused'}</Badge>
-                    <Badge tone="blue">{o.productType === 'PERSONAL' ? 'Personal loan' : 'BNPL'}</Badge>
-                  </div>
-                  {o.description && <p className="mt-1 text-sm text-muted">{o.description}</p>}
+            <div key={o.id} className="border-b border-line last:border-0">
+              <RecordLine title={o.name} description={`${o.productType === 'PERSONAL' ? 'Personal loan' : 'BNPL'} · ${o.termMonths} months · ${bpsToPercent(o.monthlyInterestRateBps)} / month`} value={`${formatZAR(o.minAmountCents, { decimals: false })}–${formatZAR(o.maxAmountPerUserCents, { decimals: false })}`} status={o.active ? 'ACTIVE' : 'PAUSED'} actions={<RecordActions label={`Actions for ${o.name}`} actions={[{ label: 'Edit offer', onSelect: () => { setDraft(null); setEditing(o); } }, { label: o.active ? 'Pause offer' : 'Activate offer', disabled: toggle.loading, onSelect: () => toggle.run(o) }]} />} />
+              <details className="px-4 pb-3 text-xs text-muted">
+                <summary className="cursor-pointer font-semibold text-brand-purple">Eligibility & pricing</summary>
+                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                  <Kv k="Initiation fee" v={formatZAR(o.initiationFeeCents)} />
+                  <Kv k="Service fee" v={`${formatZAR(o.monthlyServiceFeeCents)} / month`} />
+                  <Kv k="Minimum income" v={formatZAR(o.minMonthlyIncomeCents, { decimals: false })} />
+                  <Kv k="Minimum credit score" v={o.minCreditScore || 'Any'} />
+                  <Kv k="Age range" v={`${o.minAge}–${o.maxAge}`} />
+                  <Kv k="Employment" v={o.employmentStatuses.length ? o.employmentStatuses.map((e) => EMPLOYMENT_LABELS[e]).join(', ') : 'Any employment'} />
+                  <Kv k="Provinces" v={o.provinces.length ? o.provinces.join(', ') : 'All provinces'} />
+                  {o.locationTarget && <Kv k="Local advertising" v={`${o.locationTarget.label} · ${o.locationTarget.radiusMeters} m`} />}
                 </div>
-                <RecordActions label={`Actions for ${o.name}`} actions={[
-                  { label: 'Edit offer', onSelect: () => { setDraft(null); setEditing(o); } },
-                  { label: o.active ? 'Pause offer' : 'Activate offer', disabled: toggle.loading, onSelect: () => toggle.run(o) },
-                ]} />
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                <Kv k="Interest" v={`${bpsToPercent(o.monthlyInterestRateBps)} / month`} />
-                <Kv k="Term" v={`${o.termMonths} months`} />
-                <Kv k="Initiation fee" v={formatZAR(o.initiationFeeCents)} />
-                <Kv k="Service fee" v={`${formatZAR(o.monthlyServiceFeeCents)} / month`} />
-                <Kv k="Amount" v={`${formatZAR(o.minAmountCents, { decimals: false })} – ${formatZAR(o.maxAmountPerUserCents, { decimals: false })}`} />
-                <Kv k="Min income" v={formatZAR(o.minMonthlyIncomeCents, { decimals: false })} />
-                <Kv k="Min credit score" v={o.minCreditScore || 'Any'} />
-                <Kv k="Age" v={`${o.minAge}–${o.maxAge}`} />
-              </div>
-              <div className="mt-3 flex flex-wrap gap-1">
-                {o.locationTarget && <Badge tone="brand">{o.locationTarget.label} · {o.locationTarget.radiusMeters} m adverts</Badge>}
-                {(o.employmentStatuses.length ? o.employmentStatuses.map((e) => EMPLOYMENT_LABELS[e]) : ['Any employment']).map((x) => <Badge key={x}>{x}</Badge>)}
-                {(o.provinces.length ? o.provinces : ['All provinces']).map((x) => <Badge key={x} tone="blue">{x}</Badge>)}
-              </div>
-            </Card>
+                {o.description && <p className="mt-2 leading-relaxed">{o.description}</p>}
+              </details>
+            </div>
           ))}
         </div>
       )}

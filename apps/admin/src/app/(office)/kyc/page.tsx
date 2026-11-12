@@ -37,7 +37,7 @@ export default function KycPage() {
             { header: 'Income', align: 'right', cell: (k) => formatZAR(k.monthlyIncomeCents) },
             { header: 'Expenses', align: 'right', cell: (k) => formatZAR(k.monthlyExpensesCents) },
             { header: 'Score', align: 'right', cell: (k) => k.creditScore ?? '—' },
-            { header: '', cell: (k) => <RecordActions label={`Actions for ${k.user.firstName} ${k.user.lastName}`} actions={[
+            { header: 'Actions', cell: (k) => <RecordActions label={`Actions for ${k.user.firstName} ${k.user.lastName}`} actions={[
               { label: 'View applicant', href: `/users/${k.userId}` },
               ...(status === 'PENDING' ? [
                 { label: 'Approve verification', onSelect: () => setDecision({ userId: k.userId, approve: true }) },

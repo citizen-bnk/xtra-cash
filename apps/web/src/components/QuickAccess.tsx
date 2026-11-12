@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Alert, Button, Field, Input, useAuth } from '@xtra/ui';
+import { Alert, Button, Field, Input, PasswordResetLink, useAuth } from '@xtra/ui';
 import { ArrowLeft, ArrowRight, BriefcaseBusiness, Check, ChevronRight, Eye, EyeOff, Fingerprint, IdCard, LockKeyhole, Mail, Phone, UserRound, Users } from 'lucide-react';
 import { homeFor } from '@/lib/config';
 
@@ -94,15 +94,15 @@ export function QuickAccess({ initialRegister = false }: { initialRegister?: boo
       </form>
       </section>}
       {!register && <section>
-        <div className="mb-6"><p className="text-xs font-bold uppercase tracking-[.16em] text-brand-purple">XTRA-CASH account</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-ink">Welcome back</h1><p className="mt-2 text-sm text-muted">Sign in to continue to your account.</p></div>
-        <form onSubmit={submit} className="space-y-5">
+        <div className="mb-5 text-center md:text-left"><p className="hidden text-xs font-bold uppercase tracking-[.16em] text-brand-purple md:block">XTRA-CASH account</p><h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">Welcome back</h1><p className="mt-1 hidden text-sm text-muted sm:block">Sign in to your account.</p></div>
+        <form onSubmit={submit} className="space-y-4">
           <Field label="Email address"><IconInput icon={Mail}><Input type="email" inputMode="email" autoComplete="email" value={identifier} onChange={e => setIdentifier(e.target.value)} required maxLength={254} placeholder="you@example.com" /></IconInput></Field>
           <Field label="Password"><IconInput icon={LockKeyhole}><Input type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required maxLength={72} placeholder="Enter your password" /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(v => !v)} className="absolute right-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-muted">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></IconInput></Field>
           {error && <Alert tone="red">{error}</Alert>}
           <Button className="w-full rounded-xl bg-brand-orange text-ink hover:bg-brand-orange-dark" size="lg" loading={busy}>Log in <ArrowRight className="h-4 w-4" /></Button>
         </form>
       </section>}
-      <div className="mt-6 text-center text-sm text-muted">{register ? 'Already have an account? ' : "New to XTRA-CASH? "}{register ? <Link href={`/login${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`} className="font-bold text-brand-purple underline">Log in</Link> : <Link href="/register" className="font-bold text-brand-purple underline">Create an account</Link>}</div>
+      {register ? <div className="mt-6 text-center text-sm text-muted">Already have an account? <Link href={`/login${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`} className="font-bold text-brand-purple underline">Log in</Link></div> : <nav aria-label="Sign-in links" className="mt-5 flex items-center justify-center gap-4 text-xs sm:gap-6"><Link href="/" className="font-semibold text-muted underline underline-offset-2">Home</Link><PasswordResetLink /><Link href="/register" className="font-semibold text-brand-purple underline underline-offset-2">Register</Link></nav>}
   </div>;
 }
 
