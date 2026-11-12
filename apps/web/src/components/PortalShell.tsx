@@ -15,6 +15,11 @@ export function PortalShell({ nav, section, children, footer }: { nav: NavItem[]
       section={section}
       userName={me ? `${me.firstName} ${me.lastName}` : ''}
       userEmail={me?.email}
+      switchApps={[
+        ...(me?.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN') ? [{ label: 'Back office', href: 'https://xtra-cash-admin.vercel.app' }] : []),
+        { label: 'Customer app', href: 'https://xtra-cash.vercel.app/app', current: !pathname.startsWith('/lender') && !pathname.startsWith('/affiliate') },
+        ...(me?.roles.includes('LENDER') ? [{ label: 'Lender workspace', href: 'https://xtra-cash.vercel.app/lender', current: pathname.startsWith('/lender') }] : []),
+      ]}
       footer={footer}
       onLogout={async () => {
         await logout();

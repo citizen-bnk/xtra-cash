@@ -33,6 +33,7 @@ export function AppShell({
   contentClassName,
   topBarClassName,
   topBarContent,
+  switchApps = [],
   children,
 }: {
   nav: NavItem[];
@@ -46,6 +47,7 @@ export function AppShell({
   contentClassName?: string;
   topBarClassName?: string;
   topBarContent?: React.ReactNode;
+  switchApps?: { label: string; href: string; current?: boolean }[];
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -105,7 +107,7 @@ export function AppShell({
   return (
     <div className="xc-app-theme min-h-screen">
       <aside className="fixed inset-y-0 left-0 hidden w-60 lg:block">{side}</aside>
-      <header className="safe-pt sticky top-0 z-30 bg-gradient-to-r from-[#5c2394] via-[#a617d3] to-[#d91f63] lg:hidden">
+      <header className="safe-pt sticky top-0 z-30 bg-gradient-to-r from-[#1b1030] via-[#5c2394] to-[#a617d3] lg:hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-2.5">
           <div className="min-w-0">
             <Logo light size={26} />
@@ -168,6 +170,7 @@ export function AppShell({
               ))}
             </nav>
             {footer && <div className="px-5 pb-2 text-sm">{footer}</div>}
+            {switchApps.length > 0 && <div className="border-t border-line px-3 py-3"><div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[.16em] text-muted">Switch workspace</div><div className="grid gap-1">{switchApps.map(app => <Link key={app.href} href={app.href} onClick={() => setOpen(false)} className={cx('pressable flex min-h-11 items-center justify-between rounded-xl px-3 text-sm font-semibold', app.current ? 'bg-brand-soft text-brand-purple' : 'text-ink hover:bg-surface')}>{app.label}{app.current && <span className="text-[10px] uppercase tracking-wider">Current</span>}</Link>)}</div></div>}
             <div className="px-3 pb-4">
               <button onClick={onLogout} className="pressable flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-sm font-semibold text-red-600">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-red-50"><LogOut className="h-5 w-5" /></span> Sign out
@@ -177,7 +180,7 @@ export function AppShell({
         </div>
       )}
       <main className={cx('lg:pl-60', nav.length > 1 && 'pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0')}>
-        <header className={cx('sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-white/10 bg-gradient-to-r from-[#5c2394] via-[#a617d3] to-[#d91f63] px-4 py-2 text-white [&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white', topBarClassName)}>{topBarContent ?? <div className="hidden text-sm font-bold text-white/90 lg:block">{section}</div>}<div className="ml-auto flex items-center gap-2"><WorkFormAssistant pathname={pathname}/><LoanActionCentre/></div></header>
+        <header className={cx('sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-white/10 bg-gradient-to-r from-[#1b1030] via-[#5c2394] to-[#a617d3] px-4 py-2 text-white [&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white', topBarClassName)}>{topBarContent ?? <div className="hidden text-sm font-bold text-white/90 lg:block">{section}</div>}<div className="ml-auto flex items-center gap-2">{switchApps.length > 0 && <div className="hidden items-center gap-1.5 sm:flex">{switchApps.filter(x => !x.current).map(app => <Link key={app.href} href={app.href} className="rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20">{app.label}</Link>)}</div>}<WorkFormAssistant pathname={pathname}/><LoanActionCentre/></div></header>
         <div className={cx('mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8', contentClassName)}>{children}</div>
       </main>
     </div>

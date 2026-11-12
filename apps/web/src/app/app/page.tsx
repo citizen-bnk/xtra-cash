@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Banknote, CreditCard, Gift, Grid2X2, HandCoins, House, MapPin, Menu, Mic, ReceiptText, ScanLine, ShoppingCart, Sparkles, X } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Banknote, CreditCard, Gift, Grid2X2, HandCoins, House, MapPin, Menu, Mic, ReceiptText, ScanLine, ShoppingCart, Sparkles, X } from 'lucide-react';
 import { formatZAR } from '@xtra/shared';
 import { Alert, Button, Logo, Modal, useApi, useAuth, LoanActionCentre } from '@xtra/ui';
 import { PayModal, TopUpModal } from '@/components/PayModal';
@@ -151,7 +151,7 @@ export default function ConsumerHome() {
     </Modal>
 
     <Modal open={menuOpen} title="XTRA-CASH menu" onClose={() => setMenuOpen(false)}>
-      <div className="divide-y divide-line">{[{ label: 'My loans', href: '/app/loans' }, { label: 'My wallet', href: '/app/wallet' }, { label: 'My card', href: '/app/card' }, { label: 'Transactions', href: '/app/activity' }, { label: 'Profile & settings', href: '/app/profile' }].map(x => <Link key={x.href} href={x.href} onClick={() => setMenuOpen(false)} className="flex min-h-12 items-center justify-between text-sm font-semibold">{x.label}<ArrowRight className="h-4 w-4 text-muted" /></Link>)}</div>
+      <div className="divide-y divide-line">{[{ label: 'My loans', href: '/app/loans' }, { label: 'My wallet', href: '/app/wallet' }, { label: 'My card', href: '/app/card' }, { label: 'Transactions', href: '/app/activity' }, { label: 'Profile & settings', href: '/app/profile' }].map(x => <Link key={x.href} href={x.href} onClick={() => setMenuOpen(false)} className="flex min-h-12 items-center justify-between text-sm font-semibold">{x.label}<ArrowRight className="h-4 w-4 text-muted" /></Link>)}{me?.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN') && <Link href="https://xtra-cash-admin.vercel.app" onClick={() => setMenuOpen(false)} className="flex min-h-12 items-center justify-between text-sm font-semibold text-brand-purple">Open Back Office<ArrowUpRight className="h-4 w-4" /></Link>}</div>
       <button type="button" onClick={() => setMenuOpen(false)} className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-muted"><X className="h-4 w-4" /> Close menu</button>
     </Modal>
     <Modal open={!!notice} title="Service update" onClose={() => setNotice('')}><Alert tone="amber">{notice}</Alert><Button className="mt-4 w-full" onClick={() => setNotice('')}>Got it</Button></Modal>
