@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { EMPLOYMENT_LABELS, formatZAR, Role } from '@xtra/shared';
-import { Alert, Badge, Button, Card, cx, Input, Loading, Modal, PageHeader, StatusBadge, Table, useAction, useApi, useAuth, useToast } from '@xtra/ui';
+import { Alert, Badge, Button, Card, cx, Input, Loading, Modal, PageHeader, RecordActions, StatusBadge, Table, useAction, useApi, useAuth, useToast } from '@xtra/ui';
 
 const ALL_ROLES = Object.values(Role);
 
@@ -16,9 +16,11 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
   const [roles, setRoles] = useState<Role[]>([]);
   const [newPassword, setNewPassword] = useState('');
   const [passwordNotice, setPasswordNotice] = useState('');
+  const [statusAction, setStatusAction] = useState<'ACTIVE' | 'SUSPENDED' | null>(null);
   const status = useAction(async (s: 'ACTIVE' | 'SUSPENDED') => {
     await client.admin.setUserStatus(id, s);
     toast(s === 'SUSPENDED' ? 'User suspended, sessions revoked and cards frozen' : 'User reactivated');
+    setStatusAction(null);
     user.reload();
   });
   const saveRoles = useAction(async () => {
@@ -44,19 +46,22 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
         title={`${u.firstName} ${u.lastName}`}
         subtitle={`${u.email} · ${u.phone} · joined ${new Date(u.createdAt).toLocaleDateString('en-ZA')}`}
         actions={
-          <>
+          <div className="flex items-center gap-2">
             <StatusBadge status={u.status} />
-            {isSuper && <Button variant="secondary" onClick={() => { setRoles(u.roles); setRolesOpen(true); }}>Edit roles</Button>}
-            {u.id !== me?.id &&
-              (u.status === 'ACTIVE' ? (
-                <Button variant="danger" loading={status.loading} onClick={() => confirm('Suspend this user? Their sessions end and cards freeze.') && status.run('SUSPENDED')}>Suspend</Button>
-              ) : (
-                <Button loading={status.loading} onClick={() => status.run('ACTIVE')}>Reactivate</Button>
-              ))}
-          </>
+            {(isSuper || u.id !== me?.id) && <RecordActions label={`Actions for ${u.firstName} ${u.lastName}`} actions={[
+              ...(isSuper ? [{ label: 'Edit roles', onSelect: () => { setRoles(u.roles); setRolesOpen(true); } }] : []),
+              ...(u.id !== me?.id && u.status === 'ACTIVE' ? [{ label: 'Suspend user', onSelect: () => setStatusAction('SUSPENDED') }] : []),
+              ...(u.id !== me?.id && u.status !== 'ACTIVE' ? [{ label: 'Reactivate user', onSelect: () => setStatusAction('ACTIVE') }] : []),
+            ]} />}
+          </div>
         }
       />
       {status.error && <Alert tone="red">{status.error}</Alert>}
+      <Modal open={!!statusAction} onClose={() => setStatusAction(null)} title={statusAction === 'SUSPENDED' ? 'Suspend this user?' : 'Reactivate this user?'}>
+        <p className="text-sm text-muted">{statusAction === 'SUSPENDED' ? 'This ends active sessions and freezes active cards. The account can be reactivated later.' : 'The user will be able to sign in again. Existing role permissions remain unchanged.'}</p>
+        {status.error && <div className="mt-3"><Alert tone="red">{status.error}</Alert></div>}
+        <div className="mt-4 flex justify-end gap-2"><Button variant="secondary" onClick={() => setStatusAction(null)}>Cancel</Button><Button variant={statusAction === 'SUSPENDED' ? 'danger' : 'primary'} loading={status.loading} onClick={() => statusAction && status.run(statusAction)}>{statusAction === 'SUSPENDED' ? 'Suspend user' : 'Reactivate user'}</Button></div>
+      </Modal>
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="space-y-2 text-sm">
           <h2 className="font-bold">Account</h2>
