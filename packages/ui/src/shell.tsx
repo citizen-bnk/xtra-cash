@@ -71,10 +71,10 @@ export function AppShell({
           onClick={() => setOpen(false)}
           className={cx(
             'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition',
-            isActive(n) ? 'bg-brand-orange text-[#2a1640] shadow-sm' : 'text-white/75 hover:bg-white/10 hover:text-white',
+            isActive(n) ? 'bg-brand-orange text-[#1b1030] shadow-sm' : 'text-white/75 hover:bg-white/10 hover:text-white',
           )}
         >
-          <n.icon className={cx('h-4 w-4', isActive(n) ? 'text-[#2a1640]' : 'text-white/70')} />
+          <n.icon className={cx('h-4 w-4', isActive(n) ? 'text-[#1b1030]' : 'text-white/70')} />
           <span className="flex-1">{n.label}</span>
           {n.badge ? <span className="rounded-full bg-brand px-1.5 text-xs font-bold text-white">{n.badge}</span> : null}
         </Link>
@@ -83,7 +83,7 @@ export function AppShell({
   );
 
   const side = (
-    <div className="flex h-full flex-col bg-gradient-to-b from-[#1b1030] via-[#28123e] to-[#1b1030] px-3 py-4">
+    <div className="flex h-full flex-col bg-gradient-to-b from-[#1b1030] via-[#2b1742] to-[#1b1030] px-3 py-4">
       <div className="mb-6 px-2">
         <Logo light />
         <div className="mt-1 text-xs font-medium uppercase tracking-wider text-white/50">{section}</div>

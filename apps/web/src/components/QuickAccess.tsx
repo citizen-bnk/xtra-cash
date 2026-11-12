@@ -2,15 +2,14 @@
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Alert, Button, Field, Input, Modal, PasskeyButton, useApi, useAuth } from '@xtra/ui';
-import { ArrowLeft, ArrowRight, BriefcaseBusiness, Check, ChevronRight, Eye, EyeOff, Fingerprint, IdCard, LockKeyhole, Mail, Phone, ShieldCheck, UserRound, Users } from 'lucide-react';
-import { ADMIN_URL, homeFor } from '@/lib/config';
+import { Alert, Button, Field, Input, useAuth } from '@xtra/ui';
+import { ArrowLeft, ArrowRight, BriefcaseBusiness, Check, ChevronRight, Eye, EyeOff, Fingerprint, IdCard, LockKeyhole, Mail, Phone, UserRound, Users } from 'lucide-react';
+import { homeFor } from '@/lib/config';
 
 export function safeNext(value: string | null, fallback = '/app') {
   return value && /^\/(app|lender|affiliate)(\/|\?|$)/.test(value) && !value.includes('\\') ? value : fallback;
 }
 type AccountType = 'CONSUMER' | 'LENDER' | 'AFFILIATE';
-type AuthConfiguration = { google: boolean; apple: boolean; whatsapp: boolean };
 
 export function QuickAccess({ initialRegister = false }: { initialRegister?: boolean }) {
   const params = useSearchParams(), router = useRouter();
@@ -18,17 +17,9 @@ export function QuickAccess({ initialRegister = false }: { initialRegister?: boo
   const register = initialRegister;
   const [stage, setStage] = useState(register && !params.has('type') ? 0 : 1);
   const [identifier, setIdentifier] = useState(''), [fullName, setFullName] = useState(''), [idNumber, setIdNumber] = useState(''), [mobile, setMobile] = useState(''), [email, setEmail] = useState('');
-  const [password, setPassword] = useState(''), [confirmPassword, setConfirmPassword] = useState(''), [agree, setAgree] = useState(false), [remember, setRemember] = useState(true);
+  const [password, setPassword] = useState(''), [confirmPassword, setConfirmPassword] = useState(''), [agree, setAgree] = useState(false);
   const [type, setType] = useState<AccountType>(params.get('type') === 'LENDER' ? 'LENDER' : params.get('type') === 'AFFILIATE' ? 'AFFILIATE' : 'CONSUMER');
-  const [showPassword, setShowPassword] = useState(false), [showConfirm, setShowConfirm] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [forgotOpen, setForgotOpen] = useState(false);
-  const providers = useApi(c => c.request<AuthConfiguration>('GET', '/auth/passwordless/configuration'));
-
-  async function finish() {
-    const me = await refreshMe();
-    if (!me) throw new Error('Please sign in again.');
-    if (!me.roles.some(r => ['CONSUMER', 'LENDER', 'AFFILIATE'].includes(r))) { await client.auth.logout(); setError('Staff accounts use the back-office sign-in below.'); return; }
-    router.replace(safeNext(params.get('next'), homeFor(me)));
-  }
+  const [showPassword, setShowPassword] = useState(false), [showConfirm, setShowConfirm] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   async function submit(event: FormEvent) {
     event.preventDefault(); setError('');
     if (register && stage === 1) {
@@ -62,13 +53,6 @@ export function QuickAccess({ initialRegister = false }: { initialRegister?: boo
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not continue.'); }
     finally { setBusy(false); }
   }
-  async function social(provider: 'google' | 'apple') {
-    if (!providers.data?.[provider]) { setError(`${provider === 'google' ? 'Google' : 'Apple'} sign-in is not connected yet.`); return; }
-    setBusy(true); setError('');
-    try { const r = await client.request<{ url: string; state: string; binding: string }>('POST', '/auth/passwordless/social/start', { accountType: type, consent: true, provider }); sessionStorage.setItem('xtra-sign-in-' + r.state, r.binding); window.location.assign(r.url); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Could not start social sign-in.'); setBusy(false); }
-  }
-
   if (register && stage === 0) return <div className="mx-auto w-full max-w-md animate-fade-in">
     <div className="mb-5 text-center"><p className="text-xs font-extrabold uppercase tracking-[.16em] text-[#9b14bc]">Step 1 · Choose account type</p><h1 className="mt-2 text-2xl font-extrabold text-[#28133b]">Create your account</h1><p className="mt-1 text-sm text-slate-600">Choose how you’ll use XTRA-CASH.</p></div>
     <div className="space-y-3">
@@ -109,16 +93,16 @@ export function QuickAccess({ initialRegister = false }: { initialRegister?: boo
         <Button className="w-full rounded-xl bg-[#fb9320] text-[#1b1030] hover:bg-[#df7b10]" size="lg" loading={busy} disabled={register && stage === 3 && (!agree || password !== confirmPassword)}>{register ? stage === 1 ? 'Continue' : stage === 2 ? 'Continue' : 'Create Account' : 'Login'} <ArrowRight className="h-4 w-4" /></Button>
       </form>
       </section>}
-      {!register && <>
-        <div className="mt-3 flex items-center justify-between text-xs text-slate-600"><label className="flex items-center gap-2"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} className="h-4 w-4 accent-[#7900b5]" />Remember me</label><button type="button" onClick={() => setForgotOpen(true)} className="font-bold text-[#7900b5] underline">Forgot password?</button></div>
-        <div className="mt-4"><PasskeyButton onSuccess={finish} /></div>
-        <div className="my-4 flex items-center gap-3 text-xs text-slate-500"><span className="h-px flex-1 bg-[#e9e2ef]" />or log in with<span className="h-px flex-1 bg-[#e9e2ef]" /></div>
-        <div className="grid gap-2"><button type="button" onClick={() => void social('google')} disabled={busy} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#d8cfe2] bg-white text-sm font-semibold text-[#28133b] disabled:opacity-60"><span className="font-black text-[#4285f4]">G</span> Continue with Google</button><button type="button" onClick={() => void social('apple')} disabled={busy} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#d8cfe2] bg-white text-sm font-semibold text-[#28133b] disabled:opacity-60"><span className="text-lg leading-none"></span> Continue with Apple</button></div>
-      </>}
-      <div className="mt-5 text-center text-sm text-slate-600">{register ? 'Already have an account? ' : "Don't have an account? "}{register ? <Link href={`/login${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`} className="font-extrabold text-[#7900b5] underline">Login</Link> : <Link href="/register" className="font-extrabold text-[#7900b5] underline">Register</Link>}</div>
-      <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-500"><ShieldCheck className="h-4 w-4 text-[#7712b1]" /> Your details are protected</div>
-      <div className="mt-3 flex justify-center gap-4 border-t border-[#eee8f2] pt-3 text-xs"><Link href="/onboarding" className="font-semibold text-[#7612ac] underline">How it works</Link>{!register && <a href={`${ADMIN_URL}/login`} className="font-semibold text-[#7612ac] underline">Staff sign-in</a>}</div>
-      <Modal open={forgotOpen} title="Forgot your password?" onClose={() => setForgotOpen(false)}><div className="space-y-3"><p className="text-sm text-slate-600">Password reset is not connected yet. Ask your XTRA-CASH administrator for support.</p><Field label="Email or mobile number"><Input autoComplete="username" /></Field><Button className="w-full" onClick={() => setForgotOpen(false)}>Close</Button></div></Modal>
+      {!register && <section>
+        <div className="mb-6"><p className="text-xs font-bold uppercase tracking-[.16em] text-brand-purple">XTRA-CASH account</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-ink">Welcome back</h1><p className="mt-2 text-sm text-muted">Sign in to continue to your account.</p></div>
+        <form onSubmit={submit} className="space-y-5">
+          <Field label="Email address"><IconInput icon={Mail}><Input type="email" inputMode="email" autoComplete="email" value={identifier} onChange={e => setIdentifier(e.target.value)} required maxLength={254} placeholder="you@example.com" /></IconInput></Field>
+          <Field label="Password"><IconInput icon={LockKeyhole}><Input type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required maxLength={72} placeholder="Enter your password" /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(v => !v)} className="absolute right-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-muted">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></IconInput></Field>
+          {error && <Alert tone="red">{error}</Alert>}
+          <Button className="w-full rounded-xl bg-brand-orange text-ink hover:bg-brand-orange-dark" size="lg" loading={busy}>Log in <ArrowRight className="h-4 w-4" /></Button>
+        </form>
+      </section>}
+      <div className="mt-6 text-center text-sm text-muted">{register ? 'Already have an account? ' : "New to XTRA-CASH? "}{register ? <Link href={`/login${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`} className="font-bold text-brand-purple underline">Log in</Link> : <Link href="/register" className="font-bold text-brand-purple underline">Create an account</Link>}</div>
   </div>;
 }
 
