@@ -27,6 +27,7 @@ const TABS = [
 export default function ConsumerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { me } = useAuth();
+  const immersiveHome = pathname === '/app';
   const active = (n: { href: string; exact?: boolean }) => (n.exact ? pathname === n.href : pathname.startsWith(n.href));
   const initials = `${me?.firstName?.[0] ?? ''}${me?.lastName?.[0] ?? ''}`.toUpperCase() || 'Me';
   const tab = (n: (typeof TABS)[number]) => (
@@ -46,8 +47,8 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
   return (
     <RequireRole roles={['CONSUMER', 'AFFILIATE', 'LENDER']}>
       <MarketingLocationObserver />
-      <div className="min-h-[100dvh] pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
-        <header className="safe-pt sticky top-0 z-30 border-b border-line/70 bg-white/90 backdrop-blur-md">
+      <div className={immersiveHome ? 'min-h-[100dvh]' : 'min-h-[100dvh] pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))] lg:pb-0'}>
+        {!immersiveHome && <header className="safe-pt sticky top-0 z-30 border-b border-line/70 bg-white/90 backdrop-blur-md">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5 lg:py-3">
             <Link href="/app" aria-label="XTRA-CASH home" className="hidden lg:block">
               <Logo />
@@ -81,15 +82,15 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
               </Link>
             </div>
           </div>
-        </header>
-        <main key={pathname} className="mx-auto max-w-5xl px-4 py-5 animate-fade-in lg:py-6">
+        </header>}
+        <main key={pathname} className={immersiveHome ? 'min-h-[100dvh]' : 'mx-auto max-w-5xl px-4 py-5 animate-fade-in lg:py-6'}>
           {children}
         </main>
-        <nav aria-label="App" className="safe-pb fixed inset-x-0 bottom-0 z-30 border-t border-line/70 bg-white/95 backdrop-blur-md lg:hidden">
+        {!immersiveHome && <nav aria-label="App" className="safe-pb fixed inset-x-0 bottom-0 z-30 border-t border-line/70 bg-white/95 backdrop-blur-md lg:hidden">
           <div className="mx-auto grid max-w-md grid-cols-5 items-center">
             {TABS.map(tab)}
           </div>
-        </nav>
+        </nav>}
       </div>
     </RequireRole>
   );

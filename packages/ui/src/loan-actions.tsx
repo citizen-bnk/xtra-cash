@@ -22,7 +22,7 @@ type Notification = {
   owner: string;
   read: boolean;
 };
-export function LoanActionCentre() {
+export function LoanActionCentre({ variant = "default" }: { variant?: "default" | "immersive" }) {
   const { client, me } = useAuth(),
     data = useApi(
       (c) =>
@@ -87,7 +87,7 @@ export function LoanActionCentre() {
               setBellOpen(true);
               data.reload();
             }}
-            className="relative grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-ink hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-purple/60"
+            className={`relative grid h-10 w-10 place-items-center rounded-xl border focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${variant === "immersive" ? "border-white/20 bg-white/10 text-white hover:bg-white/20" : "border-line bg-white text-ink hover:bg-surface focus-visible:ring-brand-purple/60"}`}
           >
             <Bell className="h-5 w-5" />
             {unread > 0 && (

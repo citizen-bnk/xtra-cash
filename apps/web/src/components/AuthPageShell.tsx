@@ -1,56 +1,18 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Home } from 'lucide-react';
 import { Logo } from '@xtra/ui';
 
-const LINKS = [
-  { href: '/', label: 'Home' },
-  { href: '/login', label: 'Sign in' },
-  { href: '/register', label: 'Create account' },
-  { href: '/install', label: 'Get the app' },
-];
-
 export function AuthPageShell({ children, currentPath }: { children: ReactNode; currentPath: '/login' | '/register' | '/personal-loan' | '/offers' | '/install' }) {
-  return (
-    <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-[#f8f5fc]">
-      <div aria-hidden="true" className="pointer-events-none absolute -right-32 -top-36 h-96 w-96 rounded-full bg-[#a617d3]/10 blur-3xl" />
-      <div aria-hidden="true" className="pointer-events-none absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-[#fb9320]/10 blur-3xl" />
-      <header className="safe-pt relative z-20">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <Link href="/" aria-label="XTRA-CASH home" className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink">
-            <Logo size={36} className="text-lg sm:text-xl" />
-          </Link>
-          {/* Phones: one clear next step instead of a row of links. */}
-          <Link href={currentPath === '/login' ? '/register' : '/login'} className="pressable inline-flex min-h-11 items-center rounded-full bg-surface px-4 text-sm font-semibold text-ink sm:hidden">
-            {currentPath === '/login' ? 'Create account' : 'Sign in'}
-          </Link>
-          <nav aria-label="Main navigation" className="hidden flex-wrap items-center gap-1 text-sm font-semibold sm:flex">
-            {LINKS.map(({ href, label }) => (
-              <Link key={href} href={href} aria-current={href === currentPath ? 'page' : undefined}
-                className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${href === currentPath ? 'bg-ink text-white' : 'text-ink hover:bg-surface'}`}>
-                {href === '/' && <Home aria-hidden="true" className="h-4 w-4" />}
-                {label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      </header>
-      <main className="safe-pb relative flex flex-1 flex-col items-center justify-center px-4 py-6 sm:py-10">
-        {children}
-      </main>
-      <footer className="hidden border-t border-line bg-white sm:block">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-5 text-sm sm:flex-row sm:px-6">
-          <p className="text-muted">XTRA-CASH. Put out the fire.</p>
-          <nav aria-label="Footer navigation" className="flex flex-wrap justify-center gap-x-5 gap-y-2">
-            {LINKS.map(({ href, label }) => (
-              <Link key={href} href={href} aria-current={href === currentPath ? 'page' : undefined}
-                className="inline-flex min-h-11 items-center rounded-lg font-semibold text-ink underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink">
-                {label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      </footer>
-    </div>
-  );
+  const switchHref = currentPath === '/login' ? '/register' : '/login';
+  const switchLabel = currentPath === '/login' ? 'Create account' : 'Login';
+  return <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-gradient-to-br from-[#31004d] via-[#7900a6] to-[#dd1587]">
+    <div aria-hidden className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-fuchsia-400/30 blur-3xl" />
+    <div aria-hidden className="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-orange-400/25 blur-3xl" />
+    <header className="safe-pt relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-5 py-4 sm:px-8">
+      <Link href="/onboarding" aria-label="XTRA-CASH app intro" className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"><Logo light size={32} /></Link>
+      <Link href={switchHref} className="inline-flex min-h-10 items-center rounded-full border border-white/30 bg-white/10 px-4 text-sm font-bold text-white backdrop-blur hover:bg-white/20">{switchLabel}</Link>
+    </header>
+    <main className="safe-pb relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-5 sm:py-8">{children}</main>
+    <footer className="relative z-10 pb-3 text-center text-[11px] text-white/60">XTRA-CASH · Put out the fire · <Link href="/onboarding" className="underline underline-offset-2">How it works</Link></footer>
+  </div>;
 }
