@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, CreditCard, HandCoins, Plus, ReceiptText, ScanLine, ShoppingBag, Wallet, Zap } from 'lucide-react';
+import { ArrowRight, CreditCard, HandCoins, Plus, ReceiptText, ScanLine, Wallet, Zap } from 'lucide-react';
 import { formatZAR } from '@xtra/shared';
 import { Alert, Button, Card, Loading, StatusBadge, useApi, useAuth } from '@xtra/ui';
 import { PayModal, TopUpModal } from '@/components/PayModal';
@@ -97,8 +97,8 @@ export default function ConsumerHome() {
         </Card>
       </section>
 
-      <Link href="/app/offers" className="pressable flex items-center gap-3 rounded-2xl border border-line bg-white p-4">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-soft text-brand-purple"><ShoppingBag className="h-5 w-5" /></span><span className="min-w-0 flex-1"><strong className="block text-sm">Shop with XTRA-CASH</strong><span className="block text-xs text-muted">Explore stores, vouchers and eligible buy-now-pay-later offers.</span></span><ArrowRight className="h-4 w-4 shrink-0 text-muted" />
+      <Link href="/app/card" className="pressable flex items-center gap-3 rounded-2xl border border-line bg-white p-4">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-soft text-brand-purple"><CreditCard className="h-5 w-5" /></span><span className="min-w-0 flex-1"><strong className="block text-sm">Manage your XTRA-CASH card</strong><span className="block text-xs text-muted">View card details, make a payment or freeze your card.</span></span><ArrowRight className="h-4 w-4 shrink-0 text-muted" />
       </Link>
       <TopUpModal open={topUp} onClose={() => setTopUp(false)} onDone={reloadAll} />
       {card && b && <PayModal open={pay} onClose={() => setPay(false)} cardId={card.id} balance={b} onDone={reloadAll} />}
