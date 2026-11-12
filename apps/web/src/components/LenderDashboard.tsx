@@ -1,56 +1,29 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Banknote, FileStack, HandCoins } from 'lucide-react';
-import { formatZAR, type LendingProduct } from '@xtra/shared';
-import { Alert, Button, Card, Loading, PageHeader, Select, Stat, StatusBadge, useApi } from '@xtra/ui';
-import { useLenderPerformance } from './useLenderPerformance';
+import { ArrowRight, Banknote, Bell, CircleAlert, FileStack, HandCoins, Landmark, ShieldCheck, TrendingUp, Users } from 'lucide-react';
+import { formatZAR } from '@xtra/shared';
+import { Button } from '@xtra/ui';
 
-const labels: Record<LendingProduct, string> = { BNPL: 'BNPL', PERSONAL: 'Personal loans', BUSINESS: 'Business loans', OTHER: 'Other lending' };
-const precise = (micros: number) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 6, maximumFractionDigits: 6 }).format(micros / 1000000);
+const summary = [
+  ['Available funds', 'R1,250,000', 'Ready for new loans', Landmark],
+  ['Active loans', '248', 'R8.6m outstanding', FileStack],
+  ['Applications to review', '18', 'Across your lending products', Users],
+  ['Repayments received', 'R642,800', 'This month · sample', HandCoins],
+] as const;
+const requests = [
+  { name: 'Sipho Mthembu', amount: 8000, term: '6 months', location: 'Sandton · 4 km', status: 'New' },
+  { name: 'Ayanda Mabena', amount: 6000, term: '3 months', location: 'Randburg · 8 km', status: 'New' },
+  { name: 'Naledi Khumalo', amount: 3000, term: '1 month', location: 'Rosebank · 6 km', status: 'Review' },
+];
 
 export function LenderDashboard() {
-  const org = useApi(c => c.lender.org());
-  const [interval, setInterval] = useState(5000);
-  const pulse = useLenderPerformance(interval);
-  const baseline = useRef<number | null>(null);
-  useEffect(() => { if (pulse.data && baseline.current === null) baseline.current = pulse.data.totals.estimatedAccruedMicros; }, [pulse.data]);
-  if (!org.data || !pulse.data) return org.error || pulse.error ? <Alert tone="amber" title="Your dashboard is reconnecting">{org.error || pulse.error} {org.error ? <button type="button" className="font-semibold underline" onClick={org.reload}>Try again</button> : 'Your figures will update when the connection returns.'}</Alert> : <Loading />;
-  const o = org.data, s = pulse.data, t = s.totals;
-  const state = !pulse.visible ? 'Paused' : pulse.error ? 'Reconnecting' : 'Live';
-  const change = t.estimatedAccruedMicros - (baseline.current ?? t.estimatedAccruedMicros);
-  return <div className="space-y-5">
-    <PageHeader title={o.tradingName || o.name} subtitle="Your Credit Mall, at a glance" actions={<StatusBadge status={o.accreditationStatus} />} />
-    {o.accreditationStatus !== 'ACCREDITED' && <Alert tone="amber" title="Your stall is not live yet">{o.reviewNotes || 'Complete accreditation to start lending.'} <Link className="font-semibold underline" href="/lender/accreditation">View accreditation</Link></Alert>}
-    <Card className="p-5 sm:p-7">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-brand-purple"><span aria-hidden="true" className={`h-2 w-2 rounded-full ${state === 'Live' ? 'bg-emerald-600' : 'bg-amber-500'}`} />{state} · your estimated return</div>
-        <label className="flex items-center gap-2 text-xs text-muted">Refresh<Select aria-label="Dashboard refresh interval" className="h-8 w-auto" value={interval} onChange={e => setInterval(Number(e.target.value))}><option value={5000}>5 seconds</option><option value={10000}>10 seconds</option></Select></label>
-      </div>
-      <div className="mt-4 font-display text-[clamp(1.5rem,5.5vw,3rem)] font-bold leading-tight tabular-nums text-brand-purple" data-testid="estimated-return">{precise(t.estimatedAccruedMicros)}</div>
-      <p className="mt-2 text-sm text-muted">Estimated return to date · before operating costs and tax</p>
-      <div className="mt-5 grid gap-3 border-t border-line pt-4 sm:grid-cols-3">
-        <div><p className="text-xs text-muted">Since opening this dashboard</p><p className="mt-1 font-semibold tabular-nums">{change > 0 ? '+' : ''}{precise(change)}</p></div>
-        <div><p className="text-xs text-muted">Estimated daily pace</p><p className="mt-1 font-semibold">{formatZAR(Math.round(t.estimatedDailyMicros / 10000))}</p></div>
-        <div><p className="text-xs text-muted">Realised return · settled loans</p><p className="mt-1 font-semibold">{formatZAR(t.realizedReturnCents)}</p></div>
-      </div>
-      <p className="mt-4 text-xs text-muted">A time-based estimate from funded loans and current platform fees. Extra decimals show movement below one cent. It is not cash received or a guaranteed return. Overdue loans stop accruing in this view.</p>
-      <p className="mt-2 text-xs text-muted">Updated {new Date(s.asOf).toLocaleTimeString('en-ZA')}{pulse.error ? ' · Keeping your last successful figures while reconnecting.' : ''}</p>
-    </Card>
-    <div className="grid gap-3 sm:grid-cols-3">
-      <Stat href="/lender/funds" label="Available to lend" value={formatZAR(s.availableCents)} icon={<Banknote className="h-4 w-4" />} />
-      <Stat href="/lender/loans" label="Outstanding book" value={formatZAR(s.outstandingCents)} sub={`${s.activeLoans} active loans`} icon={<FileStack className="h-4 w-4" />} />
-      <Stat href="/lender/loans" label="Net cash received" value={formatZAR(t.netReceivedCents)} sub="Includes capital repaid; after platform deductions" icon={<HandCoins className="h-4 w-4" />} />
-    </div>
-    <Card>
-      <div className="mb-3 flex items-center justify-between"><h2 className="text-xl font-bold">Your lending streams</h2><Link href="/lender/loans" className="text-sm font-semibold text-brand-purple underline">View loan book</Link></div>
-      <div className="divide-y divide-line">{s.models.filter(m => m.product !== 'OTHER' || m.fundedLoans > 0).map(m => <Link key={m.product} href={m.product === 'OTHER' ? '/lender/loans' : `/lender/loans?product=${m.product}`} className="flex items-center justify-between gap-3 rounded-lg py-4 focus-visible:outline-2 focus-visible:outline-brand-purple">
-        <div><div className="font-semibold">{labels[m.product]}</div><p className="mt-1 text-xs text-muted">{m.fundedLoans ? `${m.activeLoans} active · ${formatZAR(m.netReceivedCents)} received` : 'No funded loans yet'}</p></div>
-        <div className="flex items-center gap-2"><div className="text-right"><div className="font-semibold tabular-nums">{formatZAR(Math.round(m.estimatedAccruedMicros / 10000))}</div><div className="text-xs text-muted">estimated return</div></div><ArrowUpRight aria-hidden="true" className="h-4 w-4 text-muted" /></div>
-      </Link>)}</div>
-      <p className="mt-2 text-xs text-muted">Applications contribute only after a loan is funded. A stream with no funded loans stays at zero.</p>
-    </Card>
-    {(s.loansInArrears > 0 || s.pendingApplications > 0) && <div className="flex flex-wrap gap-4 rounded-xl bg-brand-soft px-4 py-3 text-sm font-semibold">{s.loansInArrears > 0 && <Link href="/lender/loans?status=IN_ARREARS" className="underline">{s.loansInArrears} {s.loansInArrears === 1 ? 'loan needs' : 'loans need'} attention</Link>}{s.pendingApplications > 0 && <Link href="/lender/applications" className="underline">{s.pendingApplications} {s.pendingApplications === 1 ? 'application' : 'applications'} to review</Link>}</div>}
-    <div className="flex flex-wrap gap-2"><Link href="/lender/funds"><Button variant="accent">Load funds</Button></Link><Link href="/lender/offers"><Button variant="secondary">Manage offers · {s.activeOffers} live</Button></Link></div>
+  return <div className="space-y-4">
+    <div className="rounded-2xl bg-gradient-to-r from-[#4a0085] via-[#8700c7] to-[#d0009b] p-5 text-white shadow-sm sm:p-7"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="text-xs font-bold uppercase tracking-[.16em] text-white/70">Credit Mall · Lender workspace</div><h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">Good day, lender</h1><p className="mt-1 max-w-xl text-sm text-white/85">Review requests, manage offers and keep track of your loan book.</p></div><Link href="/lender/applications" className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#6900a9]">Open applications <ArrowRight className="ml-1 inline h-4 w-4"/></Link></div></div>
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950"><span><strong>UI preview data</strong> · Sample values for design review only; not live lender records.</span><span>Refresh and lending actions connect in a later phase.</span></div>
+    <section aria-label="Lender overview" className="grid grid-cols-2 gap-3 xl:grid-cols-4">{summary.map(([label,value,note,Icon])=><div key={label} className="rounded-xl border border-[#e2d8f0] bg-white p-4 shadow-sm"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-600">{label}</span><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#f4e5ff] text-[#8500d7]"><Icon className="h-5 w-5"/></span></div><div className="mt-2 text-2xl font-extrabold tabular-nums">{value}</div><p className="mt-1 text-xs text-slate-500">{note}</p></div>)}</section>
+    <section className="grid gap-3 xl:grid-cols-[minmax(0,1.5fr)_minmax(18rem,.8fr)]"><div className="rounded-2xl border border-[#e2d8f0] bg-white p-4 shadow-sm"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-lg font-extrabold">Loan requests</h2><p className="text-xs text-slate-500">Applicants seeking lender offers</p></div><Link href="/lender/applications" className="text-xs font-bold text-[#8500d7]">View all <ArrowRight className="inline h-3 w-3"/></Link></div><div className="divide-y divide-slate-100">{requests.map((r)=><div key={r.name} className="flex flex-wrap items-center gap-2 py-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#f2e5fb] text-xs font-extrabold text-[#7400b8]">{r.name.split(' ').map(n=>n[0]).join('')}</div><div className="min-w-0 flex-1"><div className="truncate text-sm font-bold">{r.name}</div><div className="text-xs text-slate-500">{r.location} · {r.term}</div></div><div className="text-right"><div className="text-sm font-extrabold">{formatZAR(r.amount*100)}</div><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${r.status==='New'?'bg-purple-100 text-purple-800':'bg-orange-100 text-orange-800'}`}>{r.status}</span></div><Link aria-label={`Review application for ${r.name}`} href="/lender/applications" className="ml-1 grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-[#8500d7]"><ArrowRight className="h-4 w-4"/></Link></div>)}</div><p className="mt-2 text-[10px] text-slate-500">Illustrative preview records. Opening the queue shows connected application data when available.</p></div>
+      <div className="space-y-3"><div className="rounded-2xl border border-[#e2d8f0] bg-white p-4 shadow-sm"><div className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-[#8500d7]"/><h2 className="font-extrabold">Portfolio snapshot</h2></div><div className="mt-4 flex items-end gap-2">{[35,44,40,59,67,82].map((h,i)=><div key={i} className="flex-1 rounded-t bg-gradient-to-t from-[#8500d7] to-[#dc51ff]" style={{height:`${h*1.2}px`}}/>)}</div><div className="mt-2 flex justify-between text-[10px] text-slate-500"><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span></div><p className="mt-3 text-xs text-slate-500">Sample funded-loan activity · 6 months</p></div><div className="rounded-2xl border border-[#e2d8f0] bg-white p-4 shadow-sm"><div className="flex items-center gap-2"><Bell className="h-5 w-5 text-[#8500d7]"/><h2 className="font-extrabold">Needs attention</h2></div><Link href="/lender/applications" className="mt-3 flex items-center justify-between rounded-lg bg-purple-50 p-3 text-sm"><span>18 loan applications</span><span className="font-bold text-[#7400b8]">Review <ArrowRight className="inline h-3.5 w-3.5"/></span></Link><Link href="/lender/loans?status=IN_ARREARS" className="mt-2 flex items-center justify-between rounded-lg bg-amber-50 p-3 text-sm"><span>7 repayments overdue</span><CircleAlert className="h-4 w-4 text-amber-600"/></Link></div></div>
+    </section>
+    <div className="flex flex-wrap gap-2"><Link href="/lender/funds"><Button variant="accent"><Banknote className="mr-1 inline h-4 w-4"/>Manage funds</Button></Link><Link href="/lender/offers"><Button variant="secondary"><ShieldCheck className="mr-1 inline h-4 w-4"/>Manage offers</Button></Link><Link href="/lender/loans"><Button variant="secondary">Open loan book</Button></Link></div>
   </div>;
 }
