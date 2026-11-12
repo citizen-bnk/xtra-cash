@@ -128,7 +128,7 @@ export class AdminController {
     return this.admin.funding(status);
   }
   @HttpCode(200) @Post('funding/:id/decision') fundingDecision(@CurrentUser() a: AuthUser, @Param('id') id: string, @Body() dto: DecisionDto) {
-    return this.lenders.decideFunding(a, id, dto.approve);
+    return this.lenders.decideFunding(a, id, dto.approve, dto.reason);
   }
   @Get('offers') offers() {
     return this.admin.offers();

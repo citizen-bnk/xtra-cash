@@ -312,7 +312,7 @@ export class XtraClient {
     reviewDocument: (lenderId: string, docId: string, status: 'ACCEPTED' | 'REJECTED') =>
       this.request<LenderDocument>('POST', `/admin/lenders/${lenderId}/documents/${docId}`, { status }),
     funding: (status?: string) => this.request<LenderFunding[]>('GET', '/admin/funding', undefined, { status }),
-    fundingDecision: (id: string, approve: boolean) => this.request<LenderFunding>('POST', `/admin/funding/${id}/decision`, { approve }),
+    fundingDecision: (id: string, approve: boolean, reason?: string) => this.request<LenderFunding>('POST', `/admin/funding/${id}/decision`, { approve, ...(reason ? { reason } : {}) }),
     offers: () => this.request<LoanOffer[]>('GET', '/admin/offers'),
     setOfferActive: (id: string, active: boolean) => this.request<LoanOffer>('POST', `/admin/offers/${id}/active`, { active }),
     loans: (q: Query = {}) => this.request<Paginated<Loan>>('GET', '/admin/loans', undefined, q),
