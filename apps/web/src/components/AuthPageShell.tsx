@@ -12,9 +12,11 @@ const LINKS = [
 
 export function AuthPageShell({ children, currentPath }: { children: ReactNode; currentPath: '/login' | '/register' | '/personal-loan' | '/offers' | '/install' }) {
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="safe-pt sticky top-0 z-20 border-b border-line bg-white/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:flex-wrap sm:py-4 sm:px-6">
+    <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-[#f8f5fc]">
+      <div aria-hidden="true" className="pointer-events-none absolute -right-32 -top-36 h-96 w-96 rounded-full bg-[#a617d3]/10 blur-3xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-[#fb9320]/10 blur-3xl" />
+      <header className="safe-pt relative z-20">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <Link href="/" aria-label="XTRA-CASH home" className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink">
             <Logo size={36} className="text-lg sm:text-xl" />
           </Link>
@@ -33,7 +35,7 @@ export function AuthPageShell({ children, currentPath }: { children: ReactNode; 
           </nav>
         </div>
       </header>
-      <main className="safe-pb flex flex-1 flex-col items-center justify-start px-4 py-6 sm:justify-center sm:py-14">
+      <main className="safe-pb relative flex flex-1 flex-col items-center justify-center px-4 py-6 sm:py-10">
         {children}
       </main>
       <footer className="hidden border-t border-line bg-white sm:block">
