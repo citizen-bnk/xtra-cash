@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Plus, Users } from 'lucide-react';
+import { Banknote, BadgeCheck, Layers3, Plus, ShoppingCart, Users } from 'lucide-react';
 import { bpsToPercent, EMPLOYMENT_LABELS, EmploymentStatus, formatZAR, PROVINCES, quoteLoan, type LoanOffer, type OfferInput } from '@xtra/shared';
 import { Alert, Button, Card, cx, Empty, Field, Input, Loading, Modal, MoneyInput, PageHeader, RecordActions, RecordLine, Textarea, useAction, useApi, useAuth, useToast } from '@xtra/ui';
 import { OfferAssistant } from '@/components/OfferAssistant';
@@ -40,13 +40,19 @@ export default function OffersPage() {
 
   if (!offers.data) return <Loading />;
   const live = org.data?.accreditationStatus === 'ACCREDITED';
+  const activeOffers = offers.data.filter(o => o.active);
 
   return (
     <div>
+      <section className="relative mb-5 overflow-hidden rounded-[24px] bg-gradient-to-r from-[#1b1030] via-[#5c2394] to-[#d91f63] p-5 text-white shadow-lg sm:p-6">
+        <div aria-hidden className="absolute -right-8 -top-10 h-40 w-40 rounded-full bg-fuchsia-300/25 blur-3xl"/>
+        <div className="relative flex flex-wrap items-center justify-between gap-4"><div className="flex items-start gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl border border-white/20 bg-white/15"><Layers3 className="h-6 w-6"/></span><div><span className="rounded-full bg-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">Lender portal · product management</span><h1 className="mt-2 text-2xl font-black text-white">Loan products & offers</h1><p className="mt-1 max-w-xl text-sm text-white/80">Configure pricing, eligibility and funding limits for your Credit Mall products.</p></div></div><Button className="bg-[#fb9320] text-[#1b1030] hover:bg-[#ffac45]" onClick={() => { setDraft(null); setEditing('new'); }}><Plus className="h-4 w-4"/>Create new product</Button></div>
+        <div className="relative mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">{[['Active products',String(activeOffers.length),Layers3],['Personal loans',String(activeOffers.filter(o=>o.productType==='PERSONAL').length),Banknote],['BNPL offers',String(activeOffers.filter(o=>o.productType==='BNPL').length),ShoppingCart],['Accreditation',live?'Accredited':'In progress',BadgeCheck]].map(([label,value,StatIcon]:any)=><div key={label} className="rounded-xl border border-white/15 bg-white/10 p-3"><div className="flex items-center gap-2 text-[10px] font-semibold text-white/70"><StatIcon className="h-4 w-4"/>{label}</div><div className="mt-1 text-lg font-black">{value}</div></div>)}</div>
+      </section>
       <PageHeader
-        title="Offers & lending criteria"
+        title="Manage loan products"
         subtitle="Each offer is a product in your stall. Shoppers who meet every criterion see it in their XTRA-Balance."
-        actions={<Button variant="secondary" onClick={() => { setDraft(null); setEditing('new'); }}><Plus className="h-4 w-4" /> Open offer form</Button>}
+        actions={<Button variant="secondary" onClick={() => { setDraft(null); setEditing('new'); }}><Plus className="h-4 w-4" /> Configure product</Button>}
       />
       {!live && <div className="mb-4"><Alert tone="amber">Offers go live for shoppers once your stall is accredited.</Alert></div>}
       {toggle.error && <div className="mb-4"><Alert tone="red">{toggle.error}</Alert></div>}

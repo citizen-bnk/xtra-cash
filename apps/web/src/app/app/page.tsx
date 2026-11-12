@@ -58,7 +58,10 @@ export default function ConsumerHome() {
     if (query.includes('balance') || query.includes('wallet') || query.includes('money')) { answer = `Open your wallet to view your available cash${b ? ` (${formatZAR(b.walletCents)})` : ''} and transfer status.`; action = { label: 'Open wallet', href: '/app/wallet' }; }
     else if (query.includes('card') || query.includes('pay')) { answer = 'You can view your XTRA-CASH card, make a payment or freeze it from the card screen.'; action = { label: 'Open my card', href: '/app/card' }; }
     else if (query.includes('transaction') || query.includes('activity')) { answer = 'Your latest card payments and account activity are available here.'; action = { label: 'View activity', href: '/app/activity' }; }
-    else if (query.includes('bill') || query.includes('voucher') || query.includes('store') || query.includes('bnpl') || query.includes('buy now')) { answer = 'That service is not available yet. I can still help you with a personal loan, your wallet, card or account activity.'; action = { label: 'Explore available services', href: '/app/loans' }; }
+    else if (query.includes('bill')) { answer = 'Open the bill payment journey to choose a biller and review your payment details.'; action = { label: 'Pay a bill', href: '/app/bills' }; }
+    else if (query.includes('voucher')) { answer = 'Explore vouchers and partner rewards in the vouchers hub.'; action = { label: 'View vouchers', href: '/app/vouchers' }; }
+    else if (query.includes('store') || query.includes('bnpl') || query.includes('buy now')) { answer = 'Explore participating merchants and shop-now-pay-later options.'; action = { label: 'Explore stores', href: '/app/bnpl' }; }
+    else if (query.includes('payroll') || query.includes('salary')) { answer = 'Open your salary and payroll area to review employer-linked services.'; action = { label: 'Open payroll', href: '/app/payroll' }; }
     else if (query.includes('loan') || query.includes('borrow') || query.includes('credit')) { answer = 'Start a personal-loan request by choosing an amount and repayment period. Lenders review requests and send offers for you to consider.'; action = { label: 'Get a loan', href: '/app/loans' }; }
     setMessages(all => [...all, { role: 'user', text }, { role: 'assistant', text: answer, action }]);
     setReply('');
@@ -66,20 +69,20 @@ export default function ConsumerHome() {
 
   const shortcuts = [
     { label: 'Get a Loan', icon: HandCoins, href: '/app/loans' },
-    { label: 'BNPL Shop Now', icon: ShoppingCart, unavailable: true },
-    { label: 'Pay Bills', icon: ReceiptText, unavailable: true },
-    { label: 'Vouchers & Rewards', icon: Gift, unavailable: true },
-    { label: 'Nearby Stores', icon: MapPin, unavailable: true },
+    { label: 'BNPL Shop Now', icon: ShoppingCart, href: '/app/bnpl' },
+    { label: 'Pay Bills', icon: ReceiptText, href: '/app/bills' },
+    { label: 'Vouchers & Rewards', icon: Gift, href: '/app/vouchers' },
+    { label: 'Nearby Stores', icon: MapPin, href: '/app/bnpl' },
     { label: 'My Card', icon: CreditCard, href: '/app/card' },
     { label: 'Transactions', icon: ArrowRight, href: '/app/activity' },
     { label: 'More', icon: Grid2X2, href: '/app/profile' },
   ];
   const suggestions = [
     { label: '💸 Get a loan', href: '/app/loans', size: 'col-span-2' },
-    { label: '🛒 Buy now, pay later', unavailable: true, size: 'col-span-2' },
-    { label: '🧾 Pay a bill', unavailable: true, size: 'col-span-2' },
-    { label: '📍 Find stores near me', unavailable: true, size: 'col-span-3' },
-    { label: '🎁 Get a voucher', unavailable: true, size: 'col-span-3' },
+    { label: '🛒 Buy now, pay later', href: '/app/bnpl', size: 'col-span-2' },
+    { label: '🧾 Pay a bill', href: '/app/bills', size: 'col-span-2' },
+    { label: '📍 Find stores near me', href: '/app/bnpl', size: 'col-span-3' },
+    { label: '🎁 Get a voucher', href: '/app/vouchers', size: 'col-span-3' },
   ];
 
   return <div className="xc-app-theme relative min-h-[100dvh] overflow-hidden bg-[#1b1030] text-white">
