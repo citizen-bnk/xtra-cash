@@ -18,7 +18,7 @@ export default function AdminLogin() {
     setBusy(true); setError('');
     try { await client.auth.login(identifier, password); await finish(); } catch (e) { setError(e instanceof Error ? e.message : 'Could not sign in.'); } finally { setBusy(false); }
   }
-  return <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#f8f5fc] px-4 py-8">
+  return <main className="xc-app-theme relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#f8f5fc] px-4 py-8">
     <div aria-hidden="true" className="pointer-events-none absolute -right-32 -top-36 h-96 w-96 rounded-full bg-[#a617d3]/10 blur-3xl" />
     <div aria-hidden="true" className="pointer-events-none absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-[#fb9320]/10 blur-3xl" />
     <div className="relative w-full max-w-[440px]">

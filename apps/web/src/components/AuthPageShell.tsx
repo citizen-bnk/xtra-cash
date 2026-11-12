@@ -1,18 +1,15 @@
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Logo } from '@xtra/ui';
 
-export function AuthPageShell({ children, currentPath }: { children: ReactNode; currentPath: '/login' | '/register' | '/personal-loan' | '/offers' | '/install' }) {
-  const switchHref = currentPath === '/login' ? '/register' : '/login';
-  const switchLabel = currentPath === '/login' ? 'Create account' : 'Login';
-  return <div className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-gradient-to-br from-[#31004d] via-[#7900a6] to-[#dd1587]">
-    <div aria-hidden className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-fuchsia-400/30 blur-3xl" />
-    <div aria-hidden className="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-orange-400/25 blur-3xl" />
-    <header className="safe-pt relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-5 py-4 sm:px-8">
-      <Link href="/onboarding" aria-label="XTRA-CASH app intro" className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"><Logo light size={32} /></Link>
-      <Link href={switchHref} className="inline-flex min-h-10 items-center rounded-full border border-white/30 bg-white/10 px-4 text-sm font-bold text-white backdrop-blur hover:bg-white/20">{switchLabel}</Link>
-    </header>
-    <main className="safe-pb relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-5 sm:py-8">{children}</main>
-    <footer className="relative z-10 pb-3 text-center text-[11px] text-white/60">XTRA-CASH · Put out the fire · <Link href="/onboarding" className="underline underline-offset-2">How it works</Link></footer>
+export function AuthPageShell({ children }: { children: ReactNode; currentPath: '/login' | '/register' | '/personal-loan' | '/offers' | '/install' }) {
+  return <div className="xc-app-theme min-h-[100dvh] bg-[#f4eff8] sm:grid sm:place-items-center sm:p-5">
+    <div className="mx-auto flex min-h-[100dvh] w-full max-w-[480px] flex-col overflow-hidden bg-white shadow-[0_25px_80px_rgba(42,22,64,.18)] sm:min-h-[min(900px,calc(100dvh-2.5rem))] sm:rounded-[34px]">
+      <header className="safe-pt relative flex min-h-[218px] shrink-0 flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#5c2394] via-[#a617d3] to-[#d91f63] px-5 pb-8 pt-7 text-center text-white">
+        <div aria-hidden className="absolute -right-16 -top-14 h-48 w-48 rounded-full bg-[#fa941f]/45 blur-3xl" />
+        <div aria-hidden className="absolute -bottom-24 -left-12 h-44 w-44 rounded-full bg-[#da1786]/50 blur-2xl" />
+        <div className="relative"><Logo light size={44} /><p className="mt-2 text-sm font-medium italic text-white/90">Put out the fire.</p></div>
+      </header>
+      <main className="safe-pb relative -mt-6 flex flex-1 flex-col rounded-t-[30px] bg-white px-5 pb-6 pt-7 sm:px-8">{children}</main>
+    </div>
   </div>;
 }

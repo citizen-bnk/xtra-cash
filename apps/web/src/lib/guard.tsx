@@ -6,7 +6,7 @@ import type { Role } from '@xtra/shared';
 import { Loading, useAuth } from '@xtra/ui';
 
 /** Client-side route guard: redirects to /login when signed out, or away when the role is missing. */
-export function RequireRole({ roles, children, fallback = '/app' }: { roles: Role[]; children: React.ReactNode; fallback?: string }) {
+export function RequireRole({ roles, children, fallback = '/app', signedOutRoute = '/login' }: { roles: Role[]; children: React.ReactNode; fallback?: string; signedOutRoute?: string }) {
   const { me, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -14,9 +14,9 @@ export function RequireRole({ roles, children, fallback = '/app' }: { roles: Rol
   const allowed = !!me && roles.some((r) => me.roles.includes(r));
   useEffect(() => {
     if (loading) return;
-    if (!me) router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+    if (!me) router.replace(`${signedOutRoute}?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
     else if (!allowed) router.replace(fallback);
-  }, [loading, me, allowed, router, fallback]);
+  }, [loading, me, allowed, router, fallback, signedOutRoute]);
   if (loading || !allowed) return <Loading />;
   if (me?.profileComplete === false && needsName) return <ServiceProfile />;
   return <>{children}</>;

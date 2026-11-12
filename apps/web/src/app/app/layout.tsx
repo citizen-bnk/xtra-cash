@@ -45,9 +45,9 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
   );
 
   return (
-    <RequireRole roles={['CONSUMER', 'AFFILIATE', 'LENDER']}>
+    <RequireRole roles={['CONSUMER', 'AFFILIATE', 'LENDER']} signedOutRoute="/onboarding">
       <MarketingLocationObserver />
-      <div className={immersiveHome ? 'min-h-[100dvh]' : 'min-h-[100dvh] pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))] lg:pb-0'}>
+      <div className={`xc-app-theme ${immersiveHome ? 'min-h-[100dvh]' : 'min-h-[100dvh] pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))] lg:pb-0'}`}>
         {!immersiveHome && <header className="safe-pt sticky top-0 z-30 border-b border-line/70 bg-white/90 backdrop-blur-md">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5 lg:py-3">
             <Link href="/app" aria-label="XTRA-CASH home" className="hidden lg:block">
