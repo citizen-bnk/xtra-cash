@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Linking, Share, Text } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { formatZAR, type NearbyCampaign } from '@xtra/shared';
 import { useApi, useAuth } from '../../src/auth';
 import { Button, Card, H1, Loading, Muted, Screen } from '../../src/ui';
@@ -12,7 +12,7 @@ export default function Offer() {
   if (!offer.data) return <Screen>{offer.error ? <Text>{offer.error}</Text> : <Loading />}</Screen>;
   const o = offer.data;
   return <Screen><H1>{o.title}</H1><Card><Muted>{o.place}</Muted><Text>{formatZAR(o.minAmountCents)}–{formatZAR(o.maxAmountCents)} · {o.termMonths} months</Text><Muted>{o.message}</Muted><Muted>Sharing does not transfer eligibility. Lender names remain private until verification.</Muted></Card>
-    <Button title={o.productType === 'PERSONAL' ? 'Apply' : 'Explore BNPL'} onPress={async () => { const next = o.productType === 'PERSONAL' ? `/personal-loan?amountCents=${Math.max(50000, Math.min(o.maxAmountCents, Math.max(100000, o.minAmountCents)))}&termMonths=${o.termMonths}` : '/app'; try { await Linking.openURL(WEB_URL + next); if (me?.roles.includes('CONSUMER')) await client.request('POST', `/marketing/campaigns/${id}/events`, { kind: 'APPLY' }); } catch { setError('Could not open the offer. Please try again.'); } }} />
+    <Button title={o.productType === 'PERSONAL' ? 'Apply' : 'Explore BNPL'} onPress={async () => { try { if (me?.roles.includes('CONSUMER')) await client.request('POST', `/marketing/campaigns/${id}/events`, { kind: 'APPLY' }).catch(() => {}); if (o.productType === 'PERSONAL') { const amountCents = Math.max(50000, Math.min(o.maxAmountCents, Math.max(100000, o.minAmountCents))); router.push({ pathname: '/personal-loan', params: { amountCents: String(amountCents), termMonths: String(o.termMonths) } }); } else await Linking.openURL(WEB_URL + '/app'); } catch { setError('Could not open the offer. Please try again.'); } }} />
     <Button title="Share offer" variant="secondary" onPress={async () => { try { const result = await Share.share({ message: `Explore this XTRA-CASH offer: ${WEB_URL}/offers/${id}` }); if (result.action === Share.sharedAction && me?.roles.includes('CONSUMER')) await client.request('POST', `/marketing/campaigns/${id}/events`, { kind: 'SHARE' }); } catch { setError('Could not share this offer.'); } }} />{error && <Text>{error}</Text>}
   </Screen>;
 }
