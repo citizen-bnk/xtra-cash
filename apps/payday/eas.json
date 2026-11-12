@@ -1,1 +1,22 @@
-{"cli":{"appVersionSource":"remote"},"build":{"preview":{"distribution":"internal","android":{"buildType":"apk"},"env":{"EXPO_PUBLIC_API_URL":"https://xtra-cash-api.vercel.app"}},"production":{"autoIncrement":true,"env":{"EXPO_PUBLIC_API_URL":"https://xtra-cash-api.vercel.app"}}}}
+{
+  "cli": { "appVersionSource": "remote" },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": { "EXPO_PUBLIC_API_URL": "https://xtra-cash-api.vercel.app" }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": { "EXPO_PUBLIC_API_URL": "https://xtra-cash-api.vercel.app" }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "production",
+        "releaseStatus": "completed"
+      }
+    }
+  }
+}
