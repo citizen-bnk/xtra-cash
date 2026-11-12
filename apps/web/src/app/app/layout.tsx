@@ -1,40 +1,34 @@
 'use client';
 import {LoanActionCentre} from '@xtra/ui';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { CreditCard, Home, ListOrdered, ReceiptText, ScanLine, UserRound } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { Home, ListOrdered, ReceiptText, UserRound, Wallet } from 'lucide-react';
 import { cx, Logo, useAuth } from '@xtra/ui';
 import { RequireRole } from '@/lib/guard';
-import { PAY_EVENT } from '@/lib/pay-event';
 import { MarketingLocationObserver } from '@/components/MarketingLocationObserver';
 
 const NAV = [
   { href: '/app', label: 'Home', icon: Home, exact: true },
-  { href: '/app/card', label: 'Card', icon: CreditCard },
   { href: '/app/loans', label: 'Loans', icon: ListOrdered },
+  { href: '/app/wallet', label: 'Wallet', icon: Wallet },
   { href: '/app/activity', label: 'Activity', icon: ReceiptText },
   { href: '/app/profile', label: 'Profile', icon: UserRound },
 ];
 
-/** Phone tab bar: Pay sits in the middle, raised, because paying at the till is the main job. */
+/** Phone navigation follows the customer journey board: Home, Loans, Wallet, Activity, Profile. */
 const TABS = [
   { href: '/app', label: 'Home', icon: Home, exact: true },
-  { href: '/app/card', label: 'Card', icon: CreditCard },
   { href: '/app/loans', label: 'Loans', icon: ListOrdered },
-  { href: '/app/profile', label: 'Me', icon: UserRound },
+  { href: '/app/wallet', label: 'Wallet', icon: Wallet },
+  { href: '/app/activity', label: 'Activity', icon: ReceiptText },
+  { href: '/app/profile', label: 'Profile', icon: UserRound },
 ];
 
 export default function ConsumerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { me } = useAuth();
   const active = (n: { href: string; exact?: boolean }) => (n.exact ? pathname === n.href : pathname.startsWith(n.href));
   const initials = `${me?.firstName?.[0] ?? ''}${me?.lastName?.[0] ?? ''}`.toUpperCase() || 'Me';
-  const pay = () => {
-    if (pathname === '/app') window.dispatchEvent(new Event(PAY_EVENT));
-    else router.push('/app?pay=1');
-  };
-
   const tab = (n: (typeof TABS)[number]) => (
     <Link
       key={n.href}
@@ -92,21 +86,8 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
           {children}
         </main>
         <nav aria-label="App" className="safe-pb fixed inset-x-0 bottom-0 z-30 border-t border-line/70 bg-white/95 backdrop-blur-md lg:hidden">
-          <div className="mx-auto grid max-w-md grid-cols-5 items-end">
-            {TABS.slice(0, 2).map(tab)}
-            <div className="flex justify-center">
-              <button
-                onClick={pay}
-                aria-label="Pay"
-                className="pressable -mt-6 flex flex-col items-center gap-1 pb-1.5 text-[11px] font-semibold text-ink"
-              >
-                <span className="grid h-14 w-14 place-items-center rounded-full bg-brand-purple text-white shadow-lg shadow-brand/40 ring-4 ring-white">
-                  <ScanLine className="h-6 w-6" />
-                </span>
-                Pay
-              </button>
-            </div>
-            {TABS.slice(2).map(tab)}
+          <div className="mx-auto grid max-w-md grid-cols-5 items-center">
+            {TABS.map(tab)}
           </div>
         </nav>
       </div>
