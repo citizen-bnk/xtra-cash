@@ -2,9 +2,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Bell, Check, ChevronRight, CircleHelp, CreditCard, Fingerprint, Landmark, LockKeyhole, LogOut, Mail, MapPin, ShieldCheck, UserRound, Wallet, X } from 'lucide-react';
+import { ArrowLeft, Bell, Check, ChevronRight, CircleHelp, CreditCard, Database, Fingerprint, Landmark, LockKeyhole, LogOut, Mail, MapPin, ShieldCheck, UserRound, Wallet } from 'lucide-react';
 import { formatZAR } from '@xtra/shared';
 import { Alert, Button, Card, Field, Input, SecuritySettings, StatusBadge, useAuth, useToast } from '@xtra/ui';
+import { ServiceProfile } from '@/components/ServiceProfile';
 
 type Screen = 'home' | 'personal' | 'photo' | 'contact' | 'security' | 'notifications' | 'privacy' | 'linked' | 'logout' | 'success';
 type Preferences = { marketing: boolean; locationEnabled: boolean; devices?: unknown[]; webPush?: boolean; nativePush?: boolean };
@@ -23,12 +24,15 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState(''); const [lastName, setLastName] = useState('');
   const [preferences, setPreferences] = useState<Preferences>({ marketing: false, locationEnabled: false });
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const [joining, setJoining] = useState(false);
   useEffect(() => { if (me) { setFirstName(me.firstName ?? ''); setLastName(me.lastName ?? ''); } }, [me]);
   useEffect(() => { client.request<Preferences>('GET', '/marketing/preferences').then(setPreferences).catch(() => undefined); }, [client]);
   if (!me) return null;
+  if (joining && me.profileComplete === false) return <ServiceProfile afterSave={async () => { await client.affiliate.join(); await refreshMe(); setJoining(false); toast('Welcome to the affiliate programme!'); }} />;
   const fullName = `${me.firstName ?? ''} ${me.lastName ?? ''}`.trim() || 'XTRA-CASH customer';
   const initials = `${me.firstName?.[0] ?? 'X'}${me.lastName?.[0] ?? 'C'}`.toUpperCase();
   const verification = me.kyc?.status ?? 'NOT_STARTED';
+  const affiliateLink = typeof window !== 'undefined' ? `${window.location.origin}/register?ref=${me.referralCode}` : '';
 
   async function saveName() {
     setBusy(true); setError('');
@@ -61,6 +65,8 @@ export default function ProfilePage() {
         { label: 'Account', value: verification === 'VERIFIED' ? 'Secure' : 'Complete profile', href: '/app/kyc', icon: ShieldCheck },
       ].map(item => <Link key={item.label} href={item.href} className="rounded-2xl border border-violet-100 bg-white p-3 shadow-sm"><item.icon className="h-5 w-5 text-fuchsia-700"/><div className="mt-2 text-[11px] text-muted">{item.label}</div><div className="truncate text-xs font-bold">{item.value}</div></Link>)}</div>
       <section className="space-y-2">{rows.map(item => <button key={item.id} onClick={() => { setError(''); setScreen(item.id); }} className="flex w-full items-center gap-3 rounded-2xl border border-violet-100 bg-white px-4 py-3 text-left shadow-sm transition hover:border-fuchsia-300"><span className="grid h-10 w-10 place-items-center rounded-xl bg-fuchsia-50 text-fuchsia-700"><item.icon className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block font-semibold">{item.title}</span><span className="block truncate text-xs text-muted">{item.subtitle}</span></span><ChevronRight className="h-5 w-5 text-violet-500"/></button>)}</section>
+      <section className="grid grid-cols-2 gap-2"><Link href="/app/data-vault" className="flex items-center gap-2 rounded-xl border border-violet-100 bg-white p-3 text-xs font-semibold"><Database className="h-4 w-4 text-fuchsia-700"/>My data vault</Link><Link href="/install" className="flex items-center gap-2 rounded-xl border border-violet-100 bg-white p-3 text-xs font-semibold"><Wallet className="h-4 w-4 text-fuchsia-700"/>Install app</Link>{me.roles.includes('LENDER') && <Link href="/lender" className="flex items-center gap-2 rounded-xl border border-violet-100 bg-white p-3 text-xs font-semibold"><Landmark className="h-4 w-4 text-fuchsia-700"/>Lender portal</Link>}{me.roles.includes('AFFILIATE') && <Link href="/affiliate" className="flex items-center gap-2 rounded-xl border border-violet-100 bg-white p-3 text-xs font-semibold"><UserRound className="h-4 w-4 text-fuchsia-700"/>Affiliate dashboard</Link>}</section>
+      <Card className="p-4"><div className="font-semibold">Invite friends, earn commission</div>{me.affiliate ? <><p className="mt-1 text-xs text-muted">Share your link to invite people to XTRA-CASH.</p><div className="mt-2 flex gap-2"><code className="min-w-0 flex-1 truncate rounded-lg bg-violet-50 px-3 py-2 text-[11px]">{affiliateLink}</code><Button size="sm" variant="secondary" onClick={() => navigator.clipboard.writeText(affiliateLink).then(() => toast('Link copied'))}>Copy</Button></div><Link href="/affiliate" className="mt-2 inline-block text-xs font-bold text-fuchsia-700">Open affiliate dashboard →</Link></> : <><p className="mt-1 text-xs text-muted">Join the affiliate programme and earn when you onboard new users.</p><Button size="sm" className="mt-3" onClick={async () => { if (me.profileComplete === false) { setJoining(true); return; } await client.affiliate.join(); await refreshMe(); toast('Welcome to the affiliate programme!'); }}>Become an affiliate</Button></>}</Card>
       <button onClick={() => setScreen('logout')} className="flex w-full items-center gap-3 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-left font-semibold text-rose-700"><LogOut className="h-5 w-5"/>Log out<span className="ml-auto"><ChevronRight className="h-5 w-5"/></span></button>
       <p className="text-center text-xs text-muted">XTRA-CASH · Your account, in your control</p>
     </>}
