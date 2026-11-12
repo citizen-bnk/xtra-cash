@@ -1,3 +1,21 @@
 @import "tailwindcss";
 @import "../../../../packages/ui/theme.css";
 @source "../../../../packages/ui/src";
+
+/* Back-office pages use the same deep purple, bright action and compact record language as the approved boards. */
+.xc-admin-content {
+  min-height: calc(100dvh - 4rem);
+  color: #1b1030;
+  background-image: url('/brand/ui/illustration_scorecard.png'), radial-gradient(ellipse at 100% 0%, rgba(166, 23, 211, .08), transparent 34%), linear-gradient(180deg, #fbf9fd 0%, #f5f1fa 100%);
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: right 1.25rem top 1rem, right top, center;
+  background-size: 150px auto, 100% 280px, cover;
+}
+.xc-admin-content h1 { color: #28133b; font-family: "Poppins", var(--font-inter), sans-serif; letter-spacing: -.025em; }
+.xc-admin-content h2, .xc-admin-content h3 { color: #3b1a5e; font-family: "Poppins", var(--font-inter), sans-serif; }
+.xc-admin-content [class*="rounded-2xl"][class*="bg-white"] { box-shadow: 0 8px 24px rgba(51, 17, 78, .07); }
+.xc-admin-content [class*="overflow-hidden rounded-2xl"][class*="border"] { box-shadow: 0 8px 24px rgba(51, 17, 78, .07); }
+.xc-admin-content input:focus, .xc-admin-content select:focus, .xc-admin-content textarea:focus { outline-color: #a617d3; }
+@media (max-width: 639px) {
+  .xc-admin-content { background-size: 92px auto, 100% 220px, cover; background-position: right .8rem top .8rem, right top, center; }
+}

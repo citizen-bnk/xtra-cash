@@ -102,7 +102,7 @@ export function QuickAccess({ initialRegister = false }: { initialRegister?: boo
           <Button className="w-full rounded-xl bg-brand-orange text-ink hover:bg-brand-orange-dark" size="lg" loading={busy}>Log in <ArrowRight className="h-4 w-4" /></Button>
         </form>
       </section>}
-      {register ? <div className="mt-6 text-center text-sm text-muted">Already have an account? <Link href={`/login${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`} className="font-bold text-brand-purple underline">Log in</Link></div> : <nav aria-label="Sign-in links" className="mt-5 flex items-center justify-center gap-4 text-xs sm:gap-6"><Link href="/" className="font-semibold text-muted underline underline-offset-2">Home</Link><PasswordResetLink /><Link href="/register" className="font-semibold text-brand-purple underline underline-offset-2">Register</Link></nav>}
+      {register ? <div className="mt-6 text-center text-sm text-muted">Already have an account? <Link href={`/login${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`} className="font-bold text-brand-purple underline">Log in</Link></div> : <nav aria-label="Sign-in links" className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] sm:gap-x-6 sm:text-xs"><Link href="/" className="font-semibold text-muted underline underline-offset-2">Home</Link><PasswordResetLink /><Link href="/register" className="font-semibold text-brand-purple underline underline-offset-2">Register</Link><Link href="https://xtra-cash-admin.vercel.app/login" className="font-semibold text-brand-purple underline underline-offset-2">Back office</Link></nav>}
   </div>;
 }
 

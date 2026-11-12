@@ -2,3 +2,19 @@
 @import "../../../../packages/ui/theme.css";
 @source "../../../../packages/ui/src";
 @source "../../../../node_modules/streamdown/dist/*.js";
+
+/* Customer routes share the immersive mobile visual system shown in the journey boards. */
+.xc-customer-surface {
+  background-color: #f7f3fb;
+  background-image: url('/brand/ui/illustration_ecosystem.png'), radial-gradient(ellipse at 100% 0%, rgba(166, 23, 211, .10), transparent 34%), linear-gradient(180deg, #fbf9fd 0%, #f4eff9 100%);
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: right 1rem top .75rem, right top, center;
+  background-size: 112px auto, 100% 250px, cover;
+}
+.xc-customer-surface h1 { color: #2a1640; font-family: "Poppins", var(--font-inter), sans-serif; }
+.xc-customer-surface > div > [class*="mb-6"] h1 { font-size: clamp(1.35rem, 4vw, 1.8rem); }
+.xc-customer-surface [class*="rounded-2xl"][class*="bg-white"] { box-shadow: 0 8px 24px rgba(51, 17, 78, .075); }
+.xc-customer-app > nav[aria-label="App"] { border-color: rgba(92, 35, 148, .16); }
+@media (min-width: 1024px) {
+  .xc-customer-surface { background-size: 172px auto, 100% 320px, cover; background-position: right 2rem top 1rem, right top, center; }
+}
