@@ -117,6 +117,7 @@ export async function buildDemoData(app: Resolver, staffAccounts = SEED_STAFF) {
     firstName: 'Thabo',
     lastName: 'Nkosi',
     accountType: 'AFFILIATE',
+    consent: true,
   });
   await affiliates.saveBank(aff.user.id, { bankName: 'Capitec', bankAccountNumber: '1234567890' });
   const ref = aff.user.referralCode;
@@ -130,6 +131,7 @@ export async function buildDemoData(app: Resolver, staffAccounts = SEED_STAFF) {
       firstName: first,
       lastName: last,
       accountType: 'LENDER',
+      consent: true,
       lenderName: org,
       referralCode: withRef ? ref : undefined,
     });
@@ -253,7 +255,7 @@ export async function buildDemoData(app: Resolver, staffAccounts = SEED_STAFF) {
     k: { province: string; employmentStatus: any; income: number; expenses: number; employer?: string },
     withRef = true,
   ) => {
-    const r = await registerDemo({ email, phone, password: DEMO_PASSWORD, firstName: first, lastName: last, accountType: 'CONSUMER', referralCode: withRef ? ref : undefined });
+    const r = await registerDemo({ email, phone, password: DEMO_PASSWORD, firstName: first, lastName: last, accountType: 'CONSUMER', consent: true, referralCode: withRef ? ref : undefined });
     await kyc.submit(r.user.id, {
       idNumber: makeSaId(new Date(dob), seq),
       province: k.province,

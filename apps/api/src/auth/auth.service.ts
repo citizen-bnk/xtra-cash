@@ -77,7 +77,13 @@ export class AuthService {
         await tx.insert(lenderOrgs).values({ ownerUserId: u.id, name: dto.lenderName?.trim() || 'My lending business', contactEmail: email ?? '', contactPhone: phone ?? '' });
       }
       if (dto.accountType === 'AFFILIATE') await tx.insert(affiliateProfiles).values({ userId: u.id });
-      await this.audit.log({ id: u.id, email, roles }, 'user.registered', 'user', u.id, { accountType: dto.accountType, referredById, ...(quick ? { consentAt: new Date().toISOString(), profileDeferred: true } : {}) }, tx);
+      await this.audit.log({ id: u.id, email, roles }, 'user.registered', 'user', u.id, {
+        accountType: dto.accountType,
+        referredById,
+        consentAt: new Date().toISOString(),
+        consentVersion: 'account-creation-v1',
+        ...(quick ? { profileDeferred: true } : {}),
+      }, tx);
       return u;
     });
 

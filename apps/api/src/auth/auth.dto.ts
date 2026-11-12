@@ -17,6 +17,7 @@ export class RegisterDto {
   @IsString() @MinLength(1) @MaxLength(60) firstName: string;
   @IsString() @MinLength(1) @MaxLength(60) lastName: string;
   @IsIn(['CONSUMER', 'LENDER', 'AFFILIATE']) accountType: 'CONSUMER' | 'LENDER' | 'AFFILIATE';
+  @Equals(true) consent: boolean;
   @IsOptional() @IsString() @MaxLength(20) referralCode?: string;
   @IsOptional() @IsString() @MaxLength(120) lenderName?: string;
 }
