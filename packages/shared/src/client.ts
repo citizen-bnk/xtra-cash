@@ -309,8 +309,8 @@ export class XtraClient {
     lenders: (status?: string) => this.request<(LenderOrg & { owner: Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'status'> })[]>('GET', '/admin/lenders', undefined, { status }),
     lender: (id: string) => this.request<LenderOrg & { stats: LenderStats; offers: LoanOffer[]; funding: LenderFunding[] }>('GET', `/admin/lenders/${id}`),
     reviewLender: (id: string, status: string, notes?: string) => this.request<LenderOrg>('POST', `/admin/lenders/${id}/review`, { status, notes }),
-    reviewDocument: (lenderId: string, docId: string, status: 'ACCEPTED' | 'REJECTED') =>
-      this.request<LenderDocument>('POST', `/admin/lenders/${lenderId}/documents/${docId}`, { status }),
+    reviewDocument: (lenderId: string, docId: string, status: 'ACCEPTED' | 'REJECTED', comment?: string) =>
+      this.request<LenderDocument>('POST', `/admin/lenders/${lenderId}/documents/${docId}`, { status, comment }),
     funding: (status?: string) => this.request<LenderFunding[]>('GET', '/admin/funding', undefined, { status }),
     fundingDecision: (id: string, approve: boolean, reason?: string) => this.request<LenderFunding>('POST', `/admin/funding/${id}/decision`, { approve, ...(reason ? { reason } : {}) }),
     offers: () => this.request<LoanOffer[]>('GET', '/admin/offers'),

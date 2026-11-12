@@ -34,6 +34,7 @@ class NcrDto {
 }
 class DocReviewDto {
   @IsIn(['ACCEPTED', 'REJECTED']) status: 'ACCEPTED' | 'REJECTED';
+  @IsOptional() @IsString() @MaxLength(1000) comment?: string;
 }
 class ActiveDto {
   @IsBoolean() active: boolean;
@@ -116,7 +117,7 @@ export class AdminController {
   @HttpCode(200)
   @Post('lenders/:id/documents/:docId')
   reviewDoc(@CurrentUser() a: AuthUser, @Param('id') id: string, @Param('docId') docId: string, @Body() dto: DocReviewDto) {
-    return this.admin.reviewDocument(a, id, docId, dto.status);
+    return this.admin.reviewDocument(a, id, docId, dto.status, dto.comment);
   }
   @Get('lenders/:id/documents/:docId/file')
   async docFile(@Param('id') id: string, @Param('docId') docId: string, @Res() res: Response) {
