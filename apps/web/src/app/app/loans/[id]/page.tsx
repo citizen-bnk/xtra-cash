@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { bpsToPercent, formatZAR } from '@xtra/shared';
-import { Alert, Button, Card, Field, Loading, Modal, MoneyInput, PageHeader, StatusBadge, Table, useAction, useApi, useAuth, useToast } from '@xtra/ui';
+import { Alert, Button, Card, Field, Loading, Modal, MoneyInput, PageHeader, StatusBadge, useAction, useApi, useAuth, useToast } from '@xtra/ui';
 
 export default function LoanDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -25,6 +25,9 @@ export default function LoanDetail({ params }: { params: Promise<{ id: string }>
   const l = loan.data;
   if (!l) return <Alert tone="red">{loan.error}</Alert>;
   const next = l.nextDue ? l.nextDue.amountCents - l.nextDue.paidCents : 0;
+  const installments = l.installments ?? [];
+  const paid = Math.max(0, l.totalRepayableCents - l.outstandingCents);
+  const progress = l.totalRepayableCents ? Math.min(100, Math.round((paid / l.totalRepayableCents) * 100)) : 0;
 
   return (
     <div>
@@ -51,32 +54,15 @@ export default function LoanDetail({ params }: { params: Promise<{ id: string }>
         }
       />
       {l.status === 'IN_ARREARS' && <div className="mb-4"><Alert tone="red" title="Payment overdue">Please pay your overdue installment to avoid fees and to unlock new XTRA-CASH credit.</Alert></div>}
-      <div className="mb-6 grid gap-3 sm:grid-cols-4">
-        {[
-          ['Borrowed', formatZAR(l.principalCents)],
-          ['Total repayable', formatZAR(l.totalRepayableCents)],
-          ['Paid so far', formatZAR(l.totalRepayableCents - l.outstandingCents)],
-          ['Outstanding', formatZAR(l.outstandingCents)],
-        ].map(([k, v]) => (
-          <Card key={k} className="p-4">
-            <div className="text-xs text-muted">{k}</div>
-            <div className="mt-1 text-lg font-bold tabular-nums">{v}</div>
-          </Card>
-        ))}
-      </div>
-      <p className="mb-3 text-xs text-muted">
-        {bpsToPercent(l.monthlyInterestRateBps)} interest per month · initiation fee {formatZAR(l.initiationFeeCents)} · service fee {formatZAR(l.monthlyServiceFeeCents)}/month · {l.termMonths} months. Settle early at any time with no penalty.
-      </p>
-      <Table
-        rows={l.installments ?? []}
-        columns={[
-          { header: '#', cell: (i) => i.seq },
-          { header: 'Due date', cell: (i) => new Date(i.dueDate).toLocaleDateString('en-ZA') },
-          { header: 'Amount', align: 'right', cell: (i) => formatZAR(i.amountCents) },
-          { header: 'Paid', align: 'right', cell: (i) => formatZAR(i.paidCents) },
-          { header: 'Status', cell: (i) => <StatusBadge status={i.status} /> },
-        ]}
-      />
+      <Card className="mb-5 space-y-4 p-4 sm:p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm text-muted">Outstanding balance</p><p className="mt-1 text-3xl font-black tabular-nums">{formatZAR(l.outstandingCents)}</p></div><div className="text-right"><p className="text-xs text-muted">Total repayable</p><p className="font-bold tabular-nums">{formatZAR(l.totalRepayableCents)}</p></div></div>
+        <div><div className="h-1.5 overflow-hidden rounded-full bg-surface" aria-label={`${progress}% repaid`}><div className="h-full rounded-full bg-brand-purple" style={{ width: `${progress}%` }} /></div><div className="mt-1 flex justify-between text-xs text-muted"><span>{formatZAR(paid)} paid · {progress}%</span><span>{l.termMonths} month term</span></div></div>
+        <div className="grid grid-cols-2 gap-3 border-t border-line pt-3 text-sm"><div><p className="text-xs text-muted">Original amount</p><p className="font-semibold">{formatZAR(l.principalCents)}</p></div><div><p className="text-xs text-muted">Next payment</p><p className="font-semibold">{next ? formatZAR(next) : 'No payment due'}</p>{l.nextDue && <p className="text-xs text-muted">{new Date(l.nextDue.dueDate).toLocaleDateString('en-ZA')}</p>}</div></div>
+      </Card>
+      <details className="mb-4 rounded-xl border border-line bg-white px-4 py-3 text-sm"><summary className="cursor-pointer font-semibold">Interest, fees and terms</summary><p className="mt-3 text-muted">{bpsToPercent(l.monthlyInterestRateBps)} interest per month · initiation fee {formatZAR(l.initiationFeeCents)} · service fee {formatZAR(l.monthlyServiceFeeCents)}/month. Settle early at any time with no penalty.</p></details>
+      <section className="space-y-2" aria-label="Repayment schedule"><div className="flex items-center justify-between"><h2 className="font-bold">Repayment schedule</h2><span className="text-xs text-muted">{l.installments?.length ?? 0} instalments</span></div>
+        {installments.length ? <Card className="space-y-0 p-0">{installments.map((i) => <div key={i.id ?? i.seq} className="flex min-w-0 items-center gap-2 border-b border-line px-3 py-3 last:border-0 sm:gap-4 sm:px-4"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">Payment {i.seq} <span className="font-normal text-muted">· {new Date(i.dueDate).toLocaleDateString('en-ZA')}</span></p>{i.paidCents > 0 && <p className="text-xs text-muted">{formatZAR(i.paidCents)} paid</p>}</div><p className="shrink-0 text-sm font-bold tabular-nums">{formatZAR(i.amountCents)}</p><StatusBadge status={i.status} /></div>)}</Card> : <Card><p className="text-sm text-muted">Your repayment schedule is not available yet.</p></Card>}
+      </section>
       <Modal open={open} onClose={() => setOpen(false)} title="Make a payment">
         <div className="space-y-4">
           <div className="rounded-xl bg-surface p-3 text-sm">
