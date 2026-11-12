@@ -20,6 +20,7 @@ export default function Profile() {
         {me.kyc && <Row k="Employment" v={EMPLOYMENT_LABELS[me.kyc.employmentStatus]} />}
         {me.kyc && <Row k="Income" v={formatZAR(me.kyc.monthlyIncomeCents)} />}
       </Card>
+      <Button title="Open my personal data vault" variant="secondary" onPress={() => router.push('/data-vault')} />
       <Button title="Update income & expenses" variant="secondary" onPress={() => router.push('/kyc')} />
       <Card>
         <H2>Invite friends, earn commission</H2>

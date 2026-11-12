@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { AppState, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useApi, useAuth } from './auth';
 import { Button, Card, ErrorText, Muted } from './ui';
 import { colors } from './theme';
@@ -22,9 +23,15 @@ export function NativeLoanNotifications() {
   async function act(n: LoanNotification) {
     setNotice('');
     const reviewer = me?.roles.some((r) => r === 'LENDER' || r === 'ADMIN' || r === 'SUPER_ADMIN');
-    const path = n.kind === 'WALLET' ? '/app/wallet' : reviewer ? `/lender/applications/${encodeURIComponent(n.applicationId)}` : `/app/applications/${encodeURIComponent(n.applicationId)}`;
     try {
-      await Linking.openURL(WEB_URL + path);
+      if (!reviewer && n.kind === 'WALLET') {
+        router.push('/(tabs)');
+      } else if (!reviewer) {
+        router.push({ pathname: '/personal-loan', params: { applicationId: n.applicationId } });
+      } else {
+        const path = `/lender/applications/${encodeURIComponent(n.applicationId)}`;
+        await Linking.openURL(WEB_URL + path);
+      }
       await client.request('POST', '/loan-operations/notifications/read', { key: n.key });
       await feed.reload();
       setOpen(false);
