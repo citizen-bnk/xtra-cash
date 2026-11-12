@@ -71,10 +71,10 @@ export function AppShell({
           onClick={() => setOpen(false)}
           className={cx(
             'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition',
-            isActive(n) ? 'bg-white/10 text-white' : 'text-white/65 hover:bg-white/5 hover:text-white',
+            isActive(n) ? 'bg-brand-orange text-[#2a1640] shadow-sm' : 'text-white/75 hover:bg-white/10 hover:text-white',
           )}
         >
-          <n.icon className={cx('h-4 w-4', isActive(n) && 'text-brand-orange')} />
+          <n.icon className={cx('h-4 w-4', isActive(n) ? 'text-[#2a1640]' : 'text-white/70')} />
           <span className="flex-1">{n.label}</span>
           {n.badge ? <span className="rounded-full bg-brand px-1.5 text-xs font-bold text-white">{n.badge}</span> : null}
         </Link>
@@ -83,7 +83,7 @@ export function AppShell({
   );
 
   const side = (
-    <div className="flex h-full flex-col bg-ink px-3 py-4">
+    <div className="flex h-full flex-col bg-gradient-to-b from-[#1b1030] via-[#28123e] to-[#1b1030] px-3 py-4">
       <div className="mb-6 px-2">
         <Logo light />
         <div className="mt-1 text-xs font-medium uppercase tracking-wider text-white/50">{section}</div>
@@ -103,9 +103,9 @@ export function AppShell({
   );
 
   return (
-    <div className="min-h-screen">
+    <div className="xc-app-theme min-h-screen">
       <aside className="fixed inset-y-0 left-0 hidden w-60 lg:block">{side}</aside>
-      <header className="safe-pt sticky top-0 z-30 bg-ink lg:hidden">
+      <header className="safe-pt sticky top-0 z-30 bg-gradient-to-r from-[#5c2394] via-[#a617d3] to-[#d91f63] lg:hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-2.5">
           <div className="min-w-0">
             <Logo light size={26} />
@@ -177,7 +177,7 @@ export function AppShell({
         </div>
       )}
       <main className={cx('lg:pl-60', nav.length > 1 && 'pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0')}>
-        <header className={cx('sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-line bg-white px-4 py-2', topBarClassName)}>{topBarContent}<div className="ml-auto flex items-center gap-2"><WorkFormAssistant pathname={pathname}/><LoanActionCentre/></div></header>
+        <header className={cx('sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-white/10 bg-gradient-to-r from-[#5c2394] via-[#a617d3] to-[#d91f63] px-4 py-2 text-white [&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white', topBarClassName)}>{topBarContent ?? <div className="hidden text-sm font-bold text-white/90 lg:block">{section}</div>}<div className="ml-auto flex items-center gap-2"><WorkFormAssistant pathname={pathname}/><LoanActionCentre/></div></header>
         <div className={cx('mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8', contentClassName)}>{children}</div>
       </main>
     </div>

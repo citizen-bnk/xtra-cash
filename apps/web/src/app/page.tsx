@@ -23,7 +23,7 @@ export default function Landing() {
   useEffect(() => {
     if (me) router.replace(homeFor(me));
     // Opened from the home-screen icon: go straight into the app (sign-in if needed).
-    else if (!loading && pwa.ready && pwa.installed) router.replace('/login');
+    else if (!loading && pwa.ready && pwa.installed) router.replace('/onboarding');
   }, [me, loading, pwa.ready, pwa.installed, router]);
 
   return (

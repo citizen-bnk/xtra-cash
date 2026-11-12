@@ -18,6 +18,7 @@ export default function KycPage() {
   const [income, setIncome] = useState<number | null>(k?.monthlyIncomeCents ?? null);
   const [expenses, setExpenses] = useState<number | null>(k?.monthlyExpensesCents ?? null);
   const [consent, setConsent] = useState(false);
+  useEffect(() => { const draftId = sessionStorage.getItem('xc.pendingIdNumber'); if (draftId && !k?.idNumber) setIdNumber(draftId); }, [k?.idNumber]);
   useEffect(() => { const p = profile.data; if (!p || initialized.current) return; initialized.current = true; if (p.identityType === 'ID' && p.identityNumber) setIdNumber(p.identityNumber); if (p.province) setProvince(p.province); if (p.employment) setEmployment(p.employment); if (p.income !== null) setIncome(p.income); if (p.expenses !== null) setExpenses(p.expenses); }, [profile.data]);
 
   const id = idNumber.length === 13 ? parseSaId(idNumber) : null;
@@ -31,9 +32,11 @@ export default function KycPage() {
       monthlyExpensesCents: expenses ?? 0,
       consentCreditCheck: consent,
     });
+    sessionStorage.removeItem('xc.pendingIdNumber');
     await refreshMe();
     toast(p.status === 'VERIFIED' ? 'Verified! Your XTRA-CASH card is ready.' : 'Submitted for review');
-    router.push(new URLSearchParams(window.location.search).get('next') === '/app/card' ? '/app/card' : '/app');
+    const requested = new URLSearchParams(window.location.search).get('next');
+    router.push(requested && /^\/app(?:\/|\?|$)/.test(requested) && !requested.includes('\\') ? requested : '/app');
   });
 
   if (profile.loading) return <Loading />;

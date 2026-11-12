@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'XTRA-CASH',
     short_name: 'XTRA-CASH',
     description: 'Credit at the point of payment. Tap your XTRA-CASH card; any shortfall is covered by your best matched lender.',
-    start_url: '/app?source=pwa',
+    start_url: '/onboarding?source=pwa',
     scope: '/',
     display: 'standalone',
     display_override: ['standalone', 'minimal-ui'],

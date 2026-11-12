@@ -35,6 +35,28 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+
+/* App and portal palette from the XTRA-CASH Part 20 handoff. Kept scoped so
+ * the public marketing website retains its existing brand treatment. */
+.xc-app-theme {
+  --color-ink: #1b1030;
+  --color-ink-2: #35204d;
+  --color-brand: #d91f63;
+  --color-brand-dark: #5c2394;
+  --color-brand-purple: #5c2394;
+  --color-brand-violet: #a617d3;
+  --color-brand-coral: #d91f63;
+  --color-brand-orange: #fb9320;
+  --color-brand-orange-dark: #df7b10;
+  --color-brand-soft: #f5e8fb;
+  --color-chart-1: #5c2394;
+  --color-chart-2: #fb9320;
+  --color-chart-3: #d91f63;
+  --color-chart-4: #2a9d8f;
+  --color-surface: #faf8fc;
+  --color-line: #ebe6f0;
+  --color-muted: #6b6180;
+}
 /* Fredoka for headings; deep purple on light surfaces, white wherever a section sets its own colour. */
 h1, h2, h3, h4 {
   font-family: var(--font-display);

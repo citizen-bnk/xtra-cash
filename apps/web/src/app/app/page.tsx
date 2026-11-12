@@ -82,8 +82,8 @@ export default function ConsumerHome() {
     { label: '🎁 Get a voucher', unavailable: true, size: 'col-span-3' },
   ];
 
-  return <div className="relative min-h-[100dvh] overflow-hidden bg-[#290039] text-white">
-    <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_15%_8%,rgba(166,23,211,.65),transparent_36%),radial-gradient(ellipse_at_95%_70%,rgba(244,35,119,.55),transparent_35%),linear-gradient(165deg,#31004e_0%,#7700a5_44%,#bc087e_78%,#f05420_115%)]" />
+  return <div className="xc-app-theme relative min-h-[100dvh] overflow-hidden bg-[#1b1030] text-white">
+    <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_15%_8%,rgba(166,23,211,.65),transparent_36%),radial-gradient(ellipse_at_95%_70%,rgba(217,31,99,.55),transparent_35%),linear-gradient(165deg,#1b1030_0%,#5c2394_44%,#d91f63_78%,#fb9320_115%)]" />
     <div aria-hidden className="pointer-events-none absolute -right-20 top-56 h-72 w-72 rounded-full bg-fuchsia-500/30 blur-3xl" />
     <div aria-hidden className="pointer-events-none absolute -left-32 bottom-24 h-80 w-80 rounded-full bg-orange-500/20 blur-3xl" />
 
