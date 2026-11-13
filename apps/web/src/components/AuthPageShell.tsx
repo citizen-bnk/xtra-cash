@@ -23,6 +23,7 @@ export function AuthPageShell({ children, currentPath }: { children: ReactNode; 
       <main className={`safe-pb flex min-w-0 flex-col justify-center px-5 md:px-12 lg:px-16 ${isLogin ? 'h-full py-3 md:h-auto md:py-10' : 'py-7 sm:px-9 sm:py-10'}`}>
         <div className="mx-auto w-full max-w-md">
           {isLogin && <div className="mb-5 flex justify-center md:hidden"><Logo size={30} /></div>}
+          {!isLogin && <a href="/" className="mb-5 inline-flex items-center gap-1 text-sm font-semibold text-[#5c2394]">← Back to home</a>}
           {children}
         </div>
       </main>
