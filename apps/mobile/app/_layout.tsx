@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/auth';
 import { NearbyLifecycle } from '../src/NearbyLifecycle';
 import { colors } from '../src/theme';
+import { CustomerRootNav } from '../src/CustomerRootNav';
 
 export default function RootLayout() {
   return (
@@ -16,6 +17,7 @@ export default function RootLayout() {
           <Stack.Screen name="kyc" options={{ headerShown: true, title: 'Verify your profile' }} />
           <Stack.Screen name="loan/[id]" options={{ headerShown: true, title: 'Repayment' }} />
         </Stack>
+        <CustomerRootNav />
       </AuthProvider>
     </SafeAreaProvider>
   );
