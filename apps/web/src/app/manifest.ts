@@ -25,7 +25,7 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
     shortcuts: [
-      { name: 'Pay', short_name: 'Pay', description: 'Pay with XTRA-CASH', url: '/app?pay=1&source=shortcut', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+      { name: 'Pay', short_name: 'Pay', description: 'Pay with XTRA-CASH', url: '/app/pay', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
       { name: 'My card', short_name: 'Card', url: '/app/card?source=shortcut', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
       { name: 'Repayments', short_name: 'Repay', url: '/app/loans?source=shortcut', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
     ],
