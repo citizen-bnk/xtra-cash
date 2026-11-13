@@ -7,9 +7,7 @@ import { InstallSheet } from '@/components/InstallApp';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  // The public checkout prototype does not depend on a customer session.
-  if (pathname === '/scanqr' || pathname === '/scanqr/') return <>{children}</>;
-
+  if (pathname === '/scanqr' || pathname === '/scanqr/') return <ApiProvider baseUrl={API_URL} storageKey="xtra.web.tokens"><ToastProvider>{children}</ToastProvider></ApiProvider>;
   return (
     <ApiProvider baseUrl={API_URL} storageKey="xtra.web.tokens">
       <ToastProvider>

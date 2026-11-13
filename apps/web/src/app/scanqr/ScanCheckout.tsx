@@ -5,10 +5,12 @@ import type { ChangeEvent, PointerEvent } from 'react';
 import {
   ArrowLeft, ArrowRight, Camera, Check, ChevronRight, CircleCheck, CreditCard,
   Download, FileText, Fingerprint, ImagePlus, Landmark, LockKeyhole, PenLine,
-  ReceiptText, ScanLine, ShieldCheck, Smartphone, Utensils, Wallet, Share2, Plus, Trash2,
+  ReceiptText, ScanLine, ShieldCheck, Utensils, Wallet, Share2, Plus, Trash2,
 } from 'lucide-react';
 import BillScanner from './BillScanner';
 import type { BillItem, ParsedBill } from './billScan';
+import LiveBill from './LiveBill';
+import { useAuth } from '@xtra/ui';
 
 type Stage = 'start' | 'capture' | 'adjust' | 'bill' | 'split' | 'identity' | 'offer' | 'link' | 'terms' | 'sign' | 'pay' | 'receipt';
 type Repayment = 'card' | 'bank';
@@ -69,8 +71,12 @@ function Signature({ signed, onChange }: { signed: boolean; onChange: (value: bo
 }
 
 export default function ScanCheckout() {
+  const { client, me, loading: authLoading } = useAuth();
   const [stage, setStage] = useState<Stage>('start');
-  const [platform, setPlatform] = useState<'ios' | 'android' | 'desktop'>('desktop');
+  const [liveToken, setLiveToken] = useState('');
+  const [creatingLive, setCreatingLive] = useState(false);
+  const [originalBill, setOriginalBill] = useState<File | null>(null);
+  const [merchantCode, setMerchantCode] = useState('');
   const [captureAvailable, setCaptureAvailable] = useState(false);
   const [ready, setReady] = useState(false);
   const [preview, setPreview] = useState<File | null>(null);
@@ -94,7 +100,6 @@ export default function ScanCheckout() {
   const [repayment, setRepayment] = useState<Repayment | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [signed, setSigned] = useState(false);
-  const [payment, setPayment] = useState<'card' | 'wallet' | 'bank'>('card');
   const [error, setError] = useState('');
   const heading = useRef<HTMLHeadingElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -104,9 +109,27 @@ export default function ScanCheckout() {
     const ua = navigator.userAgent;
     const ios = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
     const android = /Android/i.test(ua);
-    setPlatform(ios ? 'ios' : android ? 'android' : 'desktop');
     setCaptureAvailable(ios || android || /Mobi/i.test(ua));
     setReady(true);
+  }, []);
+
+  useEffect(() => {
+    const table = new URLSearchParams(window.location.search).get('table');
+    setMerchantCode(new URLSearchParams(window.location.search).get('merchant') ?? '');
+    if (table && /^[a-f0-9]{64}$/.test(table)) setLiveToken(table);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('restore') !== '1') return;
+    try {
+      const raw = sessionStorage.getItem('xc.restaurant.draft');
+      if (!raw) return;
+      const draft = JSON.parse(raw) as { merchant: string; bill: string; amount: string; items: BillItem[]; merchantCode?: string };
+      setMerchant(draft.merchant); setBill(draft.bill); setAmount(draft.amount); setItems(draft.items);
+      setMerchantCode(draft.merchantCode ?? '');
+      setStage('bill'); sessionStorage.removeItem('xc.restaurant.draft');
+    } catch { /* Invalid local draft opens the normal scan flow. */ }
   }, []);
 
   useEffect(() => {
@@ -144,8 +167,7 @@ export default function ScanCheckout() {
   const today = checkoutTotal - advance;
   const instalments = [Math.floor(advance / 3), Math.floor(advance / 3), advance - 2 * Math.floor(advance / 3)];
   const due = ['13 Dec 2026', '13 Jan 2027', '13 Feb 2027'];
-  const wallet = platform === 'ios' ? 'Apple Pay' : platform === 'android' ? 'Google Pay' : null;
-  const paymentLabel = payment === 'wallet' && wallet ? wallet : payment === 'bank' ? 'Bank account' : 'Card';
+  const paymentLabel = 'XTRA-CASH wallet';
   const billReady = !!(merchant.trim() && bill.trim() && checkoutTotal >= 100);
   const title = {
     start: 'Pay your table bill.', capture: 'Capture your bill', adjust: 'Adjust your scan', bill: 'Check your bill', split: 'Choose your items', identity: 'Verify your identity',
@@ -165,12 +187,12 @@ export default function ScanCheckout() {
     setRepayment(null);
     setTermsAccepted(false);
     setSigned(false);
-    setPayment('card');
   }
 
   function reset() {
     clearApplication();
     setPreview(null);
+    setOriginalBill(null);
     setUsingSample(false);
     setMerchant('');
     setBill('');
@@ -191,6 +213,7 @@ export default function ScanCheckout() {
 
   function loadSample() {
     setPreview(null);
+    setOriginalBill(null);
     setUsingSample(true);
     setMerchant(sample.merchant);
     setBill(sample.bill);
@@ -212,6 +235,7 @@ export default function ScanCheckout() {
       return;
     }
     setPreview(file);
+    setOriginalBill(file);
     setUsingSample(false);
     setMerchant('');
     setBill('');
@@ -222,6 +246,7 @@ export default function ScanCheckout() {
 
   function manualBill() {
     setPreview(null);
+    setOriginalBill(null);
     setUsingSample(false);
     setMerchant('');
     setBill('');
@@ -261,17 +286,37 @@ export default function ScanCheckout() {
     }
   }
 
+  function saveDraft() {
+    sessionStorage.setItem('xc.restaurant.draft', JSON.stringify({ merchant, bill, amount, items, merchantCode }));
+  }
+
+  async function startLiveBill() {
+    if (!me?.roles.includes('CONSUMER') || creatingLive || !merchant.trim() || !bill.trim() || total < 100 || items.length < 1 || items.reduce((sum, item) => sum + item.cents, 0) !== total) return;
+    setCreatingLive(true); setError('');
+    try {
+      const created = await client.request<{ shareToken: string }>('POST', '/restaurant-bills', { merchant, merchantCode: merchantCode || undefined, reference: bill, totalCents: total, items: items.map(item => ({ label: item.label, cents: item.cents })) });
+      if (originalBill) {
+        const form = new FormData(); form.append('file', originalBill);
+        try { await client.request('POST', `/restaurant-bills/${created.shareToken}/original`, form); }
+        catch { setError('The shared bill was created, but its original photo was not saved.'); }
+      }
+      window.history.pushState(null, '', `/scanqr/?table=${created.shareToken}`);
+      setLiveToken(created.shareToken);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create the shared bill.'); }
+    finally { setCreatingLive(false); }
+  }
+
   function download(kind: 'quote' | 'receipt') {
     const lines = kind === 'quote'
       ? ['XTRA-CASH | SAMPLE CREDIT QUOTATION AND AGREEMENT', 'Illustrative only. No credit agreement is created.',
         `Merchant: ${merchant.trim()}`, `Bill: ${bill.trim()}`, `Your selected items: ${money(checkoutTotal)}`,
-        `Pay today: ${money(today)}`, `Principal: ${money(advance)}`,
+        `Wallet top-up needed: ${money(today)}`, `Illustrative loan into wallet: ${money(advance)}`,
         'Annual interest: 0% (illustrative)', 'Fees and insurance: R0.00 (illustrative)',
         ...instalments.map((value, index) => `${due[index]}: ${money(value)}`), `Total repayment: ${money(advance)}`]
       : ['XTRA-CASH | SAMPLE PAYMENT RECEIPT', 'Simulated payment. No money moved.',
         `Merchant: ${merchant.trim()}`, `Bill: ${bill.trim()}`, `Your selected items: ${money(checkoutTotal)}`,
-        `Diner payment: ${money(today)}`, `Payment method: ${paymentLabel}`,
-        `XTRA-CASH share: ${money(advance)}`, 'Reference: DEMO-1048'];
+        `Wallet payment: ${money(checkoutTotal)}`, `Payment method: ${paymentLabel}`,
+        `Illustrative loan into wallet: ${money(advance)}`, 'Reference: DEMO-1048'];
     const url = URL.createObjectURL(new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -279,6 +324,8 @@ export default function ScanCheckout() {
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+
+  if (liveToken) return <LiveBill token={liveToken} onBack={() => { setLiveToken(''); window.history.pushState(null, '', '/scanqr/'); reset(); }} />;
 
   return <main className="sq-root">
     <div className="sq-layout">
@@ -322,7 +369,7 @@ export default function ScanCheckout() {
             {stage === 'link' && <p>Choose how you’ll repay the amount advanced by XTRA-CASH.</p>}
             {stage === 'terms' && <p>Review the sample credit quotation and agreement before you sign.</p>}
             {stage === 'sign' && <p>Draw a sample signature in the box below.</p>}
-            {stage === 'pay' && <p>{finance ? 'Your sample agreement is signed and your XTRA-CASH share is ready for this bill.' : 'Review the total and choose how to pay.'}</p>}
+            {stage === 'pay' && <p>{finance ? 'In a live checkout, an approved loan would fund your wallet before you pay.' : 'Review the wallet amount for your items.'}</p>}
             {stage === 'receipt' && <p>This receipt shows both parts of the sample payment.</p>}
           </div>
 
@@ -359,17 +406,18 @@ export default function ScanCheckout() {
             {items.length > 0 && total > 0 && items.reduce((sum, item) => sum + item.cents, 0) !== total && <p className="sq-note">Items add to {money(items.reduce((sum, item) => sum + item.cents, 0))}; bill total is {money(total)}. Correct missing items, tax or tip before splitting.</p>}
             {!usingSample && <p className="sq-note">OCR may misread photos. Check every amount against the original bill.</p>}
             {error && <p className="sq-error" role="alert">{error}</p>}
-            <button className="sq-primary" disabled={!merchant.trim() || !bill.trim() || total < 100 || !items.length || items.reduce((sum, item) => sum + item.cents, 0) !== total} onClick={() => { clearApplication(); setSplitEnabled(true); go('split'); }}>Choose my items <ArrowRight size={19} /></button>
-            <button className="sq-secondary" disabled={!merchant.trim() || !bill.trim() || total < 100} onClick={() => { clearApplication(); setSplitEnabled(false); setSelectedIds([]); setFinance(false); go('pay'); }}>Pay whole bill {total ? money(total) : ''}</button>
+            {usingSample && <button className="sq-primary" disabled={!merchant.trim() || !bill.trim() || total < 100 || !items.length || items.reduce((sum, item) => sum + item.cents, 0) !== total} onClick={() => { clearApplication(); setSplitEnabled(true); go('split'); }}>Try choosing items <ArrowRight size={19} /></button>}
+            {!usingSample && me?.roles.includes('CONSUMER') && <button className="sq-primary" disabled={creatingLive || !merchant.trim() || !bill.trim() || total < 100 || !items.length || items.reduce((sum, item) => sum + item.cents, 0) !== total} onClick={() => void startLiveBill()}><Share2 size={17} /> {creatingLive ? 'Creating shared bill…' : 'Start live shared bill'}</button>}
+            {!usingSample && !authLoading && !me && <a className="sq-primary" href="/login?next=%2Fscanqr%2F%3Frestore%3D1" onClick={saveDraft}>Log in to start a live shared bill</a>}
           </>}
 
           {stage === 'split' && <>
             {sharedSnapshot && <div className="sq-notice"><Share2 size={19} /><span><strong>Shared bill preview</strong><small>This link shows a snapshot of remaining items. Payments and selections do not sync between devices yet.</small></span></div>}
             <div className="sq-card sq-schedule"><div className="sq-row"><span>{sharedSnapshot ? 'Remaining bill' : 'Bill total'}</span><strong>{money(total)}</strong></div><div className="sq-row"><span>Your selected items</span><strong>{money(selectedTotal)}</strong></div><div className="sq-row sq-total"><span>Still unclaimed</span><strong>{money(unclaimedTotal)}</strong></div></div>
             <div className="sq-item-list">{items.map(item => <label key={item.id} className="sq-item-choice"><input type="checkbox" checked={selectedIds.includes(item.id)} onChange={e => setSelectedIds(current => e.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))} /><span>{item.label}</span><strong>{money(item.cents)}</strong></label>)}</div>
-            {unclaimedTotal > 0 && <button className="sq-secondary" type="button" onClick={() => void shareBill()} disabled={!merchant.trim() || !bill.trim()}><Share2 size={17} /> Share remaining bill link</button>}
+            {!usingSample && unclaimedTotal > 0 && <button className="sq-secondary" type="button" onClick={() => void shareBill()} disabled={!merchant.trim() || !bill.trim()}><Share2 size={17} /> Share preview snapshot</button>}
             {shareNotice && <p className="sq-note" role="status">{shareNotice}</p>}
-            <p className="sq-note">Each friend opens the link, selects their own items, then signs up or logs in to continue. The preview does not reserve items or collect payment.</p>
+            <p className="sq-note">{usingSample ? 'This sample lets you try item selection. Use a real scanned bill to start a synchronized table.' : 'This older preview does not reserve items or collect payment. Scan a new bill for a synchronized table.'}</p>
             <button className="sq-primary" disabled={!billReady} onClick={() => { clearApplication(); setFinance(true); go('identity'); }}>Check a loan for my {money(selectedTotal)} share <ArrowRight size={18} /></button>
             <button className="sq-secondary" disabled={!billReady} onClick={() => { clearApplication(); setFinance(false); go('pay'); }}>Pay my {money(selectedTotal)} share in full</button>
             <div className="sq-text-row"><a className="sq-text-button" href={`/register?next=${encodeURIComponent(shareReturnPath)}`}>Create an account</a><a className="sq-text-button" href={`/login?next=${encodeURIComponent(shareReturnPath)}`}>Log in</a></div>
@@ -385,8 +433,8 @@ export default function ScanCheckout() {
           </>}
 
           {stage === 'offer' && <>
-            <div className="sq-offer"><span>AVAILABLE FOR THIS SAMPLE BILL</span><strong>{money(advance)}</strong><small>Paid to the restaurant by XTRA-CASH</small><Wallet size={38} /></div>
-            <div className="sq-card sq-split"><div><span>{splitEnabled ? 'Your items' : 'Bill total'}</span><strong>{money(checkoutTotal)}</strong></div><div><span>You pay today</span><strong>{money(today)}</strong></div></div>
+            <div className="sq-offer"><span>ILLUSTRATIVE LOAN FOR THIS SAMPLE BILL</span><strong>{money(advance)}</strong><small>Would be added to your wallet after real lender approval</small><Wallet size={38} /></div>
+            <div className="sq-card sq-split"><div><span>{splitEnabled ? 'Your items' : 'Bill total'}</span><strong>{money(checkoutTotal)}</strong></div><div><span>Wallet top-up</span><strong>{money(today)}</strong></div></div>
             <div className="sq-card sq-schedule"><div className="sq-row"><strong>3 monthly repayments</strong><small>Sample dates</small></div>{instalments.map((value, i) => <div className="sq-row" key={due[i]}><span>{due[i]}</span><strong>{money(value)}</strong></div>)}<div className="sq-row sq-total"><span>Total repayment</span><strong>{money(advance)}</strong></div></div>
             <p className="sq-note">Illustrative costs: 0% annual interest, R0.00 fees and insurance.</p>
             <button className="sq-primary" onClick={() => go('link')}>Continue with this offer <ArrowRight size={19} /></button>
@@ -398,13 +446,13 @@ export default function ScanCheckout() {
               <label className="sq-option"><CreditCard size={22} /><span><strong>Link a debit card</strong><small>Set up card repayments with the payment provider.</small></span><input type="radio" name="repayment" checked={repayment === 'card'} onChange={() => { setRepayment('card'); setTermsAccepted(false); }} /></label>
               <label className="sq-option"><Landmark size={22} /><span><strong>Link a bank account</strong><small>Set up a repayment mandate with your bank.</small></span><input type="radio" name="repayment" checked={repayment === 'bank'} onChange={() => { setRepayment('bank'); setTermsAccepted(false); }} /></label>
             </fieldset>
-            <div className="sq-notice"><ShieldCheck size={21} /><span><strong>Separate from today’s payment</strong><small>Your card or wallet for today’s share is chosen at checkout.</small></span></div>
+            <div className="sq-notice"><ShieldCheck size={21} /><span><strong>Separate from bill payment</strong><small>This sample repayment method is separate from the XTRA-CASH wallet used to pay the restaurant.</small></span></div>
             <button className="sq-primary" disabled={!repayment} onClick={() => go('terms')}>Confirm sample repayment method <ArrowRight size={18} /></button>
           </>}
 
           {stage === 'terms' && <>
             <div className="sq-card sq-schedule"><div className="sq-row"><span>Credit advanced</span><strong>{money(advance)}</strong></div><div className="sq-row"><span>Annual interest</span><strong>0%</strong></div><div className="sq-row"><span>Fees and insurance</span><strong>R0.00</strong></div><div className="sq-row"><span>Repayment method</span><strong>{repayment === 'bank' ? 'Sample bank mandate' : 'Sample debit card'}</strong></div><div className="sq-row sq-total"><span>Total repayment</span><strong>{money(advance)}</strong></div></div>
-            <details className="sq-doc"><summary><FileText size={18} /> Sample quotation and terms</summary><p>For the sample bill {bill}, you pay {money(today)} today. The sample lender pays {money(advance)} to {merchant}. Repay the advance over three months.</p>{due.map((date, i) => <div className="sq-row" key={date}><span>{date}</span><strong>{money(instalments[i])}</strong></div>)}<p>Sample terms for demonstration only.</p></details>
+            <details className="sq-doc"><summary><FileText size={18} /> Sample quotation and terms</summary><p>For the sample bill {bill}, you would top up {money(today)}. The sample loan of {money(advance)} would be added to your wallet; your wallet would pay {money(checkoutTotal)} for your items at {merchant}. Repay the advance over three months.</p>{due.map((date, i) => <div className="sq-row" key={date}><span>{date}</span><strong>{money(instalments[i])}</strong></div>)}<p>Sample terms for demonstration only.</p></details>
             <button className="sq-text-button sq-download" onClick={() => download('quote')}><Download size={16} /> Download sample agreement</button>
             <label className="sq-checkbox"><input type="checkbox" checked={termsAccepted} onChange={e => { setTermsAccepted(e.target.checked); setSigned(false); }} /><span>I’ve read the sample quotation and agree to the sample credit terms.</span></label>
             <button className="sq-primary" disabled={!termsAccepted} onClick={() => go('sign')}>Continue to signature <ArrowRight size={19} /></button>
@@ -417,20 +465,16 @@ export default function ScanCheckout() {
           </>}
 
           {stage === 'pay' && <>
-            <div className="sq-card sq-payment-total"><small>YOUR PAYMENT TODAY</small><strong>{money(today)}</strong><span>{merchant} · {bill}</span></div>
-            <div className="sq-card sq-schedule"><div className="sq-row"><span>You pay now</span><strong>{money(today)}</strong></div>{finance && <div className="sq-row"><span>XTRA-CASH pays</span><strong>{money(advance)}</strong></div>}<div className="sq-row sq-total"><span>{splitEnabled ? 'Your share' : 'Total to restaurant'}</span><strong>{money(checkoutTotal)}</strong></div></div>
-            <fieldset className="sq-options"><legend className="sq-sr">Payment method</legend>
-              {wallet && <label className="sq-option"><Smartphone size={22} /><span><strong>{wallet}</strong><small>Wallet preview for this device</small></span><input type="radio" name="payment" checked={payment === 'wallet'} onChange={() => setPayment('wallet')} /></label>}
-              <label className="sq-option"><CreditCard size={22} /><span><strong>Pay by card</strong><small>Sample payment card</small></span><input type="radio" name="payment" checked={payment === 'card'} onChange={() => setPayment('card')} /></label>
-              <label className="sq-option"><Landmark size={22} /><span><strong>Pay from bank account</strong><small>Bank payment preview; account linking is not active.</small></span><input type="radio" name="payment" checked={payment === 'bank'} onChange={() => setPayment('bank')} /></label>
-            </fieldset>
-            <button className="sq-primary" disabled={!billReady || (finance && (!termsAccepted || !signed || !repayment))} onClick={() => go('receipt')}>Simulate payment {money(today)} <ArrowRight size={17} /></button>
+            <div className="sq-card sq-payment-total"><small>WALLET PAYMENT FOR YOUR ITEMS</small><strong>{money(checkoutTotal)}</strong><span>{merchant} · {bill}</span></div>
+            <div className="sq-card sq-schedule"><div className="sq-row"><span>Wallet top-up needed</span><strong>{money(today)}</strong></div>{finance && <div className="sq-row"><span>Illustrative loan into wallet</span><strong>{money(advance)}</strong></div>}<div className="sq-row sq-total"><span>{splitEnabled ? 'Your share' : 'Total to restaurant'}</span><strong>{money(checkoutTotal)}</strong></div></div>
+            <div className="sq-notice"><Wallet size={21} /><span><strong>Pay from XTRA-CASH wallet</strong><small>Top up your wallet before paying. Live shared bills check the balance and debit the wallet securely.</small></span></div>
+            <button className="sq-primary" disabled={!billReady || (finance && (!termsAccepted || !signed || !repayment))} onClick={() => go('receipt')}>Simulate wallet payment {money(checkoutTotal)} <ArrowRight size={17} /></button>
             <p className="sq-footnote"><LockKeyhole size={14} /> Demo payment · sample funds only.</p>
           </>}
 
           {stage === 'receipt' && <>
             <div className="sq-success"><CircleCheck size={32} /><span><strong>{money(checkoutTotal)}</strong><small>{merchant} · {bill} · simulated share</small></span></div>
-            <div className="sq-card sq-schedule"><div className="sq-row"><span>You paid · {paymentLabel}</span><strong>{money(today)}</strong></div>{finance && <><div className="sq-row"><span>XTRA-CASH paid</span><strong>{money(advance)}</strong></div><div className="sq-row"><span>First repayment</span><strong>{money(instalments[0])} · {due[0]}</strong></div></>}<div className="sq-row sq-total"><span>Reference</span><strong>DEMO-1048</strong></div></div>
+            <div className="sq-card sq-schedule"><div className="sq-row"><span>You paid · {paymentLabel}</span><strong>{money(checkoutTotal)}</strong></div>{finance && <><div className="sq-row"><span>Illustrative loan into wallet</span><strong>{money(advance)}</strong></div><div className="sq-row"><span>First repayment</span><strong>{money(instalments[0])} · {due[0]}</strong></div></>}<div className="sq-row sq-total"><span>Reference</span><strong>DEMO-1048</strong></div></div>
             <button className="sq-primary" onClick={() => download('receipt')}>Download sample receipt <Download size={19} /></button>
             {finance && <button className="sq-secondary" onClick={() => download('quote')}>Download sample agreement <Download size={17} /></button>}
             <button className="sq-text-button sq-centred" onClick={reset}>Start a new demo</button>

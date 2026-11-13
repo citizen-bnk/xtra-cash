@@ -3,15 +3,17 @@
  * All money is integer cents (ZAR). Interest rates are monthly basis points.
  */
 import { randomUUID } from 'crypto';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
   customType,
+  date,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -522,6 +524,38 @@ export const storedFiles = pgTable('stored_files', {
   content: bytea('content').notNull(),
   createdAt: createdAt(),
 });
+
+// Restaurant bill claims and customer receipt archive. Payment state is written only with a wallet ledger journal.
+export const restaurantMerchants = pgTable('restaurant_merchants', {
+  id: id(), qrCode: text('qr_code').notNull().unique(), tradingName: text('trading_name').notNull(),
+  status: text('status').notNull().default('DRAFT'), settlementReference: text('settlement_reference'), createdAt: createdAt(),
+});
+export const restaurantBills = pgTable('restaurant_bills', {
+  id: id(), shareToken: text('share_token').notNull().unique(), creatorId: text('creator_id').notNull().references(() => users.id),
+  merchantId: text('merchant_id').references(() => restaurantMerchants.id),
+  merchantName: text('merchant_name').notNull(), billReference: text('bill_reference').notNull(), totalCents: integer('total_cents').notNull(),
+  serviceDay: date('service_day', { mode: 'string' }).notNull().default(sql`(now() AT TIME ZONE 'Africa/Johannesburg')::date`),
+  originalStorageKey: text('original_storage_key').references(() => storedFiles.key), status: text('status').notNull().default('OPEN'),
+  createdAt: createdAt(), expiresAt: ts('expires_at').notNull().default(sql`now() + interval '24 hours'`), settledAt: ts('settled_at'),
+}, t => [index('restaurant_bills_creator_idx').on(t.creatorId, t.createdAt), uniqueIndex('restaurant_bills_merchant_reference_day_idx').on(t.merchantId, t.billReference, t.serviceDay).where(sql`${t.merchantId} IS NOT NULL`)]);
+export const restaurantBillItems = pgTable('restaurant_bill_items', {
+  id: id(), billId: text('bill_id').notNull().references(() => restaurantBills.id, { onDelete: 'cascade' }),
+  label: text('label').notNull(), position: integer('position').notNull(), amountCents: integer('amount_cents').notNull(), claimedBy: text('claimed_by').references(() => users.id),
+  status: text('status').notNull().default('UNCLAIMED'), paymentReference: text('payment_reference'), paidAt: ts('paid_at'), createdAt: createdAt(),
+}, t => [index('restaurant_bill_items_bill_idx').on(t.billId)]);
+export const restaurantBillParticipants = pgTable('restaurant_bill_participants', {
+  billId: text('bill_id').notNull().references(() => restaurantBills.id, { onDelete: 'cascade' }), userId: text('user_id').notNull().references(() => users.id),
+  joinedAt: createdAt(), notifiedAt: ts('notified_at'),
+}, t => [primaryKey({ columns: [t.billId, t.userId] })]);
+export const customerReceipts = pgTable('customer_receipts', {
+  id: id(), userId: text('user_id').notNull().references(() => users.id), billId: text('bill_id').references(() => restaurantBills.id),
+  kind: text('kind').notNull(), title: text('title').notNull(), originalStorageKey: text('original_storage_key').references(() => storedFiles.key),
+  digitizedJson: jsonb('digitized_json'), totalCents: integer('total_cents'), emailedAt: ts('emailed_at'), createdAt: createdAt(),
+}, t => [index('customer_receipts_user_idx').on(t.userId, t.createdAt)]);
+export const restaurantBillNotifications = pgTable('restaurant_bill_notifications', {
+  id: id(), userId: text('user_id').notNull().references(() => users.id), billId: text('bill_id').notNull().references(() => restaurantBills.id),
+  kind: text('kind').notNull(), readAt: ts('read_at'), createdAt: createdAt(),
+}, t => [uniqueIndex('restaurant_bill_notifications_unique_idx').on(t.userId, t.billId, t.kind), index('restaurant_bill_notifications_user_idx').on(t.userId, t.createdAt)]);
 
 // Consent is separate from lending/KYC. Keep only the latest encrypted location.
 export const marketingMembers = pgTable('marketing_members', {

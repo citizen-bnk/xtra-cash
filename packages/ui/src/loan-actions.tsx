@@ -22,6 +22,7 @@ type Notification = {
   owner: string;
   read: boolean;
 };
+type RestaurantNotification = { id: string; kind: 'BILL_FUNDED' | 'BILL_SETTLED'; created_at: string; read_at: string | null; share_token: string; merchant_name: string; bill_reference: string };
 export function LoanActionCentre({ variant = "default" }: { variant?: "default" | "immersive" }) {
   const { client, me } = useAuth(),
     data = useApi(
@@ -32,24 +33,27 @@ export function LoanActionCentre({ variant = "default" }: { variant?: "default" 
         ),
       [me?.id],
     );
+  const restaurant = useApi((c) => me?.roles.includes('CONSUMER') ? c.request<RestaurantNotification[]>('GET', '/me/restaurant-notifications') : Promise.resolve([]), [me?.id]);
   const [bellOpen, setBellOpen] = useState(false),
     [active, setActive] = useState<Notification | null>(null),
     [notice, setNotice] = useState("");
   useEffect(() => {
     const timer = setInterval(() => {
-      if (document.visibilityState === "visible") data.reload();
+      if (document.visibilityState === "visible") { data.reload(); restaurant.reload(); }
     }, 30000);
-    const refresh = () => data.reload();
+    const refresh = () => { data.reload(); restaurant.reload(); };
     window.addEventListener("focus", refresh);
     return () => {
       clearInterval(timer);
       window.removeEventListener("focus", refresh);
     };
-  }, [data.reload]);
+  }, [data.reload, restaurant.reload]);
   const reviewer = !!me?.roles.some(
       (r) => r === "ADMIN" || r === "SUPER_ADMIN" || r === "LENDER",
     ),
-    unread = data.data?.notifications.filter((n) => !n.read).length ?? 0;
+    unreadLoans = data.data?.notifications.filter((n) => !n.read).length ?? 0,
+    unreadRestaurant = restaurant.data?.filter((n) => !n.read_at).length ?? 0,
+    unread = unreadLoans + unreadRestaurant;
   async function act(n: Notification) {
     setActive(n);
     try {
@@ -86,6 +90,7 @@ export function LoanActionCentre({ variant = "default" }: { variant?: "default" 
             onClick={() => {
               setBellOpen(true);
               data.reload();
+              restaurant.reload();
             }}
             className={`relative grid h-10 w-10 place-items-center rounded-xl border focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${variant === "immersive" ? "border-white/20 bg-white/10 text-white hover:bg-white/20" : "border-line bg-white text-ink hover:bg-surface focus-visible:ring-brand-purple/60"}`}
           >
@@ -104,9 +109,11 @@ export function LoanActionCentre({ variant = "default" }: { variant?: "default" 
         onClose={() => {
           setBellOpen(false);
           data.reload();
+          restaurant.reload();
         }}
       >
         {data.error && <Alert tone="red">{data.error}</Alert>}
+        {restaurant.error && me?.roles.includes('CONSUMER') && <Alert tone="amber">Restaurant notifications are temporarily unavailable.</Alert>}
         {notice && <Alert tone="amber">{notice}</Alert>}
         {unread ? (
           <div className="space-y-3">
@@ -124,6 +131,7 @@ export function LoanActionCentre({ variant = "default" }: { variant?: "default" 
                 </Button>
               </Card>
             ))}
+            {restaurant.data?.filter((n) => !n.read_at).map((n) => <Card key={n.id} className="border-brand/30"><strong>{n.kind === 'BILL_FUNDED' ? 'Everyone has funded the table bill' : 'Restaurant bill settled'}</strong><p className="mt-1 text-sm text-muted">{n.merchant_name} · {n.bill_reference}. View your paid items and receipt.</p><Button className="mt-3" onClick={() => { setBellOpen(false); void client.request('POST', `/me/restaurant-notifications/${n.id}/read`, {}).finally(() => window.location.assign(`/scanqr/?table=${n.share_token}`)); }}>Open shared bill</Button></Card>)}
           </div>
         ) : (
           <p className="text-sm text-muted">You’re all caught up. New loan tasks will appear here with an action button.</p>
