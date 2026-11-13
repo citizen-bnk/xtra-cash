@@ -39,7 +39,7 @@ export function NativeLoanNotifications() {
   }
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel={`Notifications${unread.length ? `, ${unread.length} unread` : ''}`} onPress={() => { setOpen(true); void feed.reload(); }} style={s.bell}>
-      <Ionicons name="notifications-outline" color={colors.ink} size={23} />
+      <Ionicons name="notifications-outline" color={colors.white} size={23} />
       {unread.length ? <View style={s.badge}><Text style={s.badgeText}>{unread.length > 99 ? '99+' : unread.length}</Text></View> : null}
     </Pressable>
     <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>

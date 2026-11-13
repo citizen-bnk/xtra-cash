@@ -8,6 +8,7 @@ import { Alert, Button, Logo, Modal, useApi, useAuth, LoanActionCentre } from '@
 import { PayModal, TopUpModal } from '@/components/PayModal';
 import { PAY_EVENT } from '@/lib/pay-event';
 import { CustomerBottomNav } from '@/components/CustomerBottomNav';
+import { CustomerProfileLink } from '@/components/CustomerProfileLink';
 
 type ChatMessage = { role: 'assistant' | 'user'; text: string; action?: { label: string; href: string } };
 
@@ -103,7 +104,7 @@ export default function ConsumerHome() {
       <header className="flex h-12 items-center justify-between gap-2">
         <button type="button" aria-label="Open app menu" onClick={() => setMenuOpen(true)} className="relative grid h-10 w-10 place-items-center rounded-xl text-white hover:bg-white/10"><Menu className="h-6 w-6" /><span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[#1b1030]" /></button>
         <Link href="/app" aria-label="XTRA-CASH home" className="flex-1 text-center"><Logo light size={30} className="mx-auto" /></Link>
-        <LoanActionCentre variant="immersive" />
+        <div className="flex items-center gap-1"><LoanActionCentre variant="immersive" /><CustomerProfileLink /></div>
       </header>
 
       <section className="mt-5 flex items-center gap-3" aria-label="Account overview">
