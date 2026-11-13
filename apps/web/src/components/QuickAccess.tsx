@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, BriefcaseBusiness, Check, ChevronRight, Eye, Eye
 import { homeFor } from '@/lib/config';
 
 export function safeNext(value: string | null, fallback = '/app') {
-  return value && /^\/(app|lender|affiliate)(\/|\?|$)/.test(value) && !value.includes('\\') ? value : fallback;
+  return value && (/^\/(app|lender|affiliate)(\/|\?|$)/.test(value) || /^\/scanqr\/?(\?|$)/.test(value)) && !value.includes('\\') ? value : fallback;
 }
 type AccountType = 'CONSUMER' | 'LENDER' | 'AFFILIATE';
 

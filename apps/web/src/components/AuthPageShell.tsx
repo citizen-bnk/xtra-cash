@@ -12,12 +12,12 @@ export function AuthPageShell({ children, currentPath }: { children: ReactNode; 
         <div aria-hidden className="absolute -right-20 -top-16 h-64 w-64 rounded-full bg-[#a617d3]/45 blur-3xl" />
         <div aria-hidden className="absolute -bottom-24 -left-10 h-56 w-56 rounded-full bg-[#fb9320]/30 blur-3xl" />
         <LinkHome />
-        <div className="relative z-10 mt-5 max-w-[56%] sm:max-w-[55%] md:mt-auto md:max-w-[88%] md:pb-36">
+        <div className="relative z-10 mt-5 max-w-[56%] sm:max-w-[55%] md:mt-auto md:max-w-[50%] md:pb-16">
           <p className="text-[10px] font-bold uppercase tracking-[.18em] text-white/70">{isLogin ? 'Welcome back' : 'Your XTRA-CASH journey'}</p>
           <h2 className="mt-2 text-xl font-bold leading-tight text-white sm:text-2xl md:text-4xl">{isLogin ? 'Your money, all in one place.' : 'More ways to move forward.'}</h2>
           <p className="mt-2 max-w-sm text-xs leading-relaxed text-white/80 sm:text-sm">Loans, payments and everyday money tools in one simple app.</p>
         </div>
-        <Image src="/brand/photo/customer-phone.png" alt="Customer using XTRA-CASH on her phone" width={900} height={600} priority className="absolute -bottom-1 -right-6 z-0 h-[184px] w-[48%] object-contain object-bottom sm:h-[220px] sm:w-[50%] md:bottom-10 md:right-4 md:h-[330px] md:w-[94%]" />
+        <Image src="/brand/photo/customer-phone.png" alt="Customer using XTRA-CASH on her phone" width={900} height={600} priority className="absolute -bottom-1 -right-6 z-0 h-[184px] w-[48%] object-contain object-bottom sm:h-[220px] sm:w-[50%] md:bottom-10 md:right-0 md:h-[370px] md:w-[50%]" />
         <div className="relative z-10 mt-auto hidden items-center gap-2 text-xs font-medium text-white/75 md:flex"><span className="h-2 w-2 rounded-full bg-[#fb9320]" />Put out the fire.</div>
       </aside>
       <main className={`safe-pb flex min-w-0 flex-col justify-center px-5 md:px-12 lg:px-16 ${isLogin ? 'h-full py-3 md:h-auto md:py-10' : 'py-7 sm:px-9 sm:py-10'}`}>
