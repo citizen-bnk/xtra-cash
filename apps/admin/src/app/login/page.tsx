@@ -32,7 +32,7 @@ export default function AdminLogin() {
           <h1 className="mt-2 text-2xl font-bold leading-tight text-white sm:text-3xl md:text-4xl">Clear view. Confident decisions.</h1>
           <p className="mt-2 text-xs leading-relaxed text-white/80 sm:text-sm">Lending, payments and platform operations together.</p>
         </div>
-        <Image src="/brand/ui/illustration_team.png" alt="XTRA-CASH operations team reviewing lending and payments" width={980} height={574} priority className="absolute -bottom-2 -right-5 z-0 h-[185px] w-[56%] object-contain object-bottom sm:h-[220px] sm:w-[54%] md:bottom-12 md:right-5 md:h-[380px] md:w-[92%]" />
+        <Image src="/brand/photo/operations-team.png" alt="XTRA-CASH operations team reviewing lending and payments" width={980} height={574} priority className="absolute -bottom-2 -right-5 z-0 h-[185px] w-[56%] object-contain object-bottom sm:h-[220px] sm:w-[54%] md:bottom-12 md:right-5 md:h-[380px] md:w-[92%]" />
       </aside>
       <section className="safe-pb flex h-full min-w-0 flex-col justify-center px-5 py-3 sm:px-9 md:h-auto md:px-12 md:py-10 lg:px-16">
         <div className="mx-auto w-full max-w-md">

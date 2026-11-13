@@ -30,6 +30,7 @@ import {
   WorkAssistantModel,
 } from "./work-assistant";
 import { VaultService } from './vault.service';
+import { CustomerAssistantController } from './customer-assistant';
 @Module({
   imports: [ConsumerModule,LenderModule],
   controllers: [
@@ -46,6 +47,7 @@ import { VaultService } from './vault.service';
     LenderAiProviderController,
     ApplicantReviewController,
     WorkAssistantController,
+    CustomerAssistantController,
   ],
   providers: [
     LoanOperationsService,

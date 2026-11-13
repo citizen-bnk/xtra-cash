@@ -8,11 +8,11 @@ import { Logo, Loading, useAuth } from '@xtra/ui';
 import { homeFor } from '@/lib/config';
 
 const slides = [
-  { eyebrow: 'Welcome to XTRA-CASH', title: 'Fast money, easy payments and more in one app.', text: 'Borrow, shop and manage payments in one place.', image: '/brand/ui/illustration_township.png', alt: 'Local customers and a merchant using XTRA-CASH', icon: Wallet },
-  { eyebrow: 'Personal loans', title: 'Get a loan when you need it.', text: 'Choose an amount and term, then compare lender offers before you decide.', image: '/brand/ui/illustration_howitworks.png', alt: 'XTRA-CASH card and payment journey', icon: Banknote },
-  { eyebrow: 'Buy now, pay later', title: 'Shop now. Pay later.', text: 'Explore participating partner stores and eligible payment options.', image: '/brand/ui/illustration_credit_mall.png', alt: 'Lender offers in the XTRA-CASH Credit Mall', icon: ShoppingBag },
-  { eyebrow: 'Bill payments', title: 'Pay bills in one place.', text: 'Keep payment services and activity together in your account.', icon: ReceiptText },
-  { eyebrow: 'Salary & payroll', title: 'Make more of your pay day.', text: 'Explore salary-linked services available through participating employers.', icon: CalendarDays },
+  { eyebrow: 'Welcome to XTRA-CASH', title: 'Fast money, easy payments and more in one app.', text: 'Borrow, shop and manage payments in one place.', image: '/brand/photo/customer-phone.png', alt: 'Customer smiling with her phone', icon: Wallet },
+  { eyebrow: 'Personal loans', title: 'Get a loan when you need it.', text: 'Choose an amount and term, then compare lender offers before you decide.', image: '/brand/photo/customer-loan.png', alt: 'Customer looking at his phone', icon: Banknote },
+  { eyebrow: 'Buy now, pay later', title: 'Shop now. Pay later.', text: 'Explore participating partner stores and eligible payment options.', image: '/brand/photo/customer-shopping.png', alt: 'Customer shopping with her phone', icon: ShoppingBag },
+  { eyebrow: 'Bill payments', title: 'Pay bills in one place.', text: 'Keep payment services and activity together in your account.', image: '/brand/photo/customer-phone.png', alt: 'Customer using her phone', icon: ReceiptText },
+  { eyebrow: 'Salary & payroll', title: 'Make more of your pay day.', text: 'Explore salary-linked services available through participating employers.', image: '/brand/photo/customer-portrait.png', alt: 'Smiling customer', icon: CalendarDays },
 ];
 
 export default function OnboardingPage() { return <Suspense fallback={<Loading />}><OnboardingFlow /></Suspense>; }
@@ -46,9 +46,12 @@ function OnboardingFlow() {
         </div>
       </div>
       <div className="space-y-3 pt-5">
-        {step === 0 ? <Link href={registerHref} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#a617d3] to-[#d91f63] text-base font-black text-white shadow-lg">Get started <ArrowRight className="h-5 w-5" /></Link> : step === slides.length - 1 ? <Link href={registerHref} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#fb9320] text-base font-black text-[#1b1030] shadow-lg">Create account <ArrowRight className="h-5 w-5" /></Link> : <div className="grid grid-cols-2 gap-3"><button type="button" onClick={back} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white/10 font-semibold"><ArrowLeft className="h-4 w-4" /> Back</button><button type="button" onClick={next} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#a617d3] to-[#5c2394] font-bold shadow-lg">Next <ArrowRight className="h-4 w-4" /></button></div>}
-        {step === 0 ? <button type="button" onClick={next} className="w-full py-1 text-sm font-semibold text-white/85">Learn more</button> : step === slides.length - 1 ? <button type="button" onClick={back} className="flex w-full items-center justify-center gap-1 py-1 text-sm font-semibold text-white/85"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
-        <p className="pt-1 text-center text-sm text-white/80">Already have an account? <Link href={loginHref} className="font-bold text-white underline underline-offset-4">Login</Link></p>
+        <div className="flex items-center gap-3">
+          {step > 0 && <button type="button" aria-label="Previous slide" onClick={back} className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/50 bg-white/10 text-white"><ArrowLeft className="h-6 w-6" /></button>}
+          {step === 0 ? <Link href={loginHref} className="flex min-h-14 flex-1 items-center justify-center rounded-2xl bg-gradient-to-r from-[#a617d3] to-[#d91f63] text-base font-black text-white shadow-lg">Get started</Link> : step === slides.length - 1 ? <Link href={registerHref} className="flex min-h-14 flex-1 items-center justify-center rounded-2xl bg-[#fb9320] text-base font-black text-[#1b1030] shadow-lg">Create account</Link> : <span className="flex-1" />}
+          {step < slides.length - 1 && <button type="button" aria-label="Next slide" onClick={next} className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/50 bg-white/10 text-white"><ArrowRight className="h-6 w-6" /></button>}
+        </div>
+        <p className="pt-1 text-center text-sm text-white/80">Not yet registered? <Link href={registerHref} className="font-bold text-white underline underline-offset-4">Create Account</Link></p>
       </div>
     </section>
     <footer className="safe-pb relative pb-3 text-center text-[11px] text-white/55">XTRA-CASH · Put out the fire</footer>

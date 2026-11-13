@@ -32,7 +32,7 @@ export default function Dashboard() {
   return <div className="xc-app-theme space-y-3 text-[#1b1030]">
     <div className="relative flex min-h-[140px] flex-wrap items-center justify-between gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#1b1030] via-[#5c2394] to-[#d91f63] px-5 py-4 text-white shadow-sm sm:min-h-[154px] sm:px-7">
       <div aria-hidden className="absolute inset-y-0 right-0 hidden w-[38%] bg-gradient-to-l from-transparent to-[#5c2394]/20 md:block" />
-      <Image src="/brand/ui/illustration_team.png" alt="" aria-hidden width={980} height={574} priority className="pointer-events-none absolute -bottom-12 right-2 hidden h-[210px] w-[34%] object-contain object-right-bottom opacity-95 md:block" />
+      <Image src="/brand/photo/operations-team.png" alt="" aria-hidden width={980} height={574} priority className="pointer-events-none absolute -bottom-12 right-2 hidden h-[210px] w-[34%] object-contain object-right-bottom opacity-95 md:block" />
       <div className="relative z-10 min-w-0"><div className="text-xs font-bold uppercase tracking-[.16em] text-white/70">Operations · Lending · Payments · Merchants · Collections · Compliance</div><h1 className="mt-1 text-2xl font-extrabold text-white sm:text-3xl">XTRA-CASH <span className="font-medium italic">Back Office</span></h1><p className="mt-1 max-w-2xl text-sm text-white/85">Manage lending, payments, BNPL, merchants, payroll and collections in one unified platform.</p></div>
       <div className="flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-3 py-2 text-sm"><span className="h-2 w-2 rounded-full bg-emerald-300"/>This month <span className="text-white/75">· 01–30 Nov 2026</span></div>
     </div>

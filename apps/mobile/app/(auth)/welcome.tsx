@@ -1,42 +1,19 @@
-import { useEffect, useState } from 'react';
-import { AccessibilityInfo, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { Button, Logo } from '../../src/ui';
 import { colors } from '../../src/theme';
 
-const FIRE = require('../../assets/fire.mp4');
-const FIRE_POSTER = require('../../assets/fire-poster.jpg');
+const CUSTOMER_PHOTO = require('../../assets/customer-phone.png');
 
 /** Branded entry point for the native customer app. */
 export default function Welcome() {
-  const [reduceMotion, setReduceMotion] = useState(false);
-  const player = useVideoPlayer(FIRE, (p) => {
-    p.loop = true;
-    p.muted = true;
-  });
-
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
-    return () => sub.remove();
-  }, []);
-
-  useEffect(() => {
-    if (reduceMotion) player.pause();
-    else player.play();
-  }, [player, reduceMotion]);
-
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      {reduceMotion ? (
-        <Image source={FIRE_POSTER} style={StyleSheet.absoluteFill} resizeMode="cover" />
-      ) : (
-        <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
-      )}
+      <View style={styles.glow} />
+      <Image source={CUSTOMER_PHOTO} style={styles.hero} resizeMode="contain" />
       <View style={styles.scrim} />
       <SafeAreaView style={styles.safe}>
         <View style={styles.brandRow}>
@@ -56,13 +33,13 @@ export default function Welcome() {
           </View>
 
           <View style={styles.actions}>
-            <Button title="Create your account" variant="accent" onPress={() => router.push('/(auth)/register')} />
+            <Button title="Get started" variant="accent" onPress={() => router.push('/(auth)/login')} />
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.push('/(auth)/login')}
+              onPress={() => router.push('/(auth)/register')}
               style={({ pressed }) => [styles.signIn, pressed && styles.pressed]}
             >
-              <Text style={styles.signInText}>I already have an account <Text style={styles.signInStrong}>· Sign in</Text></Text>
+              <Text style={styles.signInText}>Not yet registered? <Text style={styles.signInStrong}>Create Account</Text></Text>
             </Pressable>
             <Text style={styles.footnote}>
               Credit applications are subject to lender review and affordability checks.
@@ -75,8 +52,10 @@ export default function Welcome() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.ink },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(27,16,48,0.58)' },
+  root: { flex: 1, backgroundColor: '#420063' },
+  glow: { position: 'absolute', top: '18%', right: -120, width: 360, height: 360, borderRadius: 180, backgroundColor: '#d91f63' },
+  hero: { position: 'absolute', top: '12%', right: -35, width: '100%', height: '57%' },
+  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '48%', backgroundColor: 'rgba(27,16,48,0.75)' },
   safe: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 12, paddingBottom: 12 },
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   appLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },

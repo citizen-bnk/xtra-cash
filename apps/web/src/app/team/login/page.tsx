@@ -24,7 +24,7 @@ export default function TeamLogin() {
         <div aria-hidden className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-[#a617d3]/45 blur-3xl" /><div aria-hidden className="absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-[#fb9320]/30 blur-3xl" />
         <Link href="/" aria-label="XTRA-CASH home" className="relative z-10 inline-flex w-fit"><Logo light size={31} /></Link>
         <div className="relative z-10 mt-6 max-w-[60%] sm:max-w-[55%] md:mt-auto md:max-w-full md:pb-8"><p className="text-[10px] font-bold uppercase tracking-[.18em] text-white/70">XTRA Payday field team</p><h1 className="mt-2 text-2xl font-bold leading-tight text-white sm:text-3xl md:text-4xl">Your fieldwork, connected.</h1><p className="mt-2 text-xs leading-relaxed text-white/80 sm:text-sm">Training, employer visits and remuneration in one workspace.</p></div>
-        <Image src="/brand/ui/illustration_rider.png" alt="XTRA-CASH field employee serving local businesses" width={980} height={500} priority className="absolute -bottom-2 -right-5 z-0 h-[185px] w-[56%] object-contain object-bottom sm:h-[220px] sm:w-[54%] md:bottom-12 md:right-5 md:h-[380px] md:w-[92%]" />
+        <Image src="/brand/photo/field-rep.png" alt="XTRA-CASH field representative with a tablet" width={980} height={500} priority className="absolute -bottom-2 -right-5 z-0 h-[185px] w-[56%] object-contain object-bottom sm:h-[220px] sm:w-[54%] md:bottom-12 md:right-5 md:h-[380px] md:w-[92%]" />
       </aside>
       <section className="safe-pb flex h-full min-w-0 flex-col justify-center px-5 py-3 sm:px-9 md:h-auto md:px-12 md:py-10 lg:px-16"><div className="mx-auto w-full max-w-md">
         <div className="mb-5 flex justify-center md:hidden"><Logo size={30} /></div>
