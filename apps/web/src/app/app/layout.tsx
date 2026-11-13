@@ -2,14 +2,14 @@
 import {LoanActionCentre} from '@xtra/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowUpRight, Home, ListOrdered, ReceiptText, UserRound, Wallet } from 'lucide-react';
+import { ArrowUpRight, Banknote, Home, ReceiptText, UserRound, Wallet } from 'lucide-react';
 import { cx, Logo, useAuth } from '@xtra/ui';
 import { RequireRole } from '@/lib/guard';
 import { MarketingLocationObserver } from '@/components/MarketingLocationObserver';
 
 const NAV = [
   { href: '/app', label: 'Home', icon: Home, exact: true },
-  { href: '/app/loans', label: 'Loans', icon: ListOrdered },
+  { href: '/app/loans', label: 'Loans', icon: Banknote },
   { href: '/app/bills', label: 'Pay', icon: ReceiptText },
   { href: '/app/wallet', label: 'Wallet', icon: Wallet },
   { href: '/app/profile', label: 'Profile', icon: UserRound },
@@ -18,9 +18,8 @@ const NAV = [
 /** Phone navigation follows the customer journey board: Home, Loans, Wallet, Activity, Profile. */
 const TABS = [
   { href: '/app', label: 'Home', icon: Home, exact: true },
-  { href: '/app/loans', label: 'Loans', icon: ListOrdered },
+  { href: '/app/loans', label: 'Loans', icon: Banknote },
   { href: '/app/bills', label: 'Pay', icon: ReceiptText },
-  { href: '/app/wallet', label: 'Wallet', icon: Wallet },
   { href: '/app/profile', label: 'Profile', icon: UserRound },
 ];
 
@@ -36,11 +35,9 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
       key={n.href}
       href={n.href}
       aria-current={active(n) ? 'page' : undefined}
-      className={cx('pressable flex flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px] font-semibold', active(n) ? 'text-ink' : 'text-muted')}
+      className={cx('pressable flex min-h-16 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold', active(n) ? 'text-[#5c2394]' : 'text-[#1b1030]')}
     >
-      <span className={cx('grid h-7 w-12 place-items-center rounded-full transition-colors', active(n) && 'bg-brand-soft')}>
-        <n.icon className={cx('h-5 w-5', active(n) && 'text-brand')} />
-      </span>
+      <span className="grid h-7 w-10 place-items-center"><n.icon className={cx('h-5 w-5', active(n) && 'fill-current')} /></span>
       {n.label}
     </Link>
   );
@@ -88,9 +85,11 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
         <main key={pathname} className={immersiveHome ? 'min-h-[100dvh]' : 'xc-customer-surface mx-auto min-h-[calc(100dvh-8rem)] max-w-5xl px-4 py-5 animate-fade-in sm:px-5 lg:py-6'}>
           {children}
         </main>
-        {!immersiveHome && <nav aria-label="App" className="safe-pb fixed inset-x-0 bottom-0 z-30 border-t border-line/70 bg-white/95 backdrop-blur-md lg:hidden">
-          <div className="mx-auto grid max-w-md grid-cols-5 items-center">
-            {TABS.map(tab)}
+        {!immersiveHome && <nav aria-label="App" className="safe-pb fixed inset-x-0 bottom-0 z-30 border-t border-white/40 bg-white/95 text-[#1b1030] shadow-[0_-8px_30px_rgba(30,0,50,.28)] backdrop-blur-xl lg:hidden">
+          <div className="mx-auto grid max-w-md grid-cols-5 items-center px-2">
+            {TABS.slice(0, 2).map(tab)}
+            <Link href="/app?assistant=1" aria-label="Open XTRA-CASH Assistant" className="-mt-7 flex flex-col items-center justify-center gap-0.5"><span className="grid h-[68px] w-[68px] place-items-center rounded-full border-[4px] border-white bg-gradient-to-br from-[#5c2394] via-[#d91f63] to-[#fb9320] shadow-[0_0_18px_rgba(166,23,211,.5)]"><Logo light markOnly size={43} /></span><span className="text-[10px] font-bold text-[#5c2394]">Assistant</span></Link>
+            {TABS.slice(2).map(tab)}
           </div>
         </nav>}
       </div>

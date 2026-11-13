@@ -48,6 +48,14 @@ export default function ConsumerHome() {
     if (!messages.length) setMessages([{ role: 'assistant', text: `Hi ${name}! 👋 I can help you request a personal loan, check your balance, manage your card or view transactions. What would you like to do?` }]);
     setChatOpen(true);
   };
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('assistant') === '1') {
+      openChat();
+      router.replace('/app');
+    }
+  // The query is a one-time navigation intent from the shared app menu.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   function sendMessage(event?: FormEvent) {
     event?.preventDefault();
     const text = reply.trim();
