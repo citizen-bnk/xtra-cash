@@ -7,6 +7,7 @@ import { Logo, useAuth } from '@xtra/ui';
 import { RequireRole } from '@/lib/guard';
 import { MarketingLocationObserver } from '@/components/MarketingLocationObserver';
 import { CustomerBottomNav } from '@/components/CustomerBottomNav';
+import { CustomerProfileLink } from '@/components/CustomerProfileLink';
 
 export default function ConsumerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -33,7 +34,7 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
               </span>
             </Link>
             <Link href="/app" className="hidden items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-white/90 hover:bg-white/10 lg:inline-flex"><ArrowLeft className="h-4 w-4" /> Home</Link>
-            <LoanActionCentre/>
+            <div className="flex items-center gap-1"><LoanActionCentre/><CustomerProfileLink /></div>
             {canSwitchToOffice && <Link href="https://xtra-cash-admin.vercel.app" aria-label="Open back office" title="Back office" className="pressable grid h-9 w-9 place-items-center rounded-full text-white/90 hover:bg-white/10"><ArrowUpRight className="h-5 w-5" /></Link>}
           </div>
         </header>}
