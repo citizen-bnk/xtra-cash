@@ -1,50 +1,34 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, ArrowUpRight, Banknote, CreditCard, Gift, Grid2X2, HandCoins, MapPin, Menu, Mic, ReceiptText, ShoppingCart, Sparkles, X } from 'lucide-react';
+import { ArrowRight, Banknote, CreditCard, Gift, Grid2X2, HandCoins, MapPin, Mic, ReceiptText, ShoppingCart, Sparkles } from 'lucide-react';
 import { formatZAR } from '@xtra/shared';
-import { Alert, Button, Logo, Modal, useApi, useAuth, LoanActionCentre } from '@xtra/ui';
-import { PayModal, TopUpModal } from '@/components/PayModal';
+import { Alert, Button, Logo, Modal, useApi, useAuth } from '@xtra/ui';
 import { PAY_EVENT } from '@/lib/pay-event';
 import { CustomerBottomNav } from '@/components/CustomerBottomNav';
-import { CustomerProfileLink } from '@/components/CustomerProfileLink';
+import { CustomerHeader } from '@/components/CustomerHeader';
 
 type ChatMessage = { role: 'assistant' | 'user'; text: string; action?: { label: string; href: string } };
 
 export default function ConsumerHome() {
-  const { me, refreshMe } = useAuth();
+  const { me } = useAuth();
   const balance = useApi((c) => c.consumer.balance());
-  const cards = useApi((c) => c.consumer.cards());
-  const [pay, setPay] = useState(false), [topUp, setTopUp] = useState(false), [payRequested, setPayRequested] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false), [menuOpen, setMenuOpen] = useState(false), [reply, setReply] = useState(''), [notice, setNotice] = useState('');
+  const [chatOpen, setChatOpen] = useState(false), [reply, setReply] = useState(''), [notice, setNotice] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const router = useRouter();
-  const b = balance.data, card = cards.data?.[0], kyc = me?.kyc;
-  const canPay = !!(card && card.status === 'ACTIVE' && b);
+  const b = balance.data;
   const name = me?.firstName?.trim() || 'there';
   const initials = `${me?.firstName?.[0] ?? 'X'}${me?.lastName?.[0] ?? ''}`.toUpperCase();
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('pay') === '1') {
-      setPayRequested(true);
-      router.replace('/app');
+      router.replace('/app/pay');
     }
-    const onPay = () => setPayRequested(true);
+    const onPay = () => router.push('/app/pay');
     window.addEventListener(PAY_EVENT, onPay);
     return () => window.removeEventListener(PAY_EVENT, onPay);
   }, [router]);
-  useEffect(() => {
-    if (!payRequested || balance.loading || cards.loading) return;
-    setPayRequested(false);
-    if (canPay) setPay(true);
-    else if (kyc?.status !== 'VERIFIED') router.push('/app/kyc');
-    else if (card?.status === 'FROZEN') router.push('/app/card');
-    else setNotice('Your XTRA-CASH card is not ready for payments yet. Open My Card to check its status.');
-  }, [payRequested, balance.loading, cards.loading, canPay, kyc?.status, card?.status, router]);
-
-  const reloadAll = () => { balance.reload(); refreshMe(); };
-  const requestPay = useCallback(() => setPayRequested(true), []);
   const unavailable = (label: string) => setNotice(`${label} is not available yet. You can use your personal-loan, wallet, card and transaction features here.`);
   const openChat = () => {
     if (!messages.length) setMessages([{ role: 'assistant', text: `Hi ${name}! 👋 I can help you request a personal loan, check your balance, manage your card or view transactions. What would you like to do?` }]);
@@ -100,12 +84,8 @@ export default function ConsumerHome() {
     <div aria-hidden className="pointer-events-none absolute -right-20 top-56 h-72 w-72 rounded-full bg-fuchsia-500/30 blur-3xl" />
     <div aria-hidden className="pointer-events-none absolute -left-32 bottom-24 h-80 w-80 rounded-full bg-orange-500/20 blur-3xl" />
 
-    <div className="relative mx-auto min-h-[100dvh] w-full max-w-[520px] px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom,0px))] pt-[calc(.5rem+env(safe-area-inset-top,0px))]">
-      <header className="flex h-12 items-center justify-between gap-2">
-        <button type="button" aria-label="Open app menu" onClick={() => setMenuOpen(true)} className="relative grid h-10 w-10 place-items-center rounded-xl text-white hover:bg-white/10"><Menu className="h-6 w-6" /><span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[#1b1030]" /></button>
-        <Link href="/app" aria-label="XTRA-CASH home" className="flex-1 text-center"><Logo light size={30} className="mx-auto" /></Link>
-        <div className="flex items-center gap-1"><LoanActionCentre variant="immersive" /><CustomerProfileLink /></div>
-      </header>
+    <CustomerHeader />
+    <div className="relative mx-auto min-h-[100dvh] w-full max-w-[520px] px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom,0px))] pt-2">
 
       <section className="mt-5 flex items-center gap-3" aria-label="Account overview">
         <div className="grid h-[58px] w-[58px] shrink-0 place-items-center rounded-full border-[3px] border-white bg-gradient-to-br from-orange-300 via-pink-400 to-purple-700 text-lg font-black text-white shadow-[0_0_18px_rgba(255,95,222,.65)]">{initials}</div>
@@ -142,7 +122,7 @@ export default function ConsumerHome() {
       </Link>
     </div>
 
-    <CustomerBottomNav onAssistant={openChat} onPay={requestPay} />
+    <CustomerBottomNav onAssistant={openChat} />
 
     <Modal open={chatOpen} title="✦ XTRA-CASH Assistant" onClose={() => setChatOpen(false)}>
       <div className="space-y-3">
@@ -155,12 +135,6 @@ export default function ConsumerHome() {
       </div>
     </Modal>
 
-    <Modal open={menuOpen} title="XTRA-CASH menu" onClose={() => setMenuOpen(false)}>
-      <div className="divide-y divide-line">{[{ label: 'My loans', href: '/app/loans' }, { label: 'My wallet', href: '/app/wallet' }, { label: 'My card', href: '/app/card' }, { label: 'Transactions', href: '/app/activity' }, { label: 'Profile & settings', href: '/app/profile' }].map(x => <Link key={x.href} href={x.href} onClick={() => setMenuOpen(false)} className="flex min-h-12 items-center justify-between text-sm font-semibold">{x.label}<ArrowRight className="h-4 w-4 text-muted" /></Link>)}{me?.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN') && <Link href="https://xtra-cash-admin.vercel.app" onClick={() => setMenuOpen(false)} className="flex min-h-12 items-center justify-between text-sm font-semibold text-brand-purple">Open Back Office<ArrowUpRight className="h-4 w-4" /></Link>}</div>
-      <button type="button" onClick={() => setMenuOpen(false)} className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-muted"><X className="h-4 w-4" /> Close menu</button>
-    </Modal>
     <Modal open={!!notice} title="Service update" onClose={() => setNotice('')}><Alert tone="amber">{notice}</Alert><Button className="mt-4 w-full" onClick={() => setNotice('')}>Got it</Button></Modal>
-    <TopUpModal open={topUp} onClose={() => setTopUp(false)} onDone={reloadAll} />
-    {card && b && <PayModal open={pay} onClose={() => setPay(false)} cardId={card.id} balance={b} onDone={reloadAll} />}
   </div>;
 }
