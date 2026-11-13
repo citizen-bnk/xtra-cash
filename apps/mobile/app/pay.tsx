@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Linking, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { formatZAR, type Transaction } from '@xtra/shared';
 import { errorMessage, useApi, useAuth } from '../src/auth';
 import { Button, Card, Chip, ErrorText, Field, H1, Loading, Muted, Row, Screen, toCents } from '../src/ui';
 import { colors } from '../src/theme';
+
+const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL || 'https://xtra-cash.vercel.app';
 
 /** Pay (in-app / marketplace / demo swipe) or top up the wallet. */
 export default function Pay() {
@@ -24,6 +26,15 @@ export default function Pay() {
   const fromWallet = Math.min(b?.walletCents ?? 0, amount);
   const fromCredit = Math.max(0, amount - fromWallet);
 
+  async function openRestaurantCheckout() {
+    setError(null);
+    try {
+      await Linking.openURL(new URL('/scanqr/', WEB_URL).toString());
+    } catch {
+      setError('Could not open restaurant checkout. Please try again.');
+    }
+  }
+
   useEffect(() => {
     setEstimate(null);
     const best = b?.offers.find((o) => o.availableCents >= fromCredit);
@@ -34,7 +45,14 @@ export default function Pay() {
     return () => clearTimeout(t);
   }, [fromCredit, b, client, mode]);
 
-  if (!b || !cards.data) return <Loading />;
+  if (!b || !cards.data) {
+    if (mode === 'topup') return <Loading />;
+    return <Screen>
+      <Button title="Scan a restaurant bill · Demo" onPress={openRestaurantCheckout} />
+      <ErrorText>{error || balance.error || cards.error}</ErrorText>
+      {(balance.loading || cards.loading) && <Loading />}
+    </Screen>;
+  }
 
   if (mode === 'topup') {
     const topUp = async () => {
@@ -105,6 +123,7 @@ export default function Pay() {
 
   return (
     <Screen>
+      <Button title="Scan a restaurant bill · Demo" onPress={openRestaurantCheckout} />
       <Muted>XTRA-Balance {formatZAR(b.xtraBalanceCents)}</Muted>
       <Field label="Merchant" value={merchant} onChangeText={setMerchant} placeholder="e.g. Shoprite Soweto" />
       <Field label="Amount (R)" keyboardType="decimal-pad" value={amountText} onChangeText={setAmountText} placeholder="0.00" />
