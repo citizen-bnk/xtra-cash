@@ -4,6 +4,8 @@
 
 `apps/web/src/app/scanqr/` contains a responsive public checkout prototype for `/scanqr/`. It detects iOS, Android and desktop, supports camera or file selection, bill confirmation, a sample ID and offer, repayment selection, terms, canvas signature, payment selection and a sample receipt. It is explicitly labelled DEMO. Bill values are entered manually; no OCR, KYC, affordability decision, payment method linking, loan contract, merchant settlement or real payment occurs. `apps/web/src/components/CustomerBottomNav.tsx` and the customer assistant already have working three-dot menus with navigation or chat actions. The PWA BNPL page in `CustomerJourneyPage.tsx` is a separate UI preview; its store checkout is not connected.
 
+The signed-in Pay screen links to `/scanqr/` and shows wallet plus eligible credit on a card-style balance panel. It offers a zero-wallet Top up funds CTA, but production top-up collection is disabled until a payment provider is connected. Its Get a loan action opens the personal-loan journey; the restaurant checkout remains a separate preview.
+
 ## Launch customer journey
 
 1. Scan a restaurant-specific QR code linking to `https://xtra-cash.co.za/scanqr/?merchant=<signed-id>&table=<signed-id>`. Keep a generic QR landing page for unrecognized codes. Detect browser capabilities, not only user-agent, and show a phone-sized checkout on mobile and a centered phone panel with explanatory side panel on desktop.
