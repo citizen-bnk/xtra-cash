@@ -2,11 +2,12 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, ArrowUpRight, Banknote, CreditCard, Gift, Grid2X2, HandCoins, House, MapPin, Menu, Mic, ReceiptText, ScanLine, ShoppingCart, Sparkles, X } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Banknote, CreditCard, Gift, Grid2X2, HandCoins, MapPin, Menu, Mic, ReceiptText, ShoppingCart, Sparkles, X } from 'lucide-react';
 import { formatZAR } from '@xtra/shared';
 import { Alert, Button, Logo, Modal, useApi, useAuth, LoanActionCentre } from '@xtra/ui';
 import { PayModal, TopUpModal } from '@/components/PayModal';
 import { PAY_EVENT } from '@/lib/pay-event';
+import { CustomerBottomNav } from '@/components/CustomerBottomNav';
 
 type ChatMessage = { role: 'assistant' | 'user'; text: string; action?: { label: string; href: string } };
 
@@ -140,15 +141,7 @@ export default function ConsumerHome() {
       </Link>
     </div>
 
-    <nav aria-label="Home navigation" className="safe-pb fixed inset-x-0 bottom-0 z-40 border-t border-white/40 bg-white/95 text-[#1b1030] shadow-[0_-8px_30px_rgba(30,0,50,.28)] backdrop-blur-xl">
-      <div className="mx-auto grid max-w-[520px] grid-cols-5 items-end px-1">
-        <Link href="/app" aria-current="page" className="flex min-h-16 flex-col items-center justify-center gap-0.5 text-[#5c2394]"><span className="grid h-7 w-10 place-items-center"><House className="h-5 w-5 fill-current" /></span><span className="text-[11px] font-bold">Home</span></Link>
-        <Link href="/app/loans" className="flex min-h-16 flex-col items-center justify-center gap-0.5"><Banknote className="h-6 w-6" /><span className="text-[11px] font-semibold">Loans</span></Link>
-        <button type="button" aria-label="Open XTRA-CASH Assistant" onClick={openChat} className="-mt-7 flex flex-col items-center justify-center gap-0.5"><span className="grid h-[68px] w-[68px] place-items-center rounded-full border-[4px] border-white bg-gradient-to-br from-[#5c2394] via-[#d91f63] to-[#fb9320] shadow-[0_0_18px_rgba(166,23,211,.5)]"><Logo light markOnly size={43} /></span><span className="text-[10px] font-bold text-[#5c2394]">Assistant</span></button>
-        <button type="button" onClick={requestPay} className="flex min-h-16 flex-col items-center justify-center gap-0.5"><ScanLine className="h-6 w-6" /><span className="text-[11px] font-semibold">Pay</span></button>
-        <Link href="/app/profile" className="flex min-h-16 flex-col items-center justify-center gap-0.5"><span className="grid h-7 w-7 place-items-center rounded-full border-2 border-[#5c2394] text-[11px] font-bold">{initials}</span><span className="text-[11px] font-semibold">Profile</span></Link>
-      </div>
-    </nav>
+    <CustomerBottomNav onAssistant={openChat} onPay={requestPay} />
 
     <Modal open={chatOpen} title="✦ XTRA-CASH Assistant" onClose={() => setChatOpen(false)}>
       <div className="space-y-3">

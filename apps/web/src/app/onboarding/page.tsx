@@ -30,7 +30,7 @@ function OnboardingFlow() {
   const back = () => setStep(s => Math.max(s - 1, 0));
   return <main className="xc-app-theme relative flex min-h-[100dvh] flex-col overflow-hidden bg-[#1b1030] text-white">
     <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_85%_18%,rgba(166,23,211,.62),transparent_38%),radial-gradient(ellipse_at_5%_90%,rgba(251,147,32,.32),transparent_35%),linear-gradient(145deg,#1b1030,#5c2394_53%,#d91f63)]" />
-    <header className="safe-pt relative flex items-center justify-between px-5 py-4"><Link href="/onboarding" aria-label="XTRA-CASH"><Logo light size={34} /></Link><Link href={loginHref} className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur">Skip</Link></header>
+    <header className="safe-pt relative flex items-center justify-between px-5 py-4"><Link href="/" aria-label="Back to XTRA-CASH home"><Logo light size={34} /></Link><Link href={loginHref} className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur">Skip</Link></header>
     <section className="relative mx-auto flex w-full max-w-md flex-1 flex-col px-5 pb-5 pt-2">
       <div className="flex flex-1 flex-col justify-center">
         <div className="relative mb-7 flex h-[min(36vh,290px)] min-h-[230px] items-center justify-center overflow-hidden rounded-[32px] border border-white/25 bg-[#fff7ee] p-3 shadow-[0_16px_45px_rgba(18,0,32,.3)]">
@@ -47,7 +47,7 @@ function OnboardingFlow() {
       </div>
       <div className="space-y-3 pt-5">
         {step === 0 ? <Link href={registerHref} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#a617d3] to-[#d91f63] text-base font-black text-white shadow-lg">Get started <ArrowRight className="h-5 w-5" /></Link> : step === slides.length - 1 ? <Link href={registerHref} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#fb9320] text-base font-black text-[#1b1030] shadow-lg">Create account <ArrowRight className="h-5 w-5" /></Link> : <div className="grid grid-cols-2 gap-3"><button type="button" onClick={back} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white/10 font-semibold"><ArrowLeft className="h-4 w-4" /> Back</button><button type="button" onClick={next} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#a617d3] to-[#5c2394] font-bold shadow-lg">Next <ArrowRight className="h-4 w-4" /></button></div>}
-        {step === 0 && <button type="button" onClick={next} className="w-full py-1 text-sm font-semibold text-white/85">Learn more</button>}
+        {step === 0 ? <button type="button" onClick={next} className="w-full py-1 text-sm font-semibold text-white/85">Learn more</button> : step === slides.length - 1 ? <button type="button" onClick={back} className="flex w-full items-center justify-center gap-1 py-1 text-sm font-semibold text-white/85"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
         <p className="pt-1 text-center text-sm text-white/80">Already have an account? <Link href={loginHref} className="font-bold text-white underline underline-offset-4">Login</Link></p>
       </div>
     </section>
