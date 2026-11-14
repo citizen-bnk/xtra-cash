@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { ActivityInterceptor } from './common/activity.interceptor';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { DbModule } from './common/db.module';
@@ -40,6 +41,7 @@ import { RestaurantModule } from './restaurant/restaurant.module';
   ],
   controllers: [HealthController, JobsController],
   providers: [
+    { provide: APP_INTERCEPTOR, useClass: ActivityInterceptor },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     JobsService,
