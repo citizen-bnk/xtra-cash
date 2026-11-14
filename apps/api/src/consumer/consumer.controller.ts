@@ -1,3 +1,5 @@
+import { FileInterceptor } from '@nestjs/platform-express';
+import { BadRequestException, StreamableFile, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { CurrentUser, type AuthUser } from '../common/auth';
@@ -37,6 +39,25 @@ export class ConsumerController {
     const [updated] = await this.db.update(users).set({ roles }).where(eq(users.id, actor.id)).returning();
     await this.audit.log(actor, 'user.personal_account_enabled', 'user', actor.id, {});
     return sanitizeUser(updated);
+  }
+
+  @Get('profile-photo')
+  async profilePhoto(@CurrentUser() actor: AuthUser) {
+    const result = await this.db.execute<{ jpeg: Buffer }>(sql`SELECT jpeg FROM customer_profile_photos WHERE user_id=${actor.id}`);
+    if (!result.rows[0]) throw new NotFoundException();
+    return new StreamableFile(result.rows[0].jpeg, { type: 'image/jpeg' });
+  }
+
+  @Post('profile-photo')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 512 * 1024 } }))
+  async saveProfilePhoto(@CurrentUser() actor: AuthUser, @UploadedFile() file?: Express.Multer.File) {
+    if (actor.supportSessionId) throw new ForbiddenException();
+    if (!file || file.mimetype !== 'image/jpeg' || file.buffer.subarray(0, 3).toString('hex') !== 'ffd8ff') {
+      throw new BadRequestException('Choose a valid JPEG profile photo.');
+    }
+    await this.db.execute(sql`INSERT INTO customer_profile_photos(user_id,jpeg) VALUES(${actor.id},${file.buffer})
+      ON CONFLICT (user_id) DO UPDATE SET jpeg=excluded.jpeg`);
+    return { saved: true };
   }
 
   @Get()

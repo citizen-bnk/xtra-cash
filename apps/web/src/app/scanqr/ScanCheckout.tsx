@@ -282,6 +282,7 @@ export default function ScanCheckout() {
 
   function acceptScan(scan: File, parsed: ParsedBill) {
     setPreview(scan);
+    setOriginalBill(scan);
     setMerchant(verifiedMerchantName || parsed.merchant);
     setBill(parsed.reference);
     setAmount(parsed.totalCents ? (parsed.totalCents / 100).toFixed(2) : '');

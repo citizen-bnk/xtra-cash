@@ -4,7 +4,7 @@ export type ParsedBill = { merchant: string; reference: string; totalCents: numb
 
 const amountAtEnd = /(?:\bR\s*)?(\d{1,5}(?:[ ,.']\d{3})*[.,]\d{2})\s*$/i;
 const centsOf = (value: string) => {
-  const normalized = value.replace(/[\s']/g, '').replace(/,(?=\d{3}(?:\D|$))/g, '').replace(',', '.');
+  const normalized = value.slice(0, -3).replace(/[^0-9]/g, '') + '.' + value.slice(-2);
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
 };
@@ -29,47 +29,84 @@ export function parseBillText(text: string): ParsedBill {
   if (!reference) warnings.push('Bill reference needs confirmation.');
   if (!totalCents) warnings.push('Total was not read. Enter it from the bill.');
   if (!items.length) warnings.push('Items were not read. Add them manually to split this bill.');
+  if (items.length && totalCents && items.reduce((sum, item) => sum + item.cents, 0) !== totalCents) {
+    warnings.push('The scanned items do not match the total. Check charges, discounts and quantities before paying.');
+  }
   return { merchant, reference, totalCents, items, warnings };
 }
 
 export function detectCorners(image: ImageData): Point[] {
   const { width, height, data } = image;
-  const samples: Point[] = [];
-  const step = Math.max(2, Math.floor(Math.min(width, height) / 130));
-  for (let y = step; y < height - step; y += step) for (let x = step; x < width - step; x += step) {
-    const i = (y * width + x) * 4;
-    const right = (y * width + x + step) * 4;
-    const below = ((y + step) * width + x) * 4;
-    const lum = (offset: number) => .299 * data[offset] + .587 * data[offset + 1] + .114 * data[offset + 2];
-    const contrast = Math.max(Math.abs(lum(i) - lum(right)), Math.abs(lum(i) - lum(below)));
-    if (contrast > 65) samples.push({ x: x / width, y: y / height });
+  const step = Math.max(2, Math.floor(Math.min(width, height) / 180));
+  const columns = Math.floor(width / step), rows = Math.floor(height / step);
+  const mask = new Uint8Array(columns * rows);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < columns; x++) {
+    const i = (y * step * width + x * step) * 4;
+    const light = .299 * data[i] + .587 * data[i + 1] + .114 * data[i + 2];
+    if (light > 166) mask[y * columns + x] = 1;
   }
-  if (samples.length < 30) return [{ x: .06, y: .06 }, { x: .94, y: .06 }, { x: .94, y: .94 }, { x: .06, y: .94 }];
-  const minX = Math.max(.02, Math.min(...samples.map(p => p.x)) - .025);
-  const maxX = Math.min(.98, Math.max(...samples.map(p => p.x)) + .025);
-  const minY = Math.max(.02, Math.min(...samples.map(p => p.y)) - .025);
-  const maxY = Math.min(.98, Math.max(...samples.map(p => p.y)) + .025);
-  return [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }];
+  let largest: number[] = [];
+  for (let i = 0; i < mask.length; i++) {
+    if (!mask[i]) continue;
+    const group = [i];
+    mask[i] = 0;
+    for (let j = 0; j < group.length; j++) {
+      const cell = group[j], x = cell % columns;
+      for (const n of [x ? cell - 1 : -1, x < columns - 1 ? cell + 1 : -1, cell - columns, cell + columns]) {
+        if (mask[n]) { mask[n] = 0; group.push(n); }
+      }
+    }
+    if (group.length > largest.length) largest = group;
+  }
+  const full = [{ x: .02, y: .02 }, { x: .98, y: .02 }, { x: .98, y: .98 }, { x: .02, y: .98 }];
+  if (largest.length < mask.length * .12 || largest.length > mask.length * .94) return full;
+  const points = largest.map(i => ({ x: (i % columns) * step / width, y: Math.floor(i / columns) * step / height }));
+  const scores = [(p: Point) => p.x + p.y, (p: Point) => 1 - p.x + p.y, (p: Point) => 2 - p.x - p.y, (p: Point) => 1 + p.x - p.y];
+  const corners = scores.map(score => points.reduce((best, p) => score(p) < score(best) ? p : best));
+  return validCrop(corners) ? corners : full;
+}
+
+export function validCrop(corners: Point[]) {
+  return corners.length === 4 && corners.every((a, i) => {
+    const b = corners[(i + 1) % 4], c = corners[(i + 2) % 4];
+    return (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x) > .005;
+  });
 }
 
 export function flattenDocument(source: HTMLCanvasElement, corners: Point[]): HTMLCanvasElement {
-  const width = 1200;
-  const height = Math.min(2200, Math.max(700, Math.round(width * source.height / source.width)));
+  if (!validCrop(corners)) throw new Error('Move the corners to form a rectangle around the receipt.');
+  const [tl, tr, br, bl] = corners;
+  const distance = (a: Point, b: Point) => Math.hypot((a.x - b.x) * source.width, (a.y - b.y) * source.height);
+  const rawWidth = Math.max(distance(tl, tr), distance(bl, br));
+  const rawHeight = Math.max(distance(tl, bl), distance(tr, br));
+  const scale = Math.min(1200 / rawWidth, 2600 / rawHeight, 1.5);
+  const width = Math.max(2, Math.round(rawWidth * scale));
+  const height = Math.max(2, Math.round(rawHeight * scale));
   const output = document.createElement('canvas');
   output.width = width; output.height = height;
   const sourceData = source.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, source.width, source.height);
   const target = output.getContext('2d')!;
   const result = target.createImageData(width, height);
-  const [tl, tr, br, bl] = corners;
+  const dx = tl.x - tr.x + br.x - bl.x, dy = tl.y - tr.y + br.y - bl.y;
+  const ax = tr.x - br.x, ay = tr.y - br.y, bx = bl.x - br.x, by = bl.y - br.y;
+  const determinant = ax * by - bx * ay;
+  const g = (dx * by - bx * dy) / determinant;
+  const h = (ax * dy - dx * ay) / determinant;
   for (let y = 0; y < height; y++) {
     const v = y / (height - 1);
     for (let x = 0; x < width; x++) {
       const u = x / (width - 1);
-      const px = Math.min(source.width - 1, Math.max(0, Math.round(((1-u)*(1-v)*tl.x + u*(1-v)*tr.x + u*v*br.x + (1-u)*v*bl.x) * source.width)));
-      const py = Math.min(source.height - 1, Math.max(0, Math.round(((1-u)*(1-v)*tl.y + u*(1-v)*tr.y + u*v*br.y + (1-u)*v*bl.y) * source.height)));
+      const z = 1 + g * u + h * v;
+      const px = Math.min(source.width - 1, Math.max(0, Math.round((tl.x + ((1+g)*tr.x-tl.x)*u + ((1+h)*bl.x-tl.x)*v) / z * source.width)));
+      const py = Math.min(source.height - 1, Math.max(0, Math.round((tl.y + ((1+g)*tr.y-tl.y)*u + ((1+h)*bl.y-tl.y)*v) / z * source.height)));
       const from = (py * source.width + px) * 4;
       const to = (y * width + x) * 4;
-      result.data[to] = sourceData.data[from]; result.data[to+1] = sourceData.data[from+1]; result.data[to+2] = sourceData.data[from+2]; result.data[to+3] = 255;
+      const luminance = .299 * sourceData.data[from] + .587 * sourceData.data[from+1] + .114 * sourceData.data[from+2];
+      const grey = Math.max(0, Math.min(255, (luminance - 22) * 1.19));
+      result.data[to] = grey;
+      result.data[to+1] = grey;
+      result.data[to+2] = grey;
+      result.data[to+3] = 255;
     }
   }
   target.putImageData(result, 0, 0);
