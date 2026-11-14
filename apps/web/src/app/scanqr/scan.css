@@ -130,7 +130,7 @@
   .sq-aside { display:flex; flex-direction:column; justify-content:space-between; gap:24px; padding:34px 30px; color:#fff; background:radial-gradient(ellipse at 98% 12%,#942597b0,transparent 58%),radial-gradient(ellipse at 12% 100%,#ea8a3950,transparent 42%),linear-gradient(135deg,#230f3b,#4b1e75); }
   .sq-aside>img { width:156px; height:42px; object-fit:contain; object-position:left center; }
   .sq-aside-kicker { display:flex; align-items:center; gap:8px; letter-spacing:.15em; font-size:10px; font-weight:800; color:#ffbf77; margin-bottom:14px; }
-  .sq-aside h2 { font-size:clamp(38px,5vw,61px); }
+  .sq-aside h2 { color:#fff; font-size:clamp(38px,5vw,61px); }
   .sq-aside p { font-size:14px; line-height:1.55; color:#e9d7f4; max-width:255px; }
   .sq-aside ol { display:grid; gap:8px; list-style:none; padding:0; margin:25px 0 0; }
   .sq-aside li { display:flex; align-items:center; gap:9px; color:#e4c7f3; font-size:13px; }
