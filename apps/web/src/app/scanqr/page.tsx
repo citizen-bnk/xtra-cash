@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { CustomerBottomNav } from '@/components/CustomerBottomNav';
 import ScanCheckout from './ScanCheckout';
 import './scan.css';
 
@@ -8,5 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default function ScanQrPage() {
-  return <ScanCheckout />;
+  return <>
+    <div className="pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))]">
+      <ScanCheckout />
+    </div>
+    <CustomerBottomNav />
+  </>;
 }
