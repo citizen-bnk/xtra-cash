@@ -9,6 +9,16 @@ export class RestaurantPortalController {
   @Get() dashboard(@CurrentUser() user: AuthUser) { return this.service.dashboard(user.id, user.roles); }
   @Post('payouts') request(@CurrentUser() user: AuthUser, @Body() body: { merchantId: string }) { return this.service.requestPayout(user.id, user.roles, body.merchantId); }
   @Put('payout-mode') mode(@CurrentUser() user: AuthUser, @Body() body: { merchantId: string; mode: string }) { return this.service.setPayoutMode(user.id, body.merchantId, body.mode); }
+  @Put('tips') tips(@CurrentUser() user: AuthUser, @Body() body: { merchantId: string; enabled: boolean }) { return this.service.setTips(user.id, body.merchantId, body.enabled); }
+  @Post('staff') staff(@CurrentUser() user: AuthUser, @Body() body: { merchantId: string; email: string }) { return this.service.linkStaff(user.id, body.merchantId, body.email); }
+  @Get('staff/:merchantId') listStaff(@CurrentUser() user: AuthUser, @Param('merchantId') merchantId: string) { return this.service.listStaff(user.id, merchantId); }
+}
+
+@Controller('restaurant-staff')
+export class RestaurantStaffController {
+  constructor(private service: RestaurantPayoutService) {}
+  @Get('me') me(@CurrentUser() user: AuthUser) { return this.service.staffDashboard(user.id); }
+  @Post('shift') shift(@CurrentUser() user: AuthUser) { return this.service.startShift(user.id); }
 }
 
 @Controller('admin/restaurant-merchants') @Roles('ADMIN', 'SUPER_ADMIN')

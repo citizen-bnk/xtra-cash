@@ -33,11 +33,11 @@ export class RestaurantPayoutService {
   }
 
   async listMerchants() {
-    const result = await this.pool.query('SELECT id,trading_name,status,display_code,qr_code,payout_mode,bank_account_mask,bank_recipient_token IS NOT NULL AS bank_recipient_configured,settlement_reference,portal_user_id,created_at FROM restaurant_merchants ORDER BY created_at DESC LIMIT 200');
+    const result = await this.pool.query('SELECT id,trading_name,status,display_code,qr_code,payout_mode,tips_enabled,bank_account_mask,bank_recipient_token IS NOT NULL AS bank_recipient_configured,settlement_reference,portal_user_id,created_at FROM restaurant_merchants ORDER BY created_at DESC LIMIT 200');
     return result.rows.map(row => ({ ...row, qr_url: `${checkoutBase()}/scanqr/?merchant=${row.qr_code}`, qr_code: undefined }));
   }
 
-  async configureMerchant(id: string, input: { status?: string; payoutMode?: string; settlementReference?: string; bankAccountMask?: string; bankRecipientToken?: string; portalEmail?: string }) {
+  async configureMerchant(id: string, input: { status?: string; payoutMode?: string; tipsEnabled?: boolean; settlementReference?: string; bankAccountMask?: string; bankRecipientToken?: string; portalEmail?: string }) {
     if (!validId(id)) throw new NotFoundException();
     const db = await this.pool.connect();
     try {
@@ -57,7 +57,7 @@ export class RestaurantPayoutService {
       const mask = input.bankAccountMask?.trim().slice(0, 30) || current.rows[0].bank_account_mask;
       const recipient = input.bankRecipientToken?.trim() || current.rows[0].bank_recipient_token;
       if (status === 'ACTIVE' && (!settlement || !recipient || !mask || !owner)) throw new BadRequestException('Verify the restaurant contact, bank recipient and settlement reference before activation.');
-      await db.query('UPDATE restaurant_merchants SET status=$1,payout_mode=$2,portal_user_id=$3,settlement_reference=$4,bank_account_mask=$5,bank_recipient_token=$6 WHERE id=$7', [status, mode, owner, settlement, mask, recipient, id]);
+      await db.query('UPDATE restaurant_merchants SET status=$1,payout_mode=$2,portal_user_id=$3,settlement_reference=$4,bank_account_mask=$5,bank_recipient_token=$6,tips_enabled=$8 WHERE id=$7', [status, mode, owner, settlement, mask, recipient, id, input.tipsEnabled ?? current.rows[0].tips_enabled]);
       await db.query('COMMIT');
       return { updated: true };
     } catch (error) { await db.query('ROLLBACK'); throw error; }
@@ -67,7 +67,7 @@ export class RestaurantPayoutService {
   async dashboard(userId: string, roles: string[], merchantId?: string) {
     const admin = roles.includes('ADMIN') || roles.includes('SUPER_ADMIN');
     if (merchantId && !validId(merchantId)) throw new NotFoundException();
-    const merchant = await this.pool.query(`SELECT id,trading_name,status,display_code,qr_code,payout_mode,bank_account_mask,bank_recipient_token IS NOT NULL AS bank_recipient_configured FROM restaurant_merchants WHERE ${merchantId ? 'id=$1 AND ($2=TRUE OR portal_user_id=$3)' : 'portal_user_id=$1'} LIMIT 1`, merchantId ? [merchantId, admin, userId] : [userId]);
+    const merchant = await this.pool.query(`SELECT id,trading_name,status,display_code,qr_code,payout_mode,tips_enabled,bank_account_mask,bank_recipient_token IS NOT NULL AS bank_recipient_configured FROM restaurant_merchants WHERE ${merchantId ? 'id=$1 AND ($2=TRUE OR portal_user_id=$3)' : 'portal_user_id=$1'} LIMIT 1`, merchantId ? [merchantId, admin, userId] : [userId]);
     if (!merchant.rows[0]) throw new NotFoundException('Restaurant account not found.');
     const id = merchant.rows[0].id;
     const [totals, transactions, payouts] = await Promise.all([
@@ -78,6 +78,49 @@ export class RestaurantPayoutService {
     const { qr_code, ...safeMerchant } = merchant.rows[0];
     const qrUrl = `${checkoutBase()}/scanqr/?merchant=${qr_code}`;
     return { merchant: { ...safeMerchant, qrUrl, qr_url: qrUrl }, totals: totals.rows[0], transactions: transactions.rows, payouts: payouts.rows, eftEnabled: false };
+  }
+
+  async setTips(userId: string, merchantId: string, enabled: boolean) {
+    if (!validId(merchantId) || typeof enabled !== 'boolean') throw new BadRequestException('Choose a valid tip setting.');
+    const result = await this.pool.query('UPDATE restaurant_merchants SET tips_enabled=$1 WHERE id=$2 AND portal_user_id=$3 RETURNING tips_enabled', [enabled, merchantId, userId]);
+    if (!result.rows[0]) throw new ForbiddenException('Only the restaurant owner can change tipping.');
+    return { tipsEnabled: result.rows[0].tips_enabled };
+  }
+
+  async staffDashboard(userId: string) {
+    const result = await this.pool.query("SELECT s.id,s.employee_code,s.status,s.shift_expires_at,m.trading_name,m.status AS merchant_status,m.tips_enabled,m.qr_code FROM restaurant_staff s JOIN restaurant_merchants m ON m.id=s.merchant_id WHERE s.user_id=$1 LIMIT 1", [userId]);
+    if (!result.rows[0]) throw new NotFoundException('Your restaurant has not linked your account yet.');
+    const { qr_code, ...staff } = result.rows[0];
+    return { ...staff, qrUrl: `${checkoutBase()}/scanqr/?merchant=${qr_code}&employee=${staff.employee_code}` };
+  }
+
+  async startShift(userId: string) {
+    const result = await this.pool.query("UPDATE restaurant_staff s SET shift_expires_at=now()+interval '12 hours' FROM restaurant_merchants m WHERE s.merchant_id=m.id AND s.user_id=$1 AND s.status='ACTIVE' AND m.status='ACTIVE' RETURNING s.id", [userId]);
+    if (!result.rows[0]) throw new ForbiddenException('An active restaurant staff account is required.');
+    return this.staffDashboard(userId);
+  }
+
+  async linkStaff(ownerId: string, merchantId: string, email: string) {
+    if (!validId(merchantId) || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) throw new BadRequestException('Enter an existing staff account email.');
+    const owner = await this.pool.query("SELECT id FROM restaurant_merchants WHERE id=$1 AND portal_user_id=$2", [merchantId, ownerId]);
+    if (!owner.rows[0]) throw new ForbiddenException('Only the restaurant owner can link staff.');
+    const person = await this.pool.query("SELECT id FROM users WHERE lower(email)=$1 AND status='ACTIVE'", [email.trim().toLowerCase()]);
+    if (!person.rows[0]) throw new NotFoundException('Ask the employee to create an XTRA-CASH account first.');
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const result = await this.pool.query('INSERT INTO restaurant_staff(id,merchant_id,user_id,employee_code) VALUES($1,$2,$3,$4) ON CONFLICT (merchant_id,user_id) DO UPDATE SET status=\'ACTIVE\' RETURNING employee_code', [randomUUID(), merchantId, person.rows[0].id, printedCode()]);
+        return { employeeCode: result.rows[0].employee_code };
+      } catch (error) { if ((error as { code?: string }).code !== '23505') throw error; }
+    }
+    throw new ConflictException('Could not allocate an employee code. Try again.');
+  }
+
+  async listStaff(ownerId: string, merchantId: string) {
+    if (!validId(merchantId)) throw new NotFoundException();
+    const owner = await this.pool.query('SELECT id FROM restaurant_merchants WHERE id=$1 AND portal_user_id=$2', [merchantId, ownerId]);
+    if (!owner.rows[0]) throw new ForbiddenException();
+    const result = await this.pool.query('SELECT s.id,s.employee_code,s.status,s.shift_expires_at,u.first_name,u.last_name,u.email FROM restaurant_staff s JOIN users u ON u.id=s.user_id WHERE s.merchant_id=$1 ORDER BY s.created_at DESC', [merchantId]);
+    return result.rows;
   }
 
   private async reserve(db: PoolClient, merchantId: string, mode: 'ON_DEMAND' | 'DAILY', userId: string | null) {

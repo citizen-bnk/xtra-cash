@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, StreamableFile, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, StreamableFile, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser, Public, Roles, type AuthUser } from '../common/auth';
@@ -9,10 +9,10 @@ export class RestaurantController {
   constructor(private service: RestaurantService) {}
 
   @Public() @Get('merchant/:code') @Throttle({ default: { limit: 12, ttl: 60000 } })
-  merchant(@Param('code') code: string) { return this.service.resolveMerchant(code); }
+  merchant(@Param('code') code: string, @Query('employee') employee?: string) { return this.service.resolveMerchant(code, employee); }
 
   @Roles('CONSUMER') @Post() @Throttle({ default: { limit: 8, ttl: 60000 } })
-  create(@CurrentUser() user: AuthUser, @Body() body: { merchant: string; merchantCode?: string; reference: string; totalCents: number; items: { label: string; cents: number }[] }) { return this.service.create(user.id, body); }
+  create(@CurrentUser() user: AuthUser, @Body() body: { merchant: string; merchantCode?: string; employeeCode?: string; reference: string; totalCents: number; items: { label: string; cents: number }[] }) { return this.service.create(user.id, body); }
 
   @Public() @Get(':token') @Throttle({ default: { limit: 30, ttl: 60000 } })
   view(@Param('token') token: string) { return this.service.view(token); }
@@ -24,7 +24,7 @@ export class RestaurantController {
   release(@Param('token') token: string, @CurrentUser() user: AuthUser, @Body() body: { itemIds: string[] }) { return this.service.release(token, user.id, body.itemIds); }
 
   @Roles('CONSUMER') @Post(':token/pay-wallet') @Throttle({ default: { limit: 8, ttl: 60000 } })
-  payWallet(@Param('token') token: string, @CurrentUser() user: AuthUser, @Body() body: { idempotencyKey: string }) { return this.service.payFromWallet(token, user.id, body.idempotencyKey); }
+  payWallet(@Param('token') token: string, @CurrentUser() user: AuthUser, @Body() body: { idempotencyKey: string; tipCents?: number }) { return this.service.payFromWallet(token, user.id, body.idempotencyKey, body.tipCents ?? 0); }
 
   @Roles('CONSUMER') @Post(':token/original') @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 12 * 1024 * 1024 } }))
   attachOriginal(@Param('token') token: string, @CurrentUser() user: AuthUser, @UploadedFile() file: Express.Multer.File) { return this.service.attachOriginal(token, user.id, file); }

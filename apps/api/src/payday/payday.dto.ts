@@ -4,7 +4,7 @@ import { PAYDAY_STAGES } from '@xtra/shared';
 const text = (max = 200) => z.string().trim().min(1).max(max);
 const date = z.string().datetime({ offset: true });
 const money = z.number().int().min(0).max(100000000);
-export const leadInput = z.object({ clientKey: text(100), legalName: text(), registrationNumber: text(40), contactName: text(100), contactChannel: text(120), address: text(), headcount: z.number().int().min(1).max(1000000), permissionReference: text(), nextAction: text(), followUpAt: date, ownerId: text(80).optional() }).strict();
+export const leadInput = z.object({ clientKey: text(100), legalName: text(), registrationNumber: text(40), contactName: text(100), contactChannel: text(120), address: text(), headcount: z.number().int().min(1).max(1000000), permissionReference: text(), nextAction: text(), followUpAt: date, ownerId: text(80).optional(), meetingId: z.string().uuid().optional(), meetingNotes: z.string().trim().max(6000).optional() }).strict();
 export const leadUpdate = z.object({ version: z.number().int().positive(), stage: z.enum(PAYDAY_STAGES), nextAction: text(), followUpAt: date, ownerId: text(80).optional(), agreementReference: text().optional(), lenderReference: text().optional(), payrollReference: text().optional() }).strict();
 export const visitInput = z.object({ clientKey: text(100), employerId: text(80), outcome: text(100), notes: text(1000), nextAction: text(), followUpAt: date }).strict();
 export const entryInput = z.object({ kind: z.enum(['RECEIPT', 'COST']), amountCents: money.refine(n => n > 0), reference: text(120), evidence: text(500), lenderId: text(80).optional(), settledAt: date, earnedPlatformRevenue: z.literal(true) }).strict();

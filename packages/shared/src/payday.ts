@@ -9,6 +9,7 @@ export interface PaydayLeadInput {
 }
 export interface PaydayVisitInput { clientKey: string; employerId: string; outcome: string; notes: string; nextAction: string; followUpAt: string }
 export interface PaydayEmployer extends Omit<PaydayLeadInput, 'clientKey'> {
+  meetingNotes?: string | null;
   id: string; ownerId: string; stage: PaydayStage; version: number; createdAt: string;
   agreementReference: string | null; lenderReference: string | null; payrollReference: string | null;
   policyVersion: string; commissionCents: number; bufferCents: number; onboardingCents: number;

@@ -15,7 +15,8 @@ async function main() {
     await pg.exec("CREATE TYPE role AS ENUM ('CONSUMER'); CREATE TABLE users(id text PRIMARY KEY,email text,first_name text,last_name text,roles role[],referral_code text,status text NOT NULL DEFAULT 'ACTIVE',wallet_balance_cents integer NOT NULL DEFAULT 0); CREATE TABLE stored_files(key text PRIMARY KEY,original_name text,size_bytes integer,content bytea); CREATE TABLE ledger_journals(id text PRIMARY KEY,type text,ref_type text,ref_id text,memo text); CREATE TABLE ledger_entries(id text PRIMARY KEY,journal_id text REFERENCES ledger_journals(id),account text,amount_cents integer);");
     await pg.exec(fs.readFileSync(path.join(__dirname, '../drizzle/0021_restaurant_bills.sql'), 'utf8'));
     await pg.exec(fs.readFileSync(path.join(__dirname, '../drizzle/0022_restaurant_payouts.sql'), 'utf8'));
-    for (const [id, name] of [['diner-a', 'Amina'], ['diner-b', 'Busi']])
+    await pg.exec(fs.readFileSync(path.join(__dirname, '../drizzle/0023_restaurant_staff_tips.sql'), 'utf8'));
+    for (const [id, name] of [['diner-a', 'Amina'], ['diner-b', 'Busi'], ['waiter', 'Lebo']])
       await pg.query("INSERT INTO users(id,email,first_name,last_name,roles,referral_code) VALUES($1,$2,$3,'Diner',ARRAY['CONSUMER']::role[],$4)", [id, `${id}@example.test`, name, id]);
     const merchantId = randomUUID(), code = 'A1'.repeat(18), printed = 'TBL123';
     await pg.query("INSERT INTO restaurant_merchants(id,qr_code,display_code,trading_name,status,settlement_reference,bank_account_mask,bank_recipient_token,portal_user_id) VALUES($1,$2,$3,'Table Cafe','ACTIVE','pilot-settlement-1','Bank ····1234','recipient-1','diner-a')", [merchantId, code, printed]);
@@ -23,9 +24,12 @@ async function main() {
     const storage = { put: async (buffer, originalname) => { const key = `${randomUUID()}.jpg`; await pg.query('INSERT INTO stored_files(key,original_name,size_bytes,content) VALUES($1,$2,$3,$4)', [key, originalname, buffer.length, buffer]); return key; }, get: async (key) => Buffer.from((await pg.query('SELECT content FROM stored_files WHERE key=$1', [key])).rows[0].content) };
     const service = new RestaurantService(pool, storage);
     const payouts = new RestaurantPayoutService(pool);
+    await payouts.linkStaff('diner-a', merchantId, 'waiter@example.test');
+    await payouts.setTips('diner-a', merchantId, true);
+    const shift = await payouts.startShift('waiter');
     await assert.rejects(service.create('diner-a', { merchant: 'Unknown Cafe', reference: 'T-9', totalCents: 10000, items: [{ label: 'Tea', cents: 10000 }] }), /restaurant code/);
     assert.equal((await service.resolveMerchant(printed)).tradingName, 'Table Cafe');
-    const created = await service.create('diner-a', { merchant: 'Ignored OCR name', merchantCode: printed, reference: 'T-8', totalCents: 30000, items: [{ label: 'Soup', cents: 10000 }, { label: 'Pizza', cents: 20000 }] });
+    const created = await service.create('diner-a', { merchant: 'Ignored OCR name', merchantCode: printed, employeeCode: shift.employee_code, reference: 'T-8', totalCents: 30000, items: [{ label: 'Soup', cents: 10000 }, { label: 'Pizza', cents: 20000 }] });
     assert.equal(created.canPayFromWallet, true);
     await assert.rejects(service.create('diner-b', { merchant: 'Table Cafe', merchantCode: code, reference: 'T-8', totalCents: 30000, items: [{ label: 'Soup', cents: 10000 }, { label: 'Pizza', cents: 20000 }] }), /already has a shared table/);
     const soup = created.items.find(item => item.label === 'Soup'), pizza = created.items.find(item => item.label === 'Pizza');
@@ -33,12 +37,14 @@ async function main() {
     await assert.rejects(service.claim(created.shareToken, 'diner-b', [soup.id]), /claimed/);
     await service.claim(created.shareToken, 'diner-b', [pizza.id]);
     await assert.rejects(service.payFromWallet(created.shareToken, 'diner-a', 'pay-diner-a-1'), /Not enough money/);
-    await pg.query('UPDATE users SET wallet_balance_cents=$1 WHERE id=$2', [10000, 'diner-a']);
+    await pg.query('UPDATE users SET wallet_balance_cents=$1 WHERE id=$2', [11000, 'diner-a']);
     await pg.query('UPDATE users SET wallet_balance_cents=$1 WHERE id=$2', [20000, 'diner-b']);
     await service.attachOriginal(created.shareToken, 'diner-a', { buffer: Buffer.from('image'), originalname: 'bill.jpg', mimetype: 'image/jpeg', size: 5 });
-    const first = await service.payFromWallet(created.shareToken, 'diner-a', 'pay-diner-a-1');
+    const first = await service.payFromWallet(created.shareToken, 'diner-a', 'pay-diner-a-1', 1000);
     assert.equal(first.items.filter(i => i.status === 'PAID').length, 1);
     await service.payFromWallet(created.shareToken, 'diner-a', 'pay-diner-a-1');
+    assert.equal((await pg.query('SELECT wallet_balance_cents FROM users WHERE id=$1', ['waiter'])).rows[0].wallet_balance_cents, 1000);
+    assert.equal((await pg.query('SELECT count(*)::int AS n FROM restaurant_tips')).rows[0].n, 1);
     const second = await service.payFromWallet(created.shareToken, 'diner-b', 'pay-diner-b-1');
     assert.equal(second.status, 'FUNDED');
     assert.equal(second.items.filter(i => i.status === 'PAID').length, 2);
