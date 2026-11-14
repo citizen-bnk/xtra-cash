@@ -1,8 +1,9 @@
 /* XTRA-CASH service worker: fast app start (cached build files and images) and an offline screen. Balances, payments and anything else
  * under /api/ always go to the network and are never cached. Bump VERSION to drop old caches. */
-const VERSION = 'xc-v4-nearby-offers';
+const VERSION = 'xc-v5-offline-scans';
 const SHELL = `${VERSION}-shell`;
 const STATIC = `${VERSION}-static`;
+const SCAN_URL = '/scanqr';
 const OFFLINE_URL = '/offline.html';
 const PRECACHE = [OFFLINE_URL, '/icons/icon-192.png', '/icons/icon-512.png', '/brand/mark.png', '/brand/lockup.png', '/brand/lockup-white.png', '/manifest.webmanifest'];
 
@@ -10,7 +11,10 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(SHELL)
-      .then((cache) => cache.addAll(PRECACHE))
+      .then(async (cache) => {
+        await cache.addAll(PRECACHE);
+        await prepareScanner(cache).catch(() => undefined);
+      })
       .then(() => self.skipWaiting()),
   );
 });
@@ -19,7 +23,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       const keys = await caches.keys();
-      await Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k)));
+      await Promise.all(keys.filter((k) => k.startsWith('xc-') && !k.startsWith(VERSION)).map((k) => caches.delete(k)));
       if (self.registration.navigationPreload) await self.registration.navigationPreload.enable();
       await self.clients.claim();
     })(),
@@ -47,6 +51,19 @@ const isStaticAsset = (url) =>
   url.pathname.startsWith('/icons/') ||
   (url.pathname.startsWith('/brand/') && !/\.(mp4|webm)$/.test(url.pathname));
 
+// Cache the public scanner shell and only the hashed Next.js assets it references.
+// No account pages, API responses, authentication headers or payment requests are stored.
+async function prepareScanner(shell) {
+  const page = await fetch(SCAN_URL, { credentials: 'omit', cache: 'reload' });
+  if (!page.ok || new URL(page.url).pathname.replace(/\/$/, '') !== SCAN_URL) return;
+  const markup = await page.clone().text();
+  const paths = [...new Set(Array.from(markup.matchAll(/(?:src|href)="(\/_next\/static\/[^"?]+\.(?:js|css|woff2)(?:\?[^"]*)?)"/g), match => match[1]))];
+  if (!paths.length) return;
+  const assets = await caches.open(STATIC);
+  await assets.addAll(paths);
+  await shell.put(SCAN_URL, page);
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -61,6 +78,10 @@ self.addEventListener('fetch', (event) => {
         try {
           return (await event.preloadResponse) || (await fetch(req));
         } catch {
+          if (url.pathname.replace(/\/$/, '') === SCAN_URL) {
+            const scanner = await caches.match(SCAN_URL);
+            if (scanner) return scanner;
+          }
           return (await caches.match(OFFLINE_URL)) || Response.error();
         }
       })(),

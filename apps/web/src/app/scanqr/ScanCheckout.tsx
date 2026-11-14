@@ -14,6 +14,9 @@ import { useAuth } from '@xtra/ui';
 
 type Stage = 'start' | 'capture' | 'adjust' | 'bill' | 'split' | 'identity' | 'offer' | 'link' | 'terms' | 'sign' | 'pay' | 'receipt';
 type Repayment = 'card' | 'bank';
+const DRAFT_KEY = 'xc.restaurant.draft';
+type BillDraft = { merchant: string; bill: string; amount: string; items: BillItem[]; merchantCode?: string; employeeCode?: string; photo?: string };
+
 const stages: Stage[] = ['start', 'capture', 'adjust', 'bill', 'split', 'identity', 'offer', 'link', 'terms', 'sign', 'pay', 'receipt'];
 const sample = { merchant: 'The Ember Table', bill: 'ET-1048', amount: '680.00' };
 const sampleItems: BillItem[] = [{ id: 'sample-1', label: 'Burger and chips', cents: 22000 }, { id: 'sample-2', label: 'Pasta', cents: 19500 }, { id: 'sample-3', label: 'Salad', cents: 17500 }, { id: 'sample-4', label: 'Shared starter', cents: 9000 }];
@@ -72,6 +75,9 @@ function Signature({ signed, onChange }: { signed: boolean; onChange: (value: bo
 
 export default function ScanCheckout() {
   const { client, me, loading: authLoading } = useAuth();
+  const [online, setOnline] = useState(true);
+  const [restored, setRestored] = useState(false);
+  const [draftPhoto, setDraftPhoto] = useState('');
   const [stage, setStage] = useState<Stage>('start');
   const [liveToken, setLiveToken] = useState('');
   const [creatingLive, setCreatingLive] = useState(false);
@@ -119,17 +125,44 @@ export default function ScanCheckout() {
   }, []);
 
   useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update();
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+
     const params = new URLSearchParams(window.location.search);
     const table = params.get('table');
-    const code = params.get('merchant') ?? params.get('restaurant') ?? params.get('code') ?? '';
-    const employee = (params.get('employee') ?? '').trim().toUpperCase();
-    setEmployeeCode(employee);
-    setMerchantCode(code);
-    if (code) void verifyMerchant(code, employee);
+    const incomingCode = params.get('merchant') ?? params.get('restaurant') ?? params.get('code') ?? '';
+    const incomingEmployee = (params.get('employee') ?? '').trim().toUpperCase();
+    let draft: BillDraft | undefined;
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (raw) draft = JSON.parse(raw) as BillDraft;
+    } catch { /* Storage is optional. */ }
+    const sameRestaurant = !incomingCode || (draft?.merchantCode?.toUpperCase() === incomingCode.toUpperCase() && (draft?.employeeCode ?? '') === incomingEmployee);
+    if (!table && !params.has('bill') && draft && sameRestaurant && Array.isArray(draft.items)) {
+      setMerchant(draft.merchant); setBill(draft.bill); setAmount(draft.amount); setItems(draft.items);
+      if (draft.photo?.startsWith('data:image/jpeg;base64,')) {
+        try {
+          const bytes = Uint8Array.from(atob(draft.photo.split(',')[1]), char => char.charCodeAt(0));
+          const file = new File([bytes], 'scanned-bill.jpg', { type: 'image/jpeg' });
+          setOriginalBill(file); setPreview(file); setDraftPhoto(draft.photo);
+        } catch { /* The draft details remain usable without its photo. */ }
+      }
+      setStage('bill');
+    }
+    setMerchantCode(incomingCode || (sameRestaurant ? draft?.merchantCode ?? '' : ''));
+    setEmployeeCode(incomingCode ? incomingEmployee : draft?.employeeCode ?? '');
     if (table && /^[a-f0-9]{64}$/.test(table)) setLiveToken(table);
+    setRestored(true);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
   }, []);
 
   async function verifyMerchant(input = merchantCode, employee = employeeCode) {
+    if (!navigator.onLine) return;
     const code = input.trim().toUpperCase();
     setMerchantVerified(false);
     if (!(/^[A-Z]{3}[0-9]{3}$/.test(code) || /^[A-F0-9]{36}$/.test(code))) { setError('Enter the six character code printed below the restaurant QR, for example ABC123.'); return; }
@@ -137,24 +170,20 @@ export default function ScanCheckout() {
     try {
       const found = await client.request<{ tradingName: string; displayCode: string; waiterName: string | null }>('GET', `/restaurant-bills/merchant/${encodeURIComponent(code)}${employee ? `?employee=${encodeURIComponent(employee)}` : ''}`);
       setMerchantCode(code); setMerchant(found.tradingName); setVerifiedMerchantName(found.tradingName); setWaiterName(found.waiterName ?? ''); setMerchantVerified(true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Restaurant code could not be verified.'); }
+    } catch (cause) { if (navigator.onLine && !(cause instanceof TypeError)) setError(cause instanceof Error ? cause.message : 'Restaurant code could not be verified.'); }
     finally { setCheckingMerchant(false); }
   }
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('restore') !== '1') return;
-    try {
-      const raw = sessionStorage.getItem('xc.restaurant.draft');
-      if (!raw) return;
-      const draft = JSON.parse(raw) as { merchant: string; bill: string; amount: string; items: BillItem[]; merchantCode?: string; employeeCode?: string };
-      setMerchant(draft.merchant); setBill(draft.bill); setAmount(draft.amount); setItems(draft.items);
-      setMerchantCode(draft.merchantCode ?? '');
-      setEmployeeCode(draft.employeeCode ?? '');
-      if (draft.merchantCode) void verifyMerchant(draft.merchantCode, draft.employeeCode);
-      setStage('bill'); sessionStorage.removeItem('xc.restaurant.draft');
-    } catch { /* Invalid local draft opens the normal scan flow. */ }
-  }, []);
+    if (restored && online && !liveToken && merchantCode) void verifyMerchant(merchantCode, employeeCode);
+    // The start screen verifies new manual entries through its Find restaurant button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restored, online]);
+
+  useEffect(() => {
+    if (restored && stage === 'bill' && !usingSample && !liveToken) saveDraft();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restored, stage, usingSample, liveToken, merchant, bill, amount, items, merchantCode, employeeCode, draftPhoto]);
 
   useEffect(() => {
     const encoded = new URLSearchParams(window.location.search).get('bill');
@@ -214,6 +243,9 @@ export default function ScanCheckout() {
   }
 
   function reset() {
+    clearDraft();
+    setDraftPhoto('');
+    setEmployeeCode('');
     clearApplication();
     setPreview(null);
     setOriginalBill(null);
@@ -270,6 +302,7 @@ export default function ScanCheckout() {
   }
 
   function manualBill() {
+    setDraftPhoto('');
     setPreview(null);
     setOriginalBill(null);
     setUsingSample(false);
@@ -283,6 +316,12 @@ export default function ScanCheckout() {
   function acceptScan(scan: File, parsed: ParsedBill) {
     setPreview(scan);
     setOriginalBill(scan);
+    setDraftPhoto('');
+    if (scan.size <= 1024 * 1024) {
+      const reader = new FileReader();
+      reader.onload = () => { if (typeof reader.result === 'string') setDraftPhoto(reader.result); };
+      reader.readAsDataURL(scan);
+    }
     setMerchant(verifiedMerchantName || parsed.merchant);
     setBill(parsed.reference);
     setAmount(parsed.totalCents ? (parsed.totalCents / 100).toFixed(2) : '');
@@ -313,11 +352,16 @@ export default function ScanCheckout() {
   }
 
   function saveDraft() {
-    sessionStorage.setItem('xc.restaurant.draft', JSON.stringify({ merchant, bill, amount, items, merchantCode, employeeCode }));
+    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ merchant, bill, amount, items, merchantCode, employeeCode, photo: draftPhoto })); }
+    catch { /* The current draft remains in memory if storage is full. */ }
+  }
+
+  function clearDraft() {
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* Storage is optional. */ }
   }
 
   async function startLiveBill() {
-    if (!me?.roles.includes('CONSUMER') || creatingLive || !merchantVerified || !merchant.trim() || !bill.trim() || total < 100 || items.length < 1 || items.reduce((sum, item) => sum + item.cents, 0) !== total) return;
+    if (!navigator.onLine || !me?.roles.includes('CONSUMER') || creatingLive || !merchantVerified || !merchant.trim() || !bill.trim() || total < 100 || items.length < 1 || items.reduce((sum, item) => sum + item.cents, 0) !== total) return;
     setCreatingLive(true); setError('');
     try {
       const created = await client.request<{ shareToken: string }>('POST', '/restaurant-bills', { merchant, merchantCode: merchantCode || undefined, employeeCode: employeeCode || undefined, reference: bill, totalCents: total, items: items.map(item => ({ label: item.label, cents: item.cents })) });
@@ -326,6 +370,7 @@ export default function ScanCheckout() {
         try { await client.request('POST', `/restaurant-bills/${created.shareToken}/original`, form); }
         catch { setError('The shared bill was created, but its original photo was not saved.'); }
       }
+      clearDraft();
       window.history.pushState(null, '', `/scanqr/?table=${created.shareToken}`);
       setLiveToken(created.shareToken);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create the shared bill.'); }
@@ -401,11 +446,11 @@ export default function ScanCheckout() {
 
           {stage === 'start' && <>
             <div className="sq-merchant"><div className="sq-icon"><Utensils size={20} /></div><div><strong>Table checkout</strong><small>Check the restaurant on your bill</small></div><ShieldCheck size={19} /></div>
-            {!merchantVerified && <div className="sq-fields"><label>Restaurant code<input aria-label="Restaurant code below the QR" autoCapitalize="characters" value={merchantCode} maxLength={36} onChange={e => { setMerchantCode(e.target.value.toUpperCase()); setMerchantVerified(false); }} placeholder="ABC123" /></label><button className="sq-secondary" disabled={checkingMerchant || merchantCode.trim().length < 6} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button></div>}
+            {!merchantVerified && <div className="sq-fields"><label>Restaurant code<input aria-label="Restaurant code below the QR" autoCapitalize="characters" value={merchantCode} maxLength={36} onChange={e => { setMerchantCode(e.target.value.toUpperCase()); setMerchantVerified(false); }} placeholder="ABC123" /></label><button className="sq-secondary" disabled={!online || checkingMerchant || merchantCode.trim().length < 6} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button></div>}
             {merchantVerified && <div className="sq-notice"><CircleCheck size={19} /><span><strong>{merchant}</strong><small>{waiterName ? `Your waiter: ${waiterName} · ` : ''}Restaurant code verified</small></span></div>}
             {error && <p className="sq-error" role="alert">{error}</p>}
-            <button className="sq-primary" disabled={!ready || !merchantVerified} onClick={() => go('capture')}>Start with your bill <ArrowRight size={19} /></button>
-            <a className="sq-secondary" href="/register">Sign up for XTRA-CASH <ChevronRight size={17} /></a>
+            <button className="sq-primary" disabled={!ready || (online && !merchantVerified)} onClick={() => go('capture')}>Start with your bill <ArrowRight size={19} /></button>
+            {online && <a className="sq-secondary" href="/register">Sign up for XTRA-CASH <ChevronRight size={17} /></a>}
             <p className="sq-footnote"><LockKeyhole size={14} /> Use sample details in this preview.</p>
           </>}
 
@@ -436,8 +481,12 @@ export default function ScanCheckout() {
             {!usingSample && <p className="sq-note">OCR may misread photos. Check every amount against the original bill.</p>}
             {error && <p className="sq-error" role="alert">{error}</p>}
             {usingSample && <button className="sq-primary" disabled={!merchant.trim() || !bill.trim() || total < 100 || !items.length || items.reduce((sum, item) => sum + item.cents, 0) !== total} onClick={() => { clearApplication(); setSplitEnabled(true); go('split'); }}>Try choosing items <ArrowRight size={19} /></button>}
-            {!usingSample && me?.roles.includes('CONSUMER') && <button className="sq-primary" disabled={creatingLive || !merchantVerified || !bill.trim() || total < 100 || !items.length || items.reduce((sum, item) => sum + item.cents, 0) !== total} onClick={() => void startLiveBill()}><Share2 size={17} /> {creatingLive ? 'Creating shared bill…' : 'Start live shared bill'}</button>}
-            {!usingSample && !authLoading && !me && <a className="sq-primary" href="/login?next=%2Fscanqr%2F%3Frestore%3D1" onClick={saveDraft}>Log in to start a live shared bill</a>}
+            {!usingSample && online && !merchantVerified && <div className="sq-fields">
+              <label>Restaurant code<input autoCapitalize="characters" value={merchantCode} maxLength={36} onChange={event => setMerchantCode(event.target.value.toUpperCase())} placeholder="ABC123" /></label>
+              <button className="sq-secondary" disabled={checkingMerchant || merchantCode.trim().length < 6} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button>
+            </div>}
+            {!usingSample && online && me?.roles.includes('CONSUMER') && <button className="sq-primary" disabled={creatingLive || !merchantVerified || !bill.trim() || total < 100 || !items.length || items.reduce((sum, item) => sum + item.cents, 0) !== total} onClick={() => void startLiveBill()}><Share2 size={17} /> {creatingLive ? 'Creating shared bill…' : 'Start live shared bill'}</button>}
+            {!usingSample && online && !authLoading && !me && <a className="sq-primary" href="/login?next=%2Fscanqr%2F%3Frestore%3D1" onClick={saveDraft}>Log in to start a live shared bill</a>}
           </>}
 
           {stage === 'split' && <>
