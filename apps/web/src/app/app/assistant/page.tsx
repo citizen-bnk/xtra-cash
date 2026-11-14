@@ -5,7 +5,8 @@ import { ArrowLeft, CheckCheck, FileText, MapPin, MoreVertical, Paperclip, Plus,
 import { Logo, useAuth } from '@xtra/ui';
 
 type VaultType = 'BANK_STATEMENT' | 'ID_DOCUMENT' | 'PROOF_OF_INCOME' | 'PROOF_OF_ADDRESS';
-type Entry = { id: string; role: 'assistant' | 'user'; text: string; at: string; fileName?: string; location?: string };
+type AssistantAction = { label: string; href?: string; confirmation?: string };
+type Entry = { actions?: AssistantAction[]; id: string; role: 'assistant' | 'user'; text: string; at: string; fileName?: string; location?: string };
 const documentTypes: { type: VaultType; label: string }[] = [
   { type: 'BANK_STATEMENT', label: 'Bank statements' },
   { type: 'ID_DOCUMENT', label: 'ID document' },
@@ -47,10 +48,20 @@ export default function AssistantPage() {
     try {
       const recent = next.slice(-16).map(({ role, text: content }) => ({ role, content }));
       const answer = await client.consumer.assistantReply(recent);
-      setMessages(all => [...all, entry('assistant', answer.message)]);
+      setMessages(all => [...all, entry('assistant', answer.message, { actions: answer.actions })]);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'The assistant could not reply. Please try again.'); }
     finally { setBusy(false); }
   }
+  async function confirmAction(messageId: string, confirmation: string) {
+    if (busy) return;
+    setBusy(true); setError('');
+    try {
+      const answer = await client.request<{ message: string }>('POST', '/customer-assistant/confirm', { confirmation });
+      setMessages(all => [...all.map(item => item.id === messageId ? { ...item, actions: item.actions?.filter(action => action.confirmation !== confirmation) } : item), entry('assistant', answer.message)]);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not update the receipt.'); }
+    finally { setBusy(false); }
+  }
+
   function send(event: FormEvent) { event.preventDefault(); void ask(draft); }
   async function upload(type: VaultType, file?: File) {
     setAttachmentsOpen(false);
@@ -86,7 +97,7 @@ export default function AssistantPage() {
     </header>
     <div role="log" aria-label="Assistant conversation" aria-live="polite" className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_1px_1px,rgba(92,35,148,.07)_1px,transparent_0)] bg-[length:24px_24px]">
       <div className="mx-auto flex min-h-full max-w-[760px] flex-col gap-3 px-3 py-5 sm:px-5">
-        {messages.map(message => <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[86%] rounded-2xl px-3.5 py-2.5 shadow-sm sm:max-w-[72%] ${message.role === 'user' ? 'rounded-br-sm bg-[#e7d2f6]' : 'rounded-bl-sm bg-white'}`}><p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.text}</p>{message.fileName && <p className="mt-2 flex items-center gap-1 rounded-lg bg-white/70 px-2 py-1 text-xs"><FileText className="h-4 w-4" /> <span className="truncate">{message.fileName}</span></p>}{message.location && <p className="mt-2 flex items-center gap-1 rounded-lg bg-white/70 px-2 py-1 text-xs"><MapPin className="h-4 w-4" /> {message.location}</p>}<p className="mt-1 flex items-center justify-end gap-1 text-[10px] text-[#6b6180]">{new Date(message.at).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}{message.role === 'user' && <CheckCheck className="h-3.5 w-3.5 text-[#5c2394]" />}</p></div></div>)}
+        {messages.map(message => <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[86%] rounded-2xl px-3.5 py-2.5 shadow-sm sm:max-w-[72%] ${message.role === 'user' ? 'rounded-br-sm bg-[#e7d2f6]' : 'rounded-bl-sm bg-white'}`}><p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.text}</p>{message.actions?.map((action, index) => action.href && /^\/(app(?:\/|$)|scanqr(?:\/|$))/.test(action.href) ? <Link key={index} href={action.href} className="mt-2 block rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-sm font-semibold text-purple-800">{action.label}</Link> : action.confirmation ? <button key={index} type="button" disabled={busy} onClick={() => void confirmAction(message.id, action.confirmation!)} className="mt-2 block rounded-xl bg-purple-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{action.label}</button> : null)}{message.fileName && <p className="mt-2 flex items-center gap-1 rounded-lg bg-white/70 px-2 py-1 text-xs"><FileText className="h-4 w-4" /> <span className="truncate">{message.fileName}</span></p>}{message.location && <p className="mt-2 flex items-center gap-1 rounded-lg bg-white/70 px-2 py-1 text-xs"><MapPin className="h-4 w-4" /> {message.location}</p>}<p className="mt-1 flex items-center justify-end gap-1 text-[10px] text-[#6b6180]">{new Date(message.at).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}{message.role === 'user' && <CheckCheck className="h-3.5 w-3.5 text-[#5c2394]" />}</p></div></div>)}
         {busy && <div className="self-start rounded-2xl rounded-bl-sm bg-white px-4 py-2 text-sm text-[#6b6180] shadow-sm" aria-label="Assistant is responding">● ● ●</div>}
         <div ref={bottom} />
       </div>
