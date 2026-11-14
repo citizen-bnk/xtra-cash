@@ -23,7 +23,30 @@ async function main() {
     const pool = { query: (...args) => pg.query(...args), connect: async () => ({ query: (...args) => pg.query(...args), release() {} }) };
     const storage = { put: async (buffer, originalname) => { const key = `${randomUUID()}.jpg`; await pg.query('INSERT INTO stored_files(key,original_name,size_bytes,content) VALUES($1,$2,$3,$4)', [key, originalname, buffer.length, buffer]); return key; }, get: async (key) => Buffer.from((await pg.query('SELECT content FROM stored_files WHERE key=$1', [key])).rows[0].content) };
     const service = new RestaurantService(pool, storage);
+    await pg.exec(fs.readFileSync(path.join(__dirname, '../drizzle/0026_waterfall_test_restaurants.sql'), 'utf8'));
+    for (const code of ['123ABC', '234BCD', '345CDE', '456DEF']) {
+      assert.match((await service.resolveMerchant(code)).tradingName, /Mall of Africa · TEST$/);
+    }
+    const training = await service.create('diner-a', {
+      merchant: 'Training receipt', merchantCode: '123ABC', reference: 'TRAINING-1',
+      totalCents: 10000, items: [{ label: 'Training item', cents: 10000 }],
+    });
+    assert.equal(training.canPayFromWallet, false);
     const payouts = new RestaurantPayoutService(pool);
+    await assert.rejects(
+      payouts.configureMerchant('8466a511-32ab-4f49-8d22-001900001001', { status: 'ACTIVE' }),
+      /Training restaurants/,
+    );
+    const draft = await payouts.createMerchant({ tradingName: 'Onboarding example', portalEmail: 'diner-a@example.test' });
+    assert.equal((await service.resolveMerchant(draft.displayCode)).previewOnly, true);
+    await assert.rejects(service.create('diner-a', {
+      merchant: 'Onboarding example', merchantCode: draft.displayCode, reference: 'DRAFT-1',
+      totalCents: 10000, items: [{ label: 'Training item', cents: 10000 }],
+    }), /not active/);
+    const settings = { status: 'ACTIVE', settlementReference: 'launch-check', bankAccountMask: 'Bank 1234', bankRecipientToken: 'recipient-test' };
+    await assert.rejects(payouts.configureMerchant(draft.id, settings), /Scan the printed QR/);
+    await payouts.configureMerchant(draft.id, { ...settings, qrChecked: true });
+    assert.equal((await service.resolveMerchant(draft.displayCode)).previewOnly, false);
     await payouts.linkStaff('diner-a', merchantId, 'waiter@example.test');
     await payouts.setTips('diner-a', merchantId, true);
     const shift = await payouts.startShift('waiter');

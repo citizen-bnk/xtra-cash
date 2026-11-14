@@ -7,7 +7,7 @@ import {
   Download, FileText, Fingerprint, ImagePlus, Landmark, LockKeyhole, PenLine,
   ReceiptText, ScanLine, ShieldCheck, Utensils, Wallet, Share2, Plus, Trash2,
 } from 'lucide-react';
-import { ApiError } from '@xtra/shared';
+import { ApiError, printedRestaurantCode, restaurantQrCode } from '@xtra/shared';
 import BillScanner from './BillScanner';
 import RestaurantQrScanner from './RestaurantQrScanner';
 import type { BillItem, ParsedBill } from './billScan';
@@ -78,6 +78,7 @@ function Signature({ signed, onChange }: { signed: boolean; onChange: (value: bo
 export default function ScanCheckout() {
   const { client, me, refreshMe, loading: authLoading } = useAuth();
   const [needsCode, setNeedsCode] = useState(false);
+  const [scannedQr, setScannedQr] = useState('');
   const [qrRejection, setQrRejection] = useState('');
   const merchantCheck = useRef(0);
   const [online, setOnline] = useState(true);
@@ -89,6 +90,7 @@ export default function ScanCheckout() {
   const [originalBill, setOriginalBill] = useState<File | null>(null);
   const [merchantCode, setMerchantCode] = useState('');
   const [employeeCode, setEmployeeCode] = useState('');
+  const [previewOnly, setPreviewOnly] = useState(false);
   const [waiterName, setWaiterName] = useState('');
   const [merchantVerified, setMerchantVerified] = useState(false);
   const [verifiedMerchantName, setVerifiedMerchantName] = useState('');
@@ -139,6 +141,7 @@ export default function ScanCheckout() {
     const params = new URLSearchParams(window.location.search);
     const table = params.get('table');
     const incomingCode = params.get('merchant') ?? params.get('restaurant') ?? params.get('code') ?? '';
+    if (incomingCode) setScannedQr(window.location.origin + '/scanqr?' + new URLSearchParams({ code: incomingCode }));
     const incomingEmployee = (params.get('employee') ?? '').trim().toUpperCase();
     let draft: BillDraft | undefined;
     try {
@@ -172,12 +175,12 @@ export default function ScanCheckout() {
     const check = ++merchantCheck.current;
     const code = input.trim().toUpperCase();
     setMerchantVerified(false);
-    if (!(/^[A-Z]{3}[0-9]{3}$/.test(code) || /^[A-F0-9]{36}$/.test(code))) { setError('Enter the six character code printed below the restaurant QR, for example ABC123.'); return; }
+    if (!restaurantQrCode.test(code)) { setError('Enter the six character code printed below the restaurant QR, for example ABC123 or 123ABC.'); return; }
     setCheckingMerchant(true); setError('');
     try {
-      const found = await client.request<{ tradingName: string; displayCode: string; waiterName: string | null }>('GET', `/restaurant-bills/merchant/${encodeURIComponent(code)}${employee ? `?employee=${encodeURIComponent(employee)}` : ''}`);
+      const found = await client.request<{ tradingName: string; displayCode: string; waiterName: string | null; previewOnly: boolean }>('GET', `/restaurant-bills/merchant/${encodeURIComponent(code)}${employee ? `?employee=${encodeURIComponent(employee)}` : ''}`);
       if (check !== merchantCheck.current) return;
-      setMerchantCode(code); setMerchant(found.tradingName); setVerifiedMerchantName(found.tradingName); setWaiterName(found.waiterName ?? ''); setMerchantVerified(true);
+      setMerchantCode(code); setMerchant(found.tradingName); setVerifiedMerchantName(found.tradingName); setPreviewOnly(found.previewOnly); setWaiterName(found.waiterName ?? ''); setMerchantVerified(true);
     } catch (cause) {
       if (check !== merchantCheck.current) return;
       if (!needsCode && cause instanceof ApiError && [400, 404].includes(cause.status)) {
@@ -249,9 +252,10 @@ export default function ScanCheckout() {
   }[stage];
 
   function scanRestaurant(raw: string) {
+    setScannedQr(raw.trim().slice(0, 320));
     let code = raw.trim().toUpperCase();
     let employee = '';
-    if (!/^[A-Z]{3}[0-9]{3}$/.test(code)) {
+    if (!restaurantQrCode.test(code)) {
       try {
         const url = new URL(raw.trim(), window.location.origin);
         const allowedOrigin = url.origin === window.location.origin
@@ -263,7 +267,7 @@ export default function ScanCheckout() {
         code = (codes[0] ?? '').trim().toUpperCase();
         if (codes.length && !code) throw new Error();
         employee = (url.searchParams.get('employee') ?? '').trim().toUpperCase();
-        if (code && !/^(?:[A-Z]{3}[0-9]{3}|[A-F0-9]{36})$/.test(code)) throw new Error();
+        if (code && !restaurantQrCode.test(code)) throw new Error();
         if (employee && !/^[A-Z]{3}[0-9]{3}$/.test(employee)) throw new Error();
       } catch {
         setQrRejection('This QR is not a valid XTRA-CASH restaurant checkout code.');
@@ -414,7 +418,7 @@ export default function ScanCheckout() {
   }
 
   async function startLiveBill() {
-    if (!navigator.onLine || !me?.roles.includes('CONSUMER') || creatingLive || !merchantVerified || !merchant.trim() || !bill.trim() || total < 100 || items.length < 1 || items.reduce((sum, item) => sum + item.cents, 0) !== total) return;
+    if (previewOnly || !navigator.onLine || !me?.roles.includes('CONSUMER') || creatingLive || !merchantVerified || !merchant.trim() || !bill.trim() || total < 100 || items.length < 1 || items.reduce((sum, item) => sum + item.cents, 0) !== total) return;
     setCreatingLive(true); setError('');
     try {
       const created = await client.request<{ shareToken: string }>('POST', '/restaurant-bills', { merchant, merchantCode: merchantCode || undefined, employeeCode: employeeCode || undefined, reference: bill, totalCents: total, items: items.map(item => ({ label: item.label, cents: item.cents })) });
@@ -493,12 +497,18 @@ export default function ScanCheckout() {
 
           {stage === 'start' && <>
             {restored && !needsCode && !merchantCode && !qrRejection && <RestaurantQrScanner onScan={scanRestaurant} />}
-            {qrRejection && <div className="sq-error" role="alert"><strong>QR code rejected</strong><p>{qrRejection}</p></div>}
+            {qrRejection && <div className="sq-error" role="alert">
+              <strong>QR code rejected</strong>
+              <p>{qrRejection}</p>
+              {scannedQr && <p className="break-all"><strong>Scanned</strong> <bdi>{scannedQr}</bdi></p>}
+              <p className="break-all"><strong>Expected</strong> <code>https://xtra-cash.co.za/scanqr?code=123ABC</code></p>
+              <p>Use an active restaurant code, such as 123ABC or ABC123. Existing restaurant QR links also work.</p>
+            </div>}
             {needsCode && !merchantVerified && <div className="sq-fields">
               <label>Restaurant code<input aria-label="Restaurant code below the QR" autoCapitalize="characters" value={merchantCode} maxLength={6} onChange={event => setMerchantCode(event.target.value.toUpperCase())} placeholder="ABC123" /></label>
-              <button className="sq-primary" disabled={!online || checkingMerchant || !/^[A-Z]{3}[0-9]{3}$/.test(merchantCode)} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button>
+              <button className="sq-primary" disabled={!online || checkingMerchant || !printedRestaurantCode.test(merchantCode)} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button>
             </div>}
-            {merchantVerified && <div className="sq-notice"><CircleCheck size={19} /><span><strong>{merchant}</strong><small>{waiterName ? `Your waiter: ${waiterName} · ` : ''}Restaurant code verified</small></span></div>}
+            {merchantVerified && <div className="sq-notice"><CircleCheck size={19} /><span><strong>{merchant}</strong><small>{waiterName ? `Your waiter: ${waiterName} · ` : ''}{previewOnly ? 'QR verified · checkout preview' : 'Restaurant code verified'}</small></span></div>}
             {checkingMerchant && <p role="status" className="sq-note">Checking restaurant…</p>}
             {error && <p className="sq-error" role="alert">{error}</p>}
             {(needsCode || merchantCode || qrRejection) && <button className={qrRejection ? 'sq-primary' : 'sq-text-button'} type="button" onClick={() => {
@@ -529,6 +539,7 @@ export default function ScanCheckout() {
               <label>Bill reference<input value={bill} maxLength={40} onChange={e => setBill(e.target.value)} placeholder="Reference on bill" /></label>
               <label>Total including any tip<div className="sq-amount"><span>R</span><input inputMode="decimal" maxLength={9} value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" /></div></label>
             </div>
+            {previewOnly && <p className="sq-note">This restaurant is still being set up. You can test the scanner and bill details here.</p>}
             {scanWarnings.length > 0 && <div className="sq-note" role="status">{scanWarnings.map(warning => <p key={warning}>{warning}</p>)}</div>}
             <div className="sq-card sq-items"><div className="sq-row"><strong>Items on bill</strong><span>{items.length} found</span></div>{items.map(item => <div className="sq-row" key={item.id}><span>{item.label}</span><strong>{money(item.cents)}</strong><button type="button" className="sq-icon-button" aria-label={`Remove ${item.label}`} onClick={() => setItems(current => current.filter(row => row.id !== item.id))}><Trash2 size={14} /></button></div>)}</div>
             <div className="sq-add-item"><input aria-label="Item name" placeholder="Add missing item" value={newItem} onChange={e => setNewItem(e.target.value)} /><input aria-label="Item amount in rand" inputMode="decimal" placeholder="R amount" value={newItemAmount} onChange={e => setNewItemAmount(e.target.value)} /><button type="button" aria-label="Add item" onClick={addItem}><Plus size={18} /></button></div>
@@ -540,8 +551,8 @@ export default function ScanCheckout() {
               <label>Restaurant code<input autoCapitalize="characters" value={merchantCode} maxLength={36} onChange={event => setMerchantCode(event.target.value.toUpperCase())} placeholder="ABC123" /></label>
               <button className="sq-secondary" disabled={checkingMerchant || merchantCode.trim().length < 6} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button>
             </div>}
-            {!usingSample && online && me?.roles.includes('CONSUMER') && <button className="sq-primary" disabled={creatingLive || !merchantVerified || !bill.trim() || total < 100 || !items.length || items.reduce((sum, item) => sum + item.cents, 0) !== total} onClick={() => void startLiveBill()}><Share2 size={17} /> {creatingLive ? 'Creating shared bill…' : 'Start live shared bill'}</button>}
-            {!usingSample && online && !authLoading && !me && <a className="sq-primary" href="/login?next=%2Fscanqr%2F%3Frestore%3D1" onClick={saveDraft}>Log in to start a live shared bill</a>}
+            {!usingSample && !previewOnly && online && me?.roles.includes('CONSUMER') && <button className="sq-primary" disabled={creatingLive || !merchantVerified || !bill.trim() || total < 100 || !items.length || items.reduce((sum, item) => sum + item.cents, 0) !== total} onClick={() => void startLiveBill()}><Share2 size={17} /> {creatingLive ? 'Creating shared bill…' : 'Start live shared bill'}</button>}
+            {!usingSample && !previewOnly && online && !authLoading && !me && <a className="sq-primary" href="/login?next=%2Fscanqr%2F%3Frestore%3D1" onClick={saveDraft}>Log in to start a live shared bill</a>}
           </>}
 
           {stage === 'split' && <>

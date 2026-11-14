@@ -27,7 +27,7 @@ export class RestaurantAdminController {
   @Get() list() { return this.service.listMerchants(); }
   @Post() create(@Body() body: { tradingName: string; portalEmail: string; settlementReference?: string; bankAccountMask?: string; bankRecipientToken?: string }) { return this.service.createMerchant(body); }
   @Get(':id') dashboard(@CurrentUser() user: AuthUser, @Param('id') id: string) { return this.service.dashboard(user.id, user.roles, id); }
-  @Put(':id') configure(@Param('id') id: string, @Body() body: { status?: string; payoutMode?: string; settlementReference?: string; bankAccountMask?: string; bankRecipientToken?: string; portalEmail?: string }) { return this.service.configureMerchant(id, body); }
+  @Put(':id') configure(@Param('id') id: string, @Body() body: { status?: string; qrChecked?: boolean; payoutMode?: string; settlementReference?: string; bankAccountMask?: string; bankRecipientToken?: string; portalEmail?: string }) { return this.service.configureMerchant(id, body); }
   @Post(':id/payouts') request(@CurrentUser() user: AuthUser, @Param('id') id: string) { return this.service.requestPayout(user.id, user.roles, id); }
   @Post('payouts/:id/record-bank-outcome') outcome(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: { paid: boolean; bankReference?: string; note?: string }) { return this.service.recordBankOutcome(id, body.paid === true, body.bankReference ?? '', body.note, user.id); }
 }

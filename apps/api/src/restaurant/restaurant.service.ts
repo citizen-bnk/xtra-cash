@@ -1,3 +1,4 @@
+import { restaurantQrCode } from '@xtra/shared';
 import { randomBytes, randomUUID } from 'crypto';
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
@@ -14,17 +15,18 @@ export class RestaurantService {
 
   async resolveMerchant(codeInput: string, employeeCode?: string) {
     const code = String(codeInput ?? '').trim().toUpperCase();
-    if (!(/^[A-Z]{3}[0-9]{3}$/.test(code) || /^[A-F0-9]{36}$/.test(code))) throw new BadRequestException('Enter the six character restaurant code, for example ABC123.');
-    const found = await this.pool.query("SELECT id,trading_name,display_code,tips_enabled FROM restaurant_merchants WHERE (upper(qr_code)=$1 OR upper(display_code)=$1) AND status='ACTIVE'", [code]);
+    if (!restaurantQrCode.test(code)) throw new BadRequestException('Enter the six character restaurant code, for example ABC123 or 123ABC.');
+    const found = await this.pool.query("SELECT id,trading_name,display_code,tips_enabled,status FROM restaurant_merchants WHERE (upper(qr_code)=$1 OR upper(display_code)=$1) AND status<>'SUSPENDED'", [code]);
     if (!found.rows[0]) throw new NotFoundException('Restaurant code not found or not active.');
     let waiterName: string | null = null;
     if (employeeCode) {
       if (!/^[A-Z]{3}[0-9]{3}$/.test(employeeCode)) throw new BadRequestException('Invalid employee code.');
+      if (found.rows[0].status !== 'ACTIVE') throw new NotFoundException('This restaurant is still being set up.');
       const staff = await this.pool.query("SELECT u.first_name FROM restaurant_staff s JOIN users u ON u.id=s.user_id WHERE s.merchant_id=$1 AND s.employee_code=$2 AND s.status='ACTIVE' AND s.shift_expires_at>now()", [found.rows[0].id, employeeCode]);
       if (!staff.rows[0]) throw new NotFoundException('This waiter code is no longer active. Ask for a new code.');
       waiterName = staff.rows[0].first_name;
     }
-    return { tradingName: found.rows[0].trading_name, displayCode: found.rows[0].display_code, waiterName, tipsEnabled: !!employeeCode && found.rows[0].tips_enabled };
+    return { tradingName: found.rows[0].trading_name, displayCode: found.rows[0].display_code, waiterName, previewOnly: found.rows[0].status === 'DRAFT', tipsEnabled: !!employeeCode && found.rows[0].tips_enabled };
   }
 
   async create(userId: string, input: BillInput) {
@@ -39,7 +41,7 @@ export class RestaurantService {
     let waiterId: string | null = null;
     if (input.merchantCode) {
       const code = String(input.merchantCode).trim().toUpperCase();
-      if (!(/^[A-Z]{3}[0-9]{3}$/.test(code) || /^[A-F0-9]{36}$/.test(code))) throw new BadRequestException('Invalid restaurant code.');
+      if (!restaurantQrCode.test(code)) throw new BadRequestException('Invalid restaurant code.');
       const approved = await this.pool.query("SELECT id,trading_name FROM restaurant_merchants WHERE (upper(qr_code)=$1 OR upper(display_code)=$1) AND status='ACTIVE'", [code]);
       if (!approved.rows[0]) throw new BadRequestException('This restaurant QR is not active.');
       approvedMerchant = approved.rows[0];
