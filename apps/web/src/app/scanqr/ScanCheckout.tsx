@@ -8,6 +8,7 @@ import {
   ReceiptText, ScanLine, ShieldCheck, Utensils, Wallet, Share2, Plus, Trash2,
 } from 'lucide-react';
 import BillScanner from './BillScanner';
+import RestaurantQrScanner from './RestaurantQrScanner';
 import type { BillItem, ParsedBill } from './billScan';
 import LiveBill from './LiveBill';
 import { useAuth } from '@xtra/ui';
@@ -75,6 +76,8 @@ function Signature({ signed, onChange }: { signed: boolean; onChange: (value: bo
 
 export default function ScanCheckout() {
   const { client, me, refreshMe, loading: authLoading } = useAuth();
+  const [needsCode, setNeedsCode] = useState(false);
+  const [scanVersion, setScanVersion] = useState(0);
   const [online, setOnline] = useState(true);
   const [restored, setRestored] = useState(false);
   const [draftPhoto, setDraftPhoto] = useState('');
@@ -224,10 +227,36 @@ export default function ScanCheckout() {
   const paymentLabel = 'XTRA-CASH wallet';
   const billReady = !!(merchant.trim() && bill.trim() && checkoutTotal >= 100);
   const title = {
-    start: 'Pay your table bill.', capture: 'Capture your bill', adjust: 'Adjust your scan', bill: 'Check your bill', split: 'Choose your items', identity: 'Verify your identity',
+    start: 'Scan the restaurant QR', capture: 'Capture your bill', adjust: 'Adjust your scan', bill: 'Check your bill', split: 'Choose your items', identity: 'Verify your identity',
     offer: 'Review your offer', link: 'Set up repayments', terms: 'Read your agreement',
     sign: 'Sign your agreement', pay: 'Confirm your payment', receipt: 'Bill paid in demo',
   }[stage];
+
+  function scanRestaurant(raw: string) {
+    let code = raw.trim().toUpperCase();
+    let employee = '';
+    if (!/^[A-Z]{3}[0-9]{3}$/.test(code)) {
+      try {
+        const url = new URL(raw.trim(), window.location.origin);
+        const allowedOrigin = url.origin === window.location.origin
+          || ['https://xtra-cash.vercel.app', 'https://xtra-cash.co.za', 'https://www.xtra-cash.co.za'].includes(url.origin);
+        if (!allowedOrigin || url.pathname.replace(/\/$/, '') !== '/scanqr' || url.searchParams.has('table') || url.searchParams.has('bill')) throw new Error();
+        code = (url.searchParams.get('merchant') ?? url.searchParams.get('restaurant') ?? url.searchParams.get('code') ?? '').trim().toUpperCase();
+        employee = (url.searchParams.get('employee') ?? '').trim().toUpperCase();
+        if (code && !/^(?:[A-Z]{3}[0-9]{3}|[A-F0-9]{36})$/.test(code)) throw new Error();
+        if (employee && !/^[A-Z]{3}[0-9]{3}$/.test(employee)) throw new Error();
+      } catch {
+        setError('Use the XTRA-CASH QR code from your restaurant.');
+        setScanVersion(value => value + 1);
+        return;
+      }
+    }
+    setError('');
+    setEmployeeCode(employee);
+    setMerchantCode(code);
+    setNeedsCode(!code);
+    if (code && navigator.onLine) void verifyMerchant(code, employee);
+  }
 
   function go(next: Stage) {
     setError('');
@@ -245,6 +274,8 @@ export default function ScanCheckout() {
 
   function reset() {
     clearDraft();
+    setNeedsCode(false);
+    setScanVersion(value => value + 1);
     setDraftPhoto('');
     setEmployeeCode('');
     clearApplication();
@@ -422,16 +453,10 @@ export default function ScanCheckout() {
           {stage !== 'start' && stage !== 'receipt' && <nav className="sq-progress" aria-label="Checkout progress">
             {labels.map((label, i) => <span key={label} data-state={i + 1 === phase[stage] ? 'active' : i + 1 < phase[stage] ? 'done' : 'next'} aria-current={i + 1 === phase[stage] ? 'step' : undefined}>{label}</span>)}
           </nav>}
-          {stage === 'start' && <div className="sq-hero" aria-hidden="true">
-            <div className="sq-orbit sq-orbit-one" /><div className="sq-orbit sq-orbit-two" />
-            <div className="sq-hero-bill"><Utensils size={20} /><i /><i /><i /><strong>R680.00</strong></div>
-            <div className="sq-hero-scan"><ScanLine size={29} /></div>
-            <div className="sq-hero-check"><Check size={20} strokeWidth={3} /></div>
-          </div>}
           <div className="sq-intro">
             <div className="sq-kicker">{stage === 'start' ? 'RESTAURANT CHECKOUT' : stage === 'receipt' ? 'PAYMENT COMPLETE' : `STEP ${phase[stage]} OF 4 · ${labels[phase[stage] - 1].toUpperCase()}`}</div>
             <h1 ref={heading} tabIndex={-1}>{title}</h1>
-            {stage === 'start' && <p>Pay in full or check if you qualify to pay part today with XTRA-CASH.</p>}
+            {stage === 'start' && <p>Point your camera at the XTRA-CASH QR on the table.</p>}
             {stage === 'capture' && <p>Include the restaurant name, bill number and full total in your photo.</p>}
             {stage === 'adjust' && <p>Move the corners over the bill. We’ll straighten it and read the text.</p>}
             {stage === 'bill' && <p>Confirm the restaurant, bill total and items before continuing.</p>}
@@ -446,13 +471,20 @@ export default function ScanCheckout() {
           </div>
 
           {stage === 'start' && <>
-            <div className="sq-merchant"><div className="sq-icon"><Utensils size={20} /></div><div><strong>Table checkout</strong><small>Check the restaurant on your bill</small></div><ShieldCheck size={19} /></div>
-            {!merchantVerified && <div className="sq-fields"><label>Restaurant code<input aria-label="Restaurant code below the QR" autoCapitalize="characters" value={merchantCode} maxLength={36} onChange={e => { setMerchantCode(e.target.value.toUpperCase()); setMerchantVerified(false); }} placeholder="ABC123" /></label><button className="sq-secondary" disabled={!online || checkingMerchant || merchantCode.trim().length < 6} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button></div>}
+            {restored && !needsCode && !merchantCode && <RestaurantQrScanner key={scanVersion} onScan={scanRestaurant} />}
+            {needsCode && !merchantVerified && <div className="sq-fields">
+              <label>Restaurant code<input aria-label="Restaurant code below the QR" autoCapitalize="characters" value={merchantCode} maxLength={6} onChange={event => setMerchantCode(event.target.value.toUpperCase())} placeholder="ABC123" /></label>
+              <button className="sq-primary" disabled={!online || checkingMerchant || !/^[A-Z]{3}[0-9]{3}$/.test(merchantCode)} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button>
+            </div>}
             {merchantVerified && <div className="sq-notice"><CircleCheck size={19} /><span><strong>{merchant}</strong><small>{waiterName ? `Your waiter: ${waiterName} · ` : ''}Restaurant code verified</small></span></div>}
+            {checkingMerchant && <p role="status" className="sq-note">Checking restaurant…</p>}
             {error && <p className="sq-error" role="alert">{error}</p>}
-            <button className="sq-primary" disabled={!ready} onClick={() => go('capture')}>Start with your bill <ArrowRight size={19} /></button>
+            {(needsCode || merchantCode) && <button className="sq-text-button" type="button" onClick={() => {
+              setMerchantCode(''); setEmployeeCode(''); setMerchantVerified(false); setNeedsCode(false); setError('');
+              setScanVersion(value => value + 1);
+            }}>Scan another QR</button>}
+            {(merchantVerified || (!online && (!!merchantCode || needsCode))) && <button className="sq-primary" disabled={!ready} onClick={() => go('capture')}>Capture bill <ArrowRight size={19} /></button>}
             {online && <a className="sq-secondary" href="/register">Sign up for XTRA-CASH <ChevronRight size={17} /></a>}
-            <p className="sq-footnote"><LockKeyhole size={14} /> Use sample details in this preview.</p>
           </>}
 
           {stage === 'capture' && <>
