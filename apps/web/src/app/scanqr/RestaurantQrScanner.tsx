@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
 
-export default function RestaurantQrScanner({ onScan }: { onScan: (value: string) => void }) {
+export default function RestaurantQrScanner({ onScan, onCancel }: { onScan: (value: string) => void; onCancel: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const captured = useRef(false);
+  const mounted = useRef(false);
+  const stopCamera = useRef<() => void>(() => undefined);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const callback = useRef(onScan);
   callback.current = onScan;
   const [attempt, retry] = useState(0);
@@ -27,6 +30,7 @@ export default function RestaurantQrScanner({ onScan }: { onScan: (value: string
       stream?.getTracks().forEach(track => track.stop());
       if (element) element.srcObject = null;
     }
+    stopCamera.current = stop;
     async function start() {
       if (!element || !ctx || !navigator.mediaDevices?.getUserMedia) {
         setState('unavailable');
@@ -70,6 +74,7 @@ export default function RestaurantQrScanner({ onScan }: { onScan: (value: string
       const image = new Image();
       image.src = url;
       await image.decode();
+      if (!mounted.current || captured.current) return;
       const canvas = document.createElement('canvas');
       const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
       canvas.width = Math.round(image.naturalWidth * scale);
@@ -81,7 +86,7 @@ export default function RestaurantQrScanner({ onScan }: { onScan: (value: string
       const result = jsQR(pixels.data, pixels.width, pixels.height);
       if (!result?.data) throw new Error();
       if (!captured.current) { captured.current = true; callback.current(result.data); }
-    } catch { setError('No readable QR code found. Try a clearer photo.'); }
+    } catch { if (mounted.current) setError('No readable QR code found. Try a clearer photo.'); }
     finally { URL.revokeObjectURL(url); }
   }
 
@@ -97,6 +102,11 @@ export default function RestaurantQrScanner({ onScan }: { onScan: (value: string
       if (photo) void readPhoto(photo);
     }} />
     <button type="button" className="sq-secondary" onClick={() => file.current?.click()}>Use a QR photo</button>
+    <button type="button" className="sq-text-button sq-centred" onClick={() => {
+      captured.current = true;
+      stopCamera.current();
+      onCancel();
+    }}>Cancel scan</button>
     {error && <p role="alert" className="sq-error">{error}</p>}
   </div>;
 }
