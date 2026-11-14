@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Linking, Text, View } from 'react-native';
+import { Image, ImageBackground, Linking, Pressable, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { formatZAR, type Transaction } from '@xtra/shared';
 import { errorMessage, useApi, useAuth } from '../src/auth';
@@ -7,6 +7,8 @@ import { Button, Card, Chip, ErrorText, Field, H1, Loading, Muted, Row, Screen, 
 import { colors } from '../src/theme';
 
 const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL || 'https://xtra-cash.vercel.app';
+const CARD_ART = require('../assets/card.jpg');
+const CUSTOMER_PHOTO = require('../assets/customer-phone.png');
 
 /** Pay (in-app / marketplace / demo swipe) or top up the wallet. */
 export default function Pay() {
@@ -21,6 +23,8 @@ export default function Pay() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Transaction | null>(null);
   const [estimate, setEstimate] = useState<string | null>(null);
+  const [view, setView] = useState<'home' | 'merchant'>('home');
+  const [topUpInfo, setTopUpInfo] = useState(false);
   const amount = toCents(amountText) ?? 0;
   const b = balance.data;
   const fromWallet = Math.min(b?.walletCents ?? 0, amount);
@@ -45,8 +49,7 @@ export default function Pay() {
     return () => clearTimeout(t);
   }, [fromCredit, b, client, mode]);
 
-  if (!b || !cards.data) {
-    if (mode === 'topup') return <Loading />;
+  if (!b) {
     return <Screen>
       <Button title="Scan a restaurant bill · Demo" onPress={openRestaurantCheckout} />
       <ErrorText>{error || balance.error || cards.error}</ErrorText>
@@ -55,28 +58,7 @@ export default function Pay() {
   }
 
   if (mode === 'topup') {
-    const topUp = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        await client.consumer.topUp(amount);
-        await refreshMe();
-        router.back();
-      } catch (e) {
-        setError(errorMessage(e));
-      } finally {
-        setLoading(false);
-      }
-    };
-    return (
-      <Screen>
-        <H1>Top up wallet</H1>
-        <Muted>Your wallet always pays first, so topping up means you borrow less.</Muted>
-        <Field label="Amount (R)" keyboardType="decimal-pad" value={amountText} onChangeText={setAmountText} placeholder="0.00" />
-        <ErrorText>{error}</ErrorText>
-        <Button title={`Top up ${amount ? formatZAR(amount) : ''}`} onPress={topUp} loading={loading} disabled={amount < 100} />
-      </Screen>
-    );
+    return <Screen><H1>Top up funds</H1><Card><Muted>Wallet top-ups will be available after the payment provider is connected. No funds will be moved from this screen yet.</Muted></Card><Button title="Get a loan" onPress={() => router.push('/(tabs)/loans')} /><Button title="Back to Pay" variant="secondary" onPress={() => router.replace('/pay')} /></Screen>;
   }
 
   if (result)
@@ -101,8 +83,23 @@ export default function Pay() {
       </Screen>
     );
 
-  const card = cards.data[0];
+  const card = cards.data?.[0];
+  if (view === 'home') return <Screen>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><H1>Pay</H1><Image source={CUSTOMER_PHOTO} resizeMode="cover" style={{ width: 62, height: 62, borderRadius: 31, backgroundColor: '#e9caef' }} /></View>
+    <ImageBackground source={CARD_ART} resizeMode="cover" imageStyle={{ borderRadius: 22 }} style={{ aspectRatio: 1.586, borderRadius: 22, overflow: 'hidden', padding: 20, justifyContent: 'flex-end', backgroundColor: colors.purple }}>
+      <Text style={{ color: colors.white, fontSize: 12, fontWeight: '800', textShadowColor: '#24013d', textShadowRadius: 5 }}>AVAILABLE TO SPEND</Text>
+      <Text style={{ color: colors.white, fontSize: 34, fontWeight: '900', textShadowColor: '#24013d', textShadowRadius: 7 }}>{formatZAR(b.xtraBalanceCents)}</Text>
+      <Text style={{ color: colors.white, fontSize: 12, textShadowColor: '#24013d', textShadowRadius: 5 }}>Wallet and eligible credit</Text>
+    </ImageBackground>
+    <Card><View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}><View><Muted>Wallet balance</Muted><Text style={{ color: colors.ink, fontWeight: '900', fontSize: 20 }}>{formatZAR(b.walletCents)}</Text></View>{b.walletCents === 0 ? <Pressable accessibilityRole="button" onPress={() => setTopUpInfo(true)} style={{ backgroundColor: colors.purple, borderRadius: 24, paddingHorizontal: 14, paddingVertical: 10 }}><Text style={{ color: colors.white, fontWeight: '800' }}>Top up funds</Text></Pressable> : null}</View></Card>
+    {topUpInfo ? <Card><Muted>Wallet top-ups will be available when the payment provider is connected.</Muted><Button title="Close" variant="secondary" onPress={() => setTopUpInfo(false)} /></Card> : null}
+    <Button title="Scan a restaurant bill · Preview" onPress={openRestaurantCheckout} />
+    <Button title="Get a loan" variant="secondary" onPress={() => router.push('/(tabs)/loans')} />
+    <Button title="Pay a merchant" variant="secondary" onPress={() => setView('merchant')} />
+    <Button title="My card" variant="secondary" onPress={() => router.push('/(tabs)/card')} />
+  </Screen>;
   const pay = async () => {
+    if (!card) { setError('Activate your XTRA-CASH card before paying a merchant.'); return; }
     setLoading(true);
     setError(null);
     try {
@@ -123,7 +120,8 @@ export default function Pay() {
 
   return (
     <Screen>
-      <Button title="Scan a restaurant bill · Demo" onPress={openRestaurantCheckout} />
+      <Button title="← Back to Pay" variant="secondary" onPress={() => setView('home')} />
+      <H1>Pay a merchant</H1>
       <Muted>XTRA-Balance {formatZAR(b.xtraBalanceCents)}</Muted>
       <Field label="Merchant" value={merchant} onChangeText={setMerchant} placeholder="e.g. Shoprite Soweto" />
       <Field label="Amount (R)" keyboardType="decimal-pad" value={amountText} onChangeText={setAmountText} placeholder="0.00" />

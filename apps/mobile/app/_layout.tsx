@@ -14,7 +14,7 @@ export default function RootLayout() {
         <StatusBar style="dark" />
         <NearbyLifecycle />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface }, headerStyle: { backgroundColor: colors.purple }, headerTintColor: colors.white, headerTitleStyle: { fontWeight: '800' }, headerRight: () => <CustomerHeaderActions /> }}>
-          <Stack.Screen name="pay" options={{ presentation: 'modal', headerShown: true, title: 'Pay with XTRA-CASH' }} />
+          <Stack.Screen name="pay" options={{ presentation: 'modal', headerShown: true, title: 'Pay' }} />
           <Stack.Screen name="kyc" options={{ headerShown: true, title: 'Verify your profile' }} />
           <Stack.Screen name="loan/[id]" options={{ headerShown: true, title: 'Repayment' }} />
           <Stack.Screen name="personal-loan" options={{ headerShown: true, title: 'Loan request' }} />

@@ -18,6 +18,7 @@ import { JobsController } from './common/jobs.controller';
 import { PersonalLoanModule } from './personal-loans/personal.module';
 import { MarketingModule } from './marketing/marketing.module';
 import { PaydayModule } from './payday/payday.module';
+import { RestaurantModule } from './restaurant/restaurant.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { PaydayModule } from './payday/payday.module';
     PersonalLoanModule,
     MarketingModule,
     PaydayModule,
+    RestaurantModule,
   ],
   controllers: [HealthController, JobsController],
   providers: [

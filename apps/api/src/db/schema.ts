@@ -3,15 +3,17 @@
  * All money is integer cents (ZAR). Interest rates are monthly basis points.
  */
 import { randomUUID } from 'crypto';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
   customType,
+  date,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -523,6 +525,57 @@ export const storedFiles = pgTable('stored_files', {
   createdAt: createdAt(),
 });
 
+// Restaurant bill claims and customer receipt archive. Payment state is written only with a wallet ledger journal.
+export const restaurantMerchants = pgTable('restaurant_merchants', {
+  id: id(), qrCode: text('qr_code').notNull().unique(), tradingName: text('trading_name').notNull(),
+  displayCode: text('display_code').unique(), status: text('status').notNull().default('DRAFT'),
+  payoutMode: text('payout_mode').notNull().default('ON_DEMAND'), tipsEnabled: boolean('tips_enabled').notNull().default(false), portalUserId: text('portal_user_id').references(() => users.id),
+  settlementReference: text('settlement_reference'), bankAccountMask: text('bank_account_mask'), bankRecipientToken: text('bank_recipient_token'), createdAt: createdAt(),
+});
+export const restaurantPayouts = pgTable('restaurant_payouts', {
+  id: id(), merchantId: text('merchant_id').notNull().references(() => restaurantMerchants.id), amountCents: integer('amount_cents').notNull(),
+  payoutReference: text('payout_reference').notNull().unique(), mode: text('mode').notNull(), status: text('status').notNull().default('REQUESTED'),
+  bankReference: text('bank_reference'), failureReason: text('failure_reason'), requestedBy: text('requested_by').references(() => users.id), confirmedBy: text('confirmed_by').references(() => users.id),
+  createdAt: createdAt(), submittedAt: ts('submitted_at'), paidAt: ts('paid_at'),
+}, t => [index('restaurant_payouts_merchant_idx').on(t.merchantId, t.createdAt)]);
+export const restaurantPayoutItems = pgTable('restaurant_payout_items', {
+  payoutId: text('payout_id').notNull().references(() => restaurantPayouts.id, { onDelete: 'cascade' }),
+  itemId: text('item_id').notNull().unique().references(() => restaurantBillItems.id),
+}, t => [primaryKey({ columns: [t.payoutId, t.itemId] })]);
+export const restaurantBills = pgTable('restaurant_bills', {
+  id: id(), shareToken: text('share_token').notNull().unique(), creatorId: text('creator_id').notNull().references(() => users.id),
+  merchantId: text('merchant_id').references(() => restaurantMerchants.id),
+  waiterId: text('waiter_id').references(() => restaurantStaff.id),
+  merchantName: text('merchant_name').notNull(), billReference: text('bill_reference').notNull(), totalCents: integer('total_cents').notNull(),
+  serviceDay: date('service_day', { mode: 'string' }).notNull().default(sql`(now() AT TIME ZONE 'Africa/Johannesburg')::date`),
+  originalStorageKey: text('original_storage_key').references(() => storedFiles.key), status: text('status').notNull().default('OPEN'),
+  createdAt: createdAt(), expiresAt: ts('expires_at').notNull().default(sql`now() + interval '24 hours'`), settledAt: ts('settled_at'),
+}, t => [index('restaurant_bills_creator_idx').on(t.creatorId, t.createdAt), uniqueIndex('restaurant_bills_merchant_reference_day_idx').on(t.merchantId, t.billReference, t.serviceDay).where(sql`${t.merchantId} IS NOT NULL`)]);
+export const restaurantStaff = pgTable('restaurant_staff', {
+  id: id(), merchantId: text('merchant_id').notNull().references(() => restaurantMerchants.id), userId: text('user_id').notNull().references(() => users.id), employeeCode: text('employee_code').notNull().unique(), status: text('status').notNull().default('ACTIVE'), shiftExpiresAt: ts('shift_expires_at'), createdAt: createdAt(),
+}, t => [uniqueIndex('restaurant_staff_merchant_user_idx').on(t.merchantId, t.userId), index('restaurant_staff_user_idx').on(t.userId)]);
+export const restaurantTips = pgTable('restaurant_tips', {
+  id: id(), billId: text('bill_id').notNull().references(() => restaurantBills.id), waiterId: text('waiter_id').notNull().references(() => restaurantStaff.id), payerId: text('payer_id').notNull().references(() => users.id), journalId: text('journal_id').notNull().unique().references(() => ledgerJournals.id), amountCents: integer('amount_cents').notNull(), createdAt: createdAt(),
+}, t => [index('restaurant_tips_waiter_idx').on(t.waiterId, t.createdAt)]);
+export const restaurantBillItems = pgTable('restaurant_bill_items', {
+  id: id(), billId: text('bill_id').notNull().references(() => restaurantBills.id, { onDelete: 'cascade' }),
+  label: text('label').notNull(), position: integer('position').notNull(), amountCents: integer('amount_cents').notNull(), claimedBy: text('claimed_by').references(() => users.id),
+  status: text('status').notNull().default('UNCLAIMED'), paymentReference: text('payment_reference'), paidAt: ts('paid_at'), createdAt: createdAt(),
+}, t => [index('restaurant_bill_items_bill_idx').on(t.billId)]);
+export const restaurantBillParticipants = pgTable('restaurant_bill_participants', {
+  billId: text('bill_id').notNull().references(() => restaurantBills.id, { onDelete: 'cascade' }), userId: text('user_id').notNull().references(() => users.id),
+  joinedAt: createdAt(), notifiedAt: ts('notified_at'),
+}, t => [primaryKey({ columns: [t.billId, t.userId] })]);
+export const customerReceipts = pgTable('customer_receipts', {
+  id: id(), userId: text('user_id').notNull().references(() => users.id), billId: text('bill_id').references(() => restaurantBills.id),
+  kind: text('kind').notNull(), title: text('title').notNull(), originalStorageKey: text('original_storage_key').references(() => storedFiles.key),
+  digitizedJson: jsonb('digitized_json'), totalCents: integer('total_cents'), emailedAt: ts('emailed_at'), createdAt: createdAt(),
+}, t => [index('customer_receipts_user_idx').on(t.userId, t.createdAt)]);
+export const restaurantBillNotifications = pgTable('restaurant_bill_notifications', {
+  id: id(), userId: text('user_id').notNull().references(() => users.id), billId: text('bill_id').notNull().references(() => restaurantBills.id),
+  kind: text('kind').notNull(), readAt: ts('read_at'), createdAt: createdAt(),
+}, t => [uniqueIndex('restaurant_bill_notifications_unique_idx').on(t.userId, t.billId, t.kind), index('restaurant_bill_notifications_user_idx').on(t.userId, t.createdAt)]);
+
 // Consent is separate from lending/KYC. Keep only the latest encrypted location.
 export const marketingMembers = pgTable('marketing_members', {
   userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
@@ -596,7 +649,7 @@ export const paydayCompletions = pgTable('payday_completions', {
 }, t => [uniqueIndex('payday_training_completion').on(t.userId, t.moduleId, t.revision)]);
 export const paydayEmployers = pgTable('payday_employers', {
   id: id(), ownerId: text('owner_id').notNull().references(() => users.id), createdBy: text('created_by').notNull().references(() => users.id),
-  clientKey: text('client_key').notNull(), requestHash: text('request_hash').notNull(),
+  clientKey: text('client_key').notNull(), requestHash: text('request_hash').notNull(), meetingNotes: text('meeting_notes'),
   legalName: text('legal_name').notNull(), registrationNumber: text('registration_number').notNull().unique(),
   contactName: text('contact_name').notNull(), contactChannel: text('contact_channel').notNull(), address: text('address').notNull(),
   headcount: integer('headcount').notNull(), permissionReference: text('permission_reference').notNull(),

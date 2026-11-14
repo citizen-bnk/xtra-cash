@@ -35,6 +35,7 @@ export class PaydayService {
     const e = await this.employee(a.id);
     if (e.status !== 'ACTIVE' || e.passwordChangeRequired || !e.onboardingAcknowledgedAt || !(await this.trainingComplete(a.id))) throw new ForbiddenException('Complete onboarding and required training; your manager must activate field access');
   }
+  async assertOperational(a: AuthUser) { await this.operational(a); }
   private async trainingComplete(userId: string, conn: DbOrTx = this.db) {
     const [modules, done] = await Promise.all([conn.select().from(training).where(and(eq(training.required, true), eq(training.active, true))), conn.select().from(completions).where(eq(completions.userId, userId))]);
     return modules.length > 0 && modules.every(m => done.some(c => c.moduleId === m.id && c.revision === m.revision));
@@ -69,11 +70,16 @@ export class PaydayService {
     if(isAdmin(a)&&!input.ownerId)throw new BadRequestException('Assign an employee to the lead');
     const ownerId = isAdmin(a) ? input.ownerId! : a.id;
     if (ownerId !== a.id || !isAdmin(a)) await this.employee(ownerId);
-    const value = { ...input, ownerId, registrationNumber: input.registrationNumber.toUpperCase().replace(/[^A-Z0-9]/g,''), followUpAt: new Date(input.followUpAt), createdBy: a.id, policyVersion: PAYDAY_POLICY.version, commissionCents: PAYDAY_POLICY.commissionCents, bufferCents: PAYDAY_POLICY.bufferCents, onboardingCents: PAYDAY_POLICY.onboardingCents, requestHash: digest(input) };
+    const { meetingId, ...fields } = input;
+    const value = { ...fields, ownerId, registrationNumber: input.registrationNumber.toUpperCase().replace(/[^A-Z0-9]/g,''), followUpAt: new Date(input.followUpAt), createdBy: a.id, policyVersion: PAYDAY_POLICY.version, commissionCents: PAYDAY_POLICY.commissionCents, bufferCents: PAYDAY_POLICY.bufferCents, onboardingCents: PAYDAY_POLICY.onboardingCents, requestHash: digest(input) };
     if (value.registrationNumber.length < 5) throw new BadRequestException('Enter a valid employer registration identifier');
     return this.db.transaction(async tx => {
       const [row] = await tx.insert(employers).values(value).onConflictDoNothing().returning();
       if (!row) { const [prior] = await tx.select().from(employers).where(and(eq(employers.createdBy,a.id),eq(employers.clientKey,input.clientKey))); if (prior?.requestHash === value.requestHash) return presentEmployer(prior); throw new ConflictException('Business registration or sync key already recorded. Ask operations to review the existing record.'); }
+      if (meetingId) {
+        const evidence = await tx.execute(sql`UPDATE payday_meeting_evidence SET employer_id=${row.id} WHERE id=${meetingId} AND employee_id=${a.id} AND employer_id IS NULL RETURNING id`);
+        if (!evidence.rows.length) throw new ForbiddenException('Recording is unavailable for this lead.');
+      }
       await this.audit.log(a,'PAYDAY_LEAD_CREATED','payday_employer',row.id,{},tx); return presentEmployer(row);
     });
   }

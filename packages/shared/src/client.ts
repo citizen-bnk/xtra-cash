@@ -220,6 +220,7 @@ export class XtraClient {
 
   // ---------- consumer ----------
   consumer = {
+    assistantReply: (messages: { role: 'user' | 'assistant'; content: string }[]) => this.request<{ message: string }>('POST', '/customer-assistant/reply', { messages }),
     applicantVault: () => this.request<ApplicantVaultStatus>('GET', '/personal-loans/vault'),
     uploadVaultDocument: (type: 'ID_DOCUMENT' | 'PROOF_OF_ADDRESS' | 'BANK_STATEMENT' | 'PROOF_OF_INCOME', file: Blob, observedFrom?: string, observedTo?: string) => {
       const fd = new FormData(); fd.append('type', type); fd.append('consent', 'true');

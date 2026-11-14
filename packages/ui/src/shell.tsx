@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { Ellipsis, LogOut, X } from 'lucide-react';
+import { ChevronDown, Ellipsis, LogOut, X } from 'lucide-react';
 import { cx, Logo } from './components';
 import { WorkFormAssistant } from './work-assistant';
 import {LoanActionCentre} from './loan-actions';
@@ -34,6 +34,7 @@ export function AppShell({
   topBarClassName,
   topBarContent,
   switchApps = [],
+  accountMenu = [],
   children,
 }: {
   nav: NavItem[];
@@ -48,9 +49,11 @@ export function AppShell({
   topBarClassName?: string;
   topBarContent?: React.ReactNode;
   switchApps?: { label: string; href: string; current?: boolean }[];
+  accountMenu?: { label: string; href: string }[];
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const isActive = (n: NavItem) => (n.exact ? pathname === n.href : pathname === n.href || pathname.startsWith(n.href + '/'));
   // Phone tab bar: up to five sections fit; beyond that, four tabs plus "More".
   const tabs = nav.length <= 5 ? nav : nav.slice(0, 4);
@@ -93,13 +96,13 @@ export function AppShell({
       {links}
       <div className="mt-auto space-y-3 px-2 pt-6">
         {footer}
-        <div className="border-t border-white/10 pt-3">
+        {accountMenu.length === 0 && <div className="border-t border-white/10 pt-3">
           <div className="truncate text-sm font-medium text-white">{userName}</div>
           {userEmail && <div className="truncate text-xs text-white/50">{userEmail}</div>}
           <button onClick={onLogout} className="mt-2 inline-flex items-center gap-2 text-xs font-medium text-white/60 hover:text-white">
             <LogOut className="h-3.5 w-3.5" /> Sign out
           </button>
-        </div>
+        </div>}
       </div>
     </div>
   );
@@ -114,7 +117,7 @@ export function AppShell({
             <div className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wider text-white/50">{section}</div>
           </div>
           <button
-            onClick={() => setOpen(true)}
+            onClick={() => accountMenu.length ? setAccountOpen(value => !value) : setOpen(true)}
             className="pressable grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-purple text-xs font-bold text-white"
             aria-label="Account and more"
           >
@@ -171,16 +174,17 @@ export function AppShell({
             </nav>
             {footer && <div className="px-5 pb-2 text-sm">{footer}</div>}
             {switchApps.length > 0 && <div className="border-t border-line px-3 py-3"><div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[.16em] text-muted">Switch workspace</div><div className="grid gap-1">{switchApps.map(app => <Link key={app.href} href={app.href} onClick={() => setOpen(false)} className={cx('pressable flex min-h-11 items-center justify-between rounded-xl px-3 text-sm font-semibold', app.current ? 'bg-brand-soft text-brand-purple' : 'text-ink hover:bg-surface')}>{app.label}{app.current && <span className="text-[10px] uppercase tracking-wider">Current</span>}</Link>)}</div></div>}
-            <div className="px-3 pb-4">
+            {accountMenu.length === 0 && <div className="px-3 pb-4">
               <button onClick={onLogout} className="pressable flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-sm font-semibold text-red-600">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-red-50"><LogOut className="h-5 w-5" /></span> Sign out
               </button>
-            </div>
+            </div>}
           </div>
         </div>
       )}
       <main className={cx('lg:pl-60', nav.length > 1 && 'pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0')}>
-        <header className={cx('sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-white/10 bg-gradient-to-r from-[#1b1030] via-[#5c2394] to-[#a617d3] px-4 py-2 text-white [&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white', topBarClassName)}>{topBarContent ?? <div className="hidden text-sm font-bold text-white/90 lg:block">{section}</div>}<div className="ml-auto flex items-center gap-2">{switchApps.length > 0 && <div className="hidden items-center gap-1.5 sm:flex">{switchApps.filter(x => !x.current).map(app => <Link key={app.href} href={app.href} className="rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20">{app.label}</Link>)}</div>}<WorkFormAssistant pathname={pathname}/><LoanActionCentre/></div></header>
+        <header className={cx('sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-white/10 bg-gradient-to-r from-[#1b1030] via-[#5c2394] to-[#a617d3] px-4 py-2 text-white [&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white', topBarClassName)}>{topBarContent ?? <div className="hidden text-sm font-bold text-white/90 lg:block">{section}</div>}<div className="ml-auto flex items-center gap-2">{switchApps.length > 0 && <div className="hidden items-center gap-1.5 sm:flex">{switchApps.filter(x => !x.current).map(app => <Link key={app.href} href={app.href} className="rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20">{app.label}</Link>)}</div>}<WorkFormAssistant pathname={pathname}/><LoanActionCentre/>{accountMenu.length > 0 && <button type="button" aria-label="Open account menu" aria-expanded={accountOpen} onClick={() => setAccountOpen(value => !value)} className="hidden items-center gap-1 rounded-full border border-white/30 px-1.5 py-1 lg:flex"><span className="grid h-8 w-8 place-items-center rounded-full bg-white text-xs font-bold text-[#5c2394]">{initials}</span><ChevronDown className="h-4 w-4" /></button>}</div></header>
+        {accountOpen && accountMenu.length > 0 && <><button type="button" aria-label="Close account menu" className="fixed inset-0 z-30 cursor-default bg-transparent" onClick={() => setAccountOpen(false)} /><div role="menu" aria-label="Account" className="fixed right-3 top-[calc(env(safe-area-inset-top,0px)+3.6rem)] z-40 w-64 rounded-2xl border border-line bg-white p-2 text-ink shadow-xl lg:right-5 lg:top-14"><div className="border-b border-line px-3 py-2"><strong className="block truncate text-sm">{userName}</strong>{userEmail && <span className="block truncate text-xs text-muted">{userEmail}</span>}</div>{accountMenu.map(item => <Link key={item.href} href={item.href} onClick={() => setAccountOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-surface">{item.label}</Link>)}{switchApps.filter(item => !item.current).map(item => <Link key={item.href} href={item.href} onClick={() => setAccountOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-surface">Open {item.label}</Link>)}<button type="button" onClick={() => { setAccountOpen(false); onLogout(); }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-600 hover:bg-red-50"><LogOut size={16} /> Log out</button></div></>}
         <div className={cx('mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8', contentClassName)}>{children}</div>
       </main>
     </div>
