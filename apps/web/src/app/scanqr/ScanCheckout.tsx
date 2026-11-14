@@ -77,6 +77,7 @@ function Signature({ signed, onChange }: { signed: boolean; onChange: (value: bo
 
 export default function ScanCheckout() {
   const { client, me, refreshMe, loading: authLoading } = useAuth();
+  const [scanCancelled, setScanCancelled] = useState(false);
   const [needsCode, setNeedsCode] = useState(false);
   const [scannedQr, setScannedQr] = useState('');
   const [qrRejection, setQrRejection] = useState('');
@@ -298,6 +299,7 @@ export default function ScanCheckout() {
   function reset() {
     clearDraft();
     setNeedsCode(false);
+    setScanCancelled(false);
     setQrRejection('');
     merchantCheck.current++;
     setCheckingMerchant(false);
@@ -496,7 +498,11 @@ export default function ScanCheckout() {
           </div>
 
           {stage === 'start' && <>
-            {restored && !needsCode && !merchantCode && !qrRejection && <RestaurantQrScanner onScan={scanRestaurant} />}
+            {restored && !scanCancelled && !needsCode && !merchantCode && !qrRejection && <RestaurantQrScanner onScan={scanRestaurant} onCancel={() => setScanCancelled(true)} />}
+            {scanCancelled && !needsCode && <div className="sq-fields">
+              <button type="button" className="sq-primary" onClick={() => { setScanCancelled(false); setNeedsCode(true); setMerchantCode(''); setEmployeeCode(''); setError(''); }}>Enter restaurant code</button>
+              <button type="button" className="sq-secondary" onClick={() => setScanCancelled(false)}>Scan QR again</button>
+            </div>}
             {qrRejection && <div className="sq-error" role="alert">
               <strong>QR code rejected</strong>
               <p>{qrRejection}</p>
@@ -512,7 +518,7 @@ export default function ScanCheckout() {
             {checkingMerchant && <p role="status" className="sq-note">Checking restaurant…</p>}
             {error && <p className="sq-error" role="alert">{error}</p>}
             {(needsCode || merchantCode || qrRejection) && <button className={qrRejection ? 'sq-primary' : 'sq-text-button'} type="button" onClick={() => {
-              setMerchantCode(''); setEmployeeCode(''); setMerchantVerified(false); setNeedsCode(false); setError('');
+              setMerchantCode(''); setEmployeeCode(''); setMerchantVerified(false); setNeedsCode(false); setScanCancelled(false); setError('');
               setQrRejection(''); merchantCheck.current++; setCheckingMerchant(false);
             }}>Scan another QR</button>}
             {!qrRejection && (merchantVerified || (!online && (needsCode || !!merchantCode))) && <button className="sq-primary" disabled={!ready} onClick={() => go('capture')}>{merchantVerified ? 'Capture bill' : 'Prepare bill draft'} <ArrowRight size={19} /></button>}
