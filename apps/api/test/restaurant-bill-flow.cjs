@@ -53,6 +53,8 @@ async function main() {
     assert.equal((await service.notifications('diner-b')).length, 1);
     const before = await payouts.dashboard('diner-a', ['CONSUMER']);
     assert.equal(Number(before.totals.available_cents), 30000);
+    await assert.rejects(payouts.setPayoutMode('diner-b', merchantId, 'DAILY'), /Only the active restaurant account/);
+    assert.equal((await payouts.setPayoutMode('diner-a', merchantId, 'DAILY')).payoutMode, 'DAILY');
     await assert.rejects(payouts.requestPayout('diner-b', ['CONSUMER'], merchantId), /Forbidden/);
     const payout = await payouts.requestPayout('diner-a', ['CONSUMER'], merchantId);
     assert.equal(payout.amountCents, 30000);

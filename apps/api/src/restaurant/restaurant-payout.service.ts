@@ -104,6 +104,13 @@ export class RestaurantPayoutService {
     finally { db.release(); }
   }
 
+  async setPayoutMode(userId: string, merchantId: string, mode: string) {
+    if (!validId(merchantId) || !['ON_DEMAND', 'DAILY'].includes(mode)) throw new BadRequestException('Choose daily or on-demand payouts.');
+    const result = await this.pool.query("UPDATE restaurant_merchants SET payout_mode=$1 WHERE id=$2 AND portal_user_id=$3 AND status='ACTIVE' RETURNING payout_mode", [mode, merchantId, userId]);
+    if (!result.rows[0]) throw new ForbiddenException('Only the active restaurant account can change this payout schedule.');
+    return { payoutMode: result.rows[0].payout_mode };
+  }
+
   async queueDaily() {
     const merchants = await this.pool.query("SELECT id FROM restaurant_merchants WHERE status='ACTIVE' AND payout_mode='DAILY' ORDER BY id");
     let queued = 0;
