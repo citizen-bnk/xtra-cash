@@ -5,7 +5,7 @@ import type { ChangeEvent, PointerEvent } from 'react';
 import {
   ArrowLeft, ArrowRight, Camera, Check, ChevronRight, CircleCheck, CreditCard,
   Download, FileText, Fingerprint, ImagePlus, Landmark, LockKeyhole, PenLine,
-  ReceiptText, ScanLine, ShieldCheck, Utensils, Wallet, Share2, Plus, Trash2,
+  ReceiptText, RotateCcw, ScanLine, ShieldCheck, Utensils, Wallet, Share2, Plus, Trash2,
 } from 'lucide-react';
 import { ApiError, printedRestaurantCode, restaurantQrCode } from '@xtra/shared';
 import BillScanner from './BillScanner';
@@ -498,10 +498,11 @@ export default function ScanCheckout() {
           </div>
 
           {stage === 'start' && <>
-            {restored && !scanCancelled && !needsCode && !merchantCode && !qrRejection && <RestaurantQrScanner onScan={scanRestaurant} onCancel={() => setScanCancelled(true)} />}
-            {scanCancelled && !needsCode && <div className="sq-fields">
-              <button type="button" className="sq-primary" onClick={() => { setScanCancelled(false); setNeedsCode(true); setMerchantCode(''); setEmployeeCode(''); setError(''); }}>Enter restaurant code</button>
-              <button type="button" className="sq-secondary" onClick={() => setScanCancelled(false)}>Scan QR again</button>
+            {restored && !scanCancelled && !needsCode && !merchantCode && !qrRejection && <RestaurantQrScanner showRegistration={online && !authLoading && !me} onScan={scanRestaurant} onCancel={() => setScanCancelled(true)} />}
+            {scanCancelled && !needsCode && <div className="sq-action-row">
+              <button type="button" className="sq-primary" onClick={() => { setScanCancelled(false); setNeedsCode(true); setMerchantCode(''); setEmployeeCode(''); setError(''); }}>Enter code</button>
+              <button type="button" className="sq-redo" aria-label="Scan QR again" title="Scan QR again" onClick={() => setScanCancelled(false)}><RotateCcw size={20} /></button>
+              {online && !authLoading && !me && <a className="sq-secondary" href="/register">Create account</a>}
             </div>}
             {qrRejection && <div className="sq-error" role="alert">
               <strong>QR code rejected</strong>
@@ -512,25 +513,29 @@ export default function ScanCheckout() {
             </div>}
             {needsCode && !merchantVerified && <div className="sq-fields">
               <label>Restaurant code<input aria-label="Restaurant code below the QR" autoCapitalize="characters" value={merchantCode} maxLength={6} onChange={event => setMerchantCode(event.target.value.toUpperCase())} placeholder="ABC123" /></label>
-              <button className="sq-primary" disabled={!online || checkingMerchant || !printedRestaurantCode.test(merchantCode)} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button>
             </div>}
             {merchantVerified && <div className="sq-notice"><CircleCheck size={19} /><span><strong>{merchant}</strong><small>{waiterName ? `Your waiter: ${waiterName} · ` : ''}{previewOnly ? 'QR verified · checkout preview' : 'Restaurant code verified'}</small></span></div>}
             {checkingMerchant && <p role="status" className="sq-note">Checking restaurant…</p>}
             {error && <p className="sq-error" role="alert">{error}</p>}
-            {(needsCode || merchantCode || qrRejection) && <button className={qrRejection ? 'sq-primary' : 'sq-text-button'} type="button" onClick={() => {
+            {(!scanCancelled || needsCode) && (needsCode || merchantCode || qrRejection) && <div className="sq-action-row">
+            {needsCode && !merchantVerified && <button className="sq-primary" disabled={!online || checkingMerchant || !printedRestaurantCode.test(merchantCode)} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button>}
+            {(needsCode || merchantCode || qrRejection) && <button className="sq-redo" aria-label="Scan another QR" title="Scan another QR" type="button" onClick={() => {
               setMerchantCode(''); setEmployeeCode(''); setMerchantVerified(false); setNeedsCode(false); setScanCancelled(false); setError('');
               setQrRejection(''); merchantCheck.current++; setCheckingMerchant(false);
-            }}>Scan another QR</button>}
+            }}><RotateCcw size={20} /></button>}
             {!qrRejection && (merchantVerified || (!online && (needsCode || !!merchantCode))) && <button className="sq-primary" disabled={!ready} onClick={() => go('capture')}>{merchantVerified ? 'Capture bill' : 'Prepare bill draft'} <ArrowRight size={19} /></button>}
-            {online && <a className="sq-secondary" href="/register">Sign up for XTRA-CASH <ChevronRight size={17} /></a>}
+            {online && !authLoading && !me && <a className="sq-secondary" href="/register">Create account</a>}
+            </div>}
           </>}
 
           {stage === 'capture' && <>
             <div className="sq-capture"><div className="sq-receipt-icon"><ReceiptText size={41} strokeWidth={1.5} /></div><strong>Fit the whole bill in the photo</strong><small>Keep it flat and avoid glare.</small></div>
             <input ref={cameraInput} type="file" accept="image/*" capture="environment" onChange={loadImage} hidden />
             <input ref={fileInput} type="file" accept="image/*" onChange={loadImage} hidden />
-            {captureAvailable && <button className="sq-primary" onClick={() => cameraInput.current?.click()}>Take a photo <Camera size={19} /></button>}
-            <button className={captureAvailable ? 'sq-secondary' : 'sq-primary'} onClick={() => fileInput.current?.click()}>Upload a bill photo <ImagePlus size={18} /></button>
+            <div className="sq-action-row">
+            {captureAvailable && <button className="sq-primary" onClick={() => cameraInput.current?.click()}>Take photo <Camera size={19} /></button>}
+            <button className={captureAvailable ? 'sq-secondary' : 'sq-primary'} onClick={() => fileInput.current?.click()}>Upload bill <ImagePlus size={18} /></button>
+            </div>
             <div className="sq-text-row"><button className="sq-text-button" onClick={loadSample}>Use sample bill</button><button className="sq-text-button" onClick={manualBill}>Enter manually</button></div>
             {error && <p className="sq-error" role="alert">{error}</p>}
           </>}

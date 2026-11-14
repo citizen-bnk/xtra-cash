@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
 
-export default function RestaurantQrScanner({ onScan, onCancel }: { onScan: (value: string) => void; onCancel: () => void }) {
+export default function RestaurantQrScanner({ onScan, onCancel, showRegistration = false }: { onScan: (value: string) => void; onCancel: () => void; showRegistration?: boolean }) {
   const video = useRef<HTMLVideoElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const captured = useRef(false);
@@ -101,12 +101,12 @@ export default function RestaurantQrScanner({ onScan, onCancel }: { onScan: (val
       event.currentTarget.value = '';
       if (photo) void readPhoto(photo);
     }} />
-    <button type="button" className="sq-secondary" onClick={() => file.current?.click()}>Use a QR photo</button>
-    <button type="button" className="sq-text-button sq-centred" onClick={() => {
+    <div className="sq-action-row"><button type="button" className="sq-secondary" onClick={() => file.current?.click()}>QR photo</button>
+    <button type="button" className="sq-secondary" onClick={() => {
       captured.current = true;
       stopCamera.current();
       onCancel();
-    }}>Cancel scan</button>
+    }}>Cancel</button>{showRegistration && <a href="/register" className="sq-secondary">Create account</a>}</div>
     {error && <p role="alert" className="sq-error">{error}</p>}
   </div>;
 }
