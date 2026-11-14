@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Camera, ScanLine } from 'lucide-react';
-import { detectCorners, flattenDocument, parseBillText, type ParsedBill, type Point } from './billScan';
+import { detectCorners, validCrop, flattenDocument, parseBillText, type ParsedBill, type Point } from './billScan';
 
 export default function BillScanner({ file, onDone }: { file: File; onDone: (scan: File, parsed: ParsedBill) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -18,7 +18,7 @@ export default function BillScanner({ file, onDone }: { file: File; onDone: (sca
     const image = new Image();
     image.onload = () => {
       if (cancelled || !canvas.current) return;
-      const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
+      const scale = Math.min(1, 2200 / Math.max(image.naturalWidth, image.naturalHeight));
       canvas.current.width = Math.round(image.naturalWidth * scale);
       canvas.current.height = Math.round(image.naturalHeight * scale);
       const ctx = canvas.current.getContext('2d', { willReadFrequently: true });
@@ -44,12 +44,17 @@ export default function BillScanner({ file, onDone }: { file: File; onDone: (sca
     let worker: Awaited<ReturnType<typeof import('tesseract.js').createWorker>> | undefined;
     try {
       const flat = flattenDocument(canvas.current, corners);
+      const blob = await new Promise<Blob>((resolve, reject) => flat.toBlob(value => value ? resolve(value) : reject(new Error('Could not prepare the scan.')), 'image/jpeg', .70));
       setProgress('Reading bill text…');
-      const { createWorker } = await import('tesseract.js');
-      worker = await createWorker('eng');
-      const result = await worker.recognize(flat);
-      const parsed = parseBillText(result.data.text);
-      const blob = await new Promise<Blob>((resolve, reject) => flat.toBlob(value => value ? resolve(value) : reject(new Error('Could not prepare the scan.')), 'image/jpeg', .88));
+      let parsed: ParsedBill;
+      try {
+        const { createWorker } = await import('tesseract.js');
+        worker = await createWorker('eng');
+        const result = await worker.recognize(flat);
+        parsed = parseBillText(result.data.text);
+      } catch {
+        parsed = { ...parseBillText(''), warnings: ['The scan is saved for this checkout. Enter the details from the image.'] };
+      }
       onDone(new File([blob], `scanned-${file.name.replace(/\.[^.]+$/, '')}.jpg`, { type: 'image/jpeg' }), parsed);
     } catch {
       setError('Automatic reading is unavailable. Try again, or enter the bill details manually.');
@@ -69,7 +74,7 @@ export default function BillScanner({ file, onDone }: { file: File; onDone: (sca
     <button type="button" className="sq-secondary" onClick={() => setCorners([{ x: .02, y: .02 }, { x: .98, y: .02 }, { x: .98, y: .98 }, { x: .02, y: .98 }])} disabled={busy || !corners.length}>Use full photo</button>
     {error && <p className="sq-error" role="alert">{error}</p>}
     {progress && <p className="sq-note" role="status">{progress}</p>}
-    <button type="button" className="sq-primary" onClick={() => void scan()} disabled={busy || corners.length !== 4}><ScanLine size={18} /> {busy ? 'Reading bill…' : 'Straighten and read bill'}</button>
+    <button type="button" className="sq-primary" onClick={() => void scan()} disabled={busy || !validCrop(corners)}><ScanLine size={18} /> {busy ? 'Reading bill…' : 'Straighten and read bill'}</button>
     <p className="sq-footnote"><Camera size={14} /> OCR runs in this browser. Confirm every item and amount.</p>
   </div>;
 }
