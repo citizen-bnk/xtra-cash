@@ -10,6 +10,7 @@ const money = (cents: number) => `R${(cents / 100).toFixed(2)}`;
 
 export default function LiveBill({ token, onBack }: { token: string; onBack: () => void }) {
   const { client, me, loading } = useAuth();
+  const [online, setOnline] = useState(true);
   const [bill, setBill] = useState<LiveData | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [wallet, setWallet] = useState<number | null>(null);
@@ -30,10 +31,13 @@ export default function LiveBill({ token, onBack }: { token: string; onBack: () 
 
   useEffect(() => {
     let cancelled = false;
-    const update = async () => { try { await refresh(); if (!cancelled) setError(''); } catch (cause) { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load this bill.'); } };
-    void update();
+    const update = async () => { if (!navigator.onLine) return; try { await refresh(); if (!cancelled) setError(''); } catch (cause) { if (!cancelled && navigator.onLine && !(cause instanceof TypeError)) setError(cause instanceof Error ? cause.message : 'Could not load this bill.'); } };
+    const connectionChanged = () => { setOnline(navigator.onLine); if (navigator.onLine) void update(); };
+    connectionChanged();
+    window.addEventListener('online', connectionChanged);
+    window.addEventListener('offline', connectionChanged);
     const timer = window.setInterval(() => { if (!document.hidden) void update(); }, 3000);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener('online', connectionChanged); window.removeEventListener('offline', connectionChanged); };
   }, [refresh]);
 
   const mine = bill?.items.filter(item => item.claimed_by === me?.id && item.status === 'CLAIMED') ?? [];
@@ -45,9 +49,10 @@ export default function LiveBill({ token, onBack }: { token: string; onBack: () 
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/scanqr/?table=${token}` : '';
 
   async function act(task: () => Promise<unknown>) {
+    if (!navigator.onLine) return;
     setBusy(true); setError(''); setNotice('');
     try { await task(); await refresh(); setSelected([]); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not complete this action.'); }
+    catch (cause) { if (navigator.onLine && !(cause instanceof TypeError)) setError(cause instanceof Error ? cause.message : 'Could not complete this action.'); }
     finally { setBusy(false); }
   }
 
@@ -75,15 +80,15 @@ export default function LiveBill({ token, onBack }: { token: string; onBack: () 
             <span><strong>{item.label}</strong><small>{item.status === 'UNCLAIMED' ? 'Available to claim' : `${item.claimed_name ?? 'A diner'} · ${item.status === 'PAID' ? 'Paid' : item.status === 'PAYMENT_PENDING' ? 'Payment pending' : 'Claimed, awaiting payment'}`}</small></span><strong>{money(item.amount_cents)}</strong>
           </label>;
         })}</div>
-        {selected.length > 0 && <button className="sq-primary" disabled={busy || !me} onClick={() => void act(() => client.request('POST', `/restaurant-bills/${token}/claim`, { itemIds: selected }))}>Claim {selected.length} item{selected.length === 1 ? '' : 's'}</button>}
+        {selected.length > 0 && <button className="sq-primary" disabled={!online || busy || !me} onClick={() => void act(() => client.request('POST', `/restaurant-bills/${token}/claim`, { itemIds: selected }))}>Claim {selected.length} item{selected.length === 1 ? '' : 's'}</button>}
         {!loading && !me && <div className="sq-notice"><LockKeyhole size={19} /><span><strong>Sign in to claim and pay</strong><small>Your items and wallet payment will be linked to your account.</small></span></div>}
         {!loading && !me && <div className="sq-text-row"><a className="sq-secondary" href={`/register?next=${encodeURIComponent(`/scanqr/?table=${token}`)}`}>Create account</a><a className="sq-secondary" href={`/login?next=${encodeURIComponent(`/scanqr/?table=${token}`)}`}>Log in</a></div>}
         {bill.tips_enabled && myTotal > 0 && <div className="sq-card sq-schedule"><strong>Tip {bill.waiter_name ?? 'your waiter'} (optional)</strong><div className="sq-text-row"><button type="button" className="sq-secondary" onClick={() => { setTipMode('percent'); setTipPercent('0'); }}>No tip</button><button type="button" className="sq-secondary" onClick={() => { setTipMode('percent'); setTipPercent('10'); }}>10%</button><button type="button" className="sq-secondary" onClick={() => { setTipMode('percent'); setTipPercent('15'); }}>15%</button></div><div className="sq-text-row"><label>Percentage<input className="w-24 rounded-lg border p-2" type="number" min="0" max="100" step="0.1" value={tipMode === 'percent' ? tipPercent : myTotal ? (tipCents / myTotal * 100).toFixed(1) : '0'} onChange={e => { setTipMode('percent'); setTipPercent(e.target.value); }} />%</label><label>Amount<input className="w-28 rounded-lg border p-2" type="number" min="0" max={myTotal / 100} step="0.01" value={tipMode === 'amount' ? tipAmount : (tipCents / 100).toFixed(2)} onChange={e => { setTipMode('amount'); setTipAmount(e.target.value); }} /></label></div><p>{tipValid ? `${money(tipCents)} tip · ${myTotal ? (tipCents / myTotal * 100).toFixed(1) : '0'}%` : 'Tip cannot exceed your selected items.'}</p></div>}
         {me?.roles.includes('CONSUMER') && <div className="sq-card sq-schedule"><div className="sq-row"><span>Your claimed items</span><strong>{money(myTotal)}</strong></div>{tipCents > 0 && tipValid && <div className="sq-row"><span>Waiter tip</span><strong>{money(tipCents)}</strong></div>}<div className="sq-row"><span>XTRA-CASH wallet</span><strong>{wallet === null ? 'Loading…' : money(wallet)}</strong></div></div>}
         {myTotal > 0 && wallet !== null && wallet < paymentTotal && <div className="sq-notice"><Wallet size={20} /><span><strong>Top up your wallet first</strong><small>You need {money(paymentTotal - wallet)} more. Wallet top-up collection is awaiting activation; a funded loan can also add money after approval.</small></span></div>}
         {myTotal > 0 && wallet !== null && wallet < paymentTotal && <div className="sq-text-row"><a className="sq-secondary" href="/app/pay">Top up wallet</a><a className="sq-secondary" href="/app/loans">Apply for a loan</a></div>}
-        {myTotal > 0 && <button className="sq-primary" disabled={busy || !tipValid || !bill.canPayFromWallet || wallet === null || wallet < paymentTotal} onClick={() => void act(() => client.request('POST', `/restaurant-bills/${token}/pay-wallet`, { idempotencyKey: crypto.randomUUID(), tipCents }))}><Wallet size={18} /> Pay {money(paymentTotal)} from wallet</button>}
-        {mine.length > 0 && <button className="sq-text-button sq-centred" disabled={busy} onClick={() => void act(() => client.request('POST', `/restaurant-bills/${token}/release`, { itemIds: mine.map(item => item.id) }))}>Release my unpaid items</button>}
+        {myTotal > 0 && <button className="sq-primary" disabled={!online || busy || !tipValid || !bill.canPayFromWallet || wallet === null || wallet < paymentTotal} onClick={() => void act(() => client.request('POST', `/restaurant-bills/${token}/pay-wallet`, { idempotencyKey: crypto.randomUUID(), tipCents }))}><Wallet size={18} /> Pay {money(paymentTotal)} from wallet</button>}
+        {mine.length > 0 && <button className="sq-text-button sq-centred" disabled={!online || busy} onClick={() => void act(() => client.request('POST', `/restaurant-bills/${token}/release`, { itemIds: mine.map(item => item.id) }))}>Release my unpaid items</button>}
         <button className="sq-secondary" disabled={!bill.items.some(item => item.status === 'CLAIMED' || item.status === 'PAID') || !bill.items.some(item => item.status === 'UNCLAIMED')} onClick={() => void share()}><Share2 size={17} /> Share remaining items</button>
         <p className="sq-note">The green tick follows a successful wallet debit. Merchant payout and emailed receipts require their own activated services.</p>
       </>}

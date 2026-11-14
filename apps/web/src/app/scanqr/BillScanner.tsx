@@ -48,6 +48,10 @@ export default function BillScanner({ file, onDone }: { file: File; onDone: (sca
       setProgress('Reading bill text…');
       let parsed: ParsedBill;
       try {
+        if (!navigator.onLine) {
+          onDone(new File([blob], 'scanned-bill.jpg', { type: 'image/jpeg' }), { merchant: '', reference: '', totalCents: 0, items: [], warnings: [] });
+          return;
+        }
         const { createWorker } = await import('tesseract.js');
         worker = await createWorker('eng');
         const result = await worker.recognize(flat);
