@@ -363,14 +363,14 @@ export default function ScanCheckout() {
           <p>Capture the bill, choose how to pay and keep the receipt in one checkout.</p>
           <ol>{labels.map((label, i) => <li key={label} data-current={phase[stage] === i + 1}><span>{i + 1}</span>{label}</li>)}</ol>
         </div>
-        <small>Restaurant checkout preview</small>
+
       </aside>
 
       <section className="sq-phone" aria-label="Restaurant checkout">
         <header className="sq-header">
           {stage !== 'start' && stage !== 'receipt' && <button type="button" className="sq-back" aria-label="Go back" onClick={back}><ArrowLeft size={19} /></button>}
           <img src="/brand/ui/wordmark.png" alt="XTRA-CASH" />
-          <span className="sq-demo">DEMO</span>
+          {(usingSample || sharedSnapshot) && <span className="sq-demo">PREVIEW</span>}
         </header>
         <div className="sq-body">
           {stage !== 'start' && stage !== 'receipt' && <nav className="sq-progress" aria-label="Checkout progress">
