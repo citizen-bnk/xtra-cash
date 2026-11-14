@@ -7,6 +7,7 @@ import {
   Download, FileText, Fingerprint, ImagePlus, Landmark, LockKeyhole, PenLine,
   ReceiptText, ScanLine, ShieldCheck, Utensils, Wallet, Share2, Plus, Trash2,
 } from 'lucide-react';
+import { ApiError } from '@xtra/shared';
 import BillScanner from './BillScanner';
 import RestaurantQrScanner from './RestaurantQrScanner';
 import type { BillItem, ParsedBill } from './billScan';
@@ -77,7 +78,8 @@ function Signature({ signed, onChange }: { signed: boolean; onChange: (value: bo
 export default function ScanCheckout() {
   const { client, me, refreshMe, loading: authLoading } = useAuth();
   const [needsCode, setNeedsCode] = useState(false);
-  const [scanVersion, setScanVersion] = useState(0);
+  const [qrRejection, setQrRejection] = useState('');
+  const merchantCheck = useRef(0);
   const [online, setOnline] = useState(true);
   const [restored, setRestored] = useState(false);
   const [draftPhoto, setDraftPhoto] = useState('');
@@ -167,15 +169,29 @@ export default function ScanCheckout() {
 
   async function verifyMerchant(input = merchantCode, employee = employeeCode) {
     if (!navigator.onLine) return;
+    const check = ++merchantCheck.current;
     const code = input.trim().toUpperCase();
     setMerchantVerified(false);
     if (!(/^[A-Z]{3}[0-9]{3}$/.test(code) || /^[A-F0-9]{36}$/.test(code))) { setError('Enter the six character code printed below the restaurant QR, for example ABC123.'); return; }
     setCheckingMerchant(true); setError('');
     try {
       const found = await client.request<{ tradingName: string; displayCode: string; waiterName: string | null }>('GET', `/restaurant-bills/merchant/${encodeURIComponent(code)}${employee ? `?employee=${encodeURIComponent(employee)}` : ''}`);
+      if (check !== merchantCheck.current) return;
       setMerchantCode(code); setMerchant(found.tradingName); setVerifiedMerchantName(found.tradingName); setWaiterName(found.waiterName ?? ''); setMerchantVerified(true);
-    } catch (cause) { if (navigator.onLine && !(cause instanceof TypeError)) setError(cause instanceof Error ? cause.message : 'Restaurant code could not be verified.'); }
-    finally { setCheckingMerchant(false); }
+    } catch (cause) {
+      if (check !== merchantCheck.current) return;
+      if (!needsCode && cause instanceof ApiError && [400, 404].includes(cause.status)) {
+        setQrRejection(cause.message);
+        setMerchantCode('');
+        setEmployeeCode('');
+        return;
+      }
+      if (navigator.onLine && !(cause instanceof TypeError)) {
+        setError(cause instanceof Error ? cause.message : 'Restaurant code could not be verified.');
+      }
+    } finally {
+      if (check === merchantCheck.current) setCheckingMerchant(false);
+    }
   }
 
   useEffect(() => {
@@ -241,13 +257,16 @@ export default function ScanCheckout() {
         const allowedOrigin = url.origin === window.location.origin
           || ['https://xtra-cash.vercel.app', 'https://xtra-cash.co.za', 'https://www.xtra-cash.co.za'].includes(url.origin);
         if (!allowedOrigin || url.pathname.replace(/\/$/, '') !== '/scanqr' || url.searchParams.has('table') || url.searchParams.has('bill')) throw new Error();
-        code = (url.searchParams.get('merchant') ?? url.searchParams.get('restaurant') ?? url.searchParams.get('code') ?? '').trim().toUpperCase();
+        const codes = ['merchant', 'restaurant', 'code'].flatMap(key => url.searchParams.getAll(key));
+        const employees = url.searchParams.getAll('employee');
+        if (url.username || url.password || codes.length > 1 || employees.length > 1) throw new Error();
+        code = (codes[0] ?? '').trim().toUpperCase();
+        if (codes.length && !code) throw new Error();
         employee = (url.searchParams.get('employee') ?? '').trim().toUpperCase();
         if (code && !/^(?:[A-Z]{3}[0-9]{3}|[A-F0-9]{36})$/.test(code)) throw new Error();
         if (employee && !/^[A-Z]{3}[0-9]{3}$/.test(employee)) throw new Error();
       } catch {
-        setError('Use the XTRA-CASH QR code from your restaurant.');
-        setScanVersion(value => value + 1);
+        setQrRejection('This QR is not a valid XTRA-CASH restaurant checkout code.');
         return;
       }
     }
@@ -275,7 +294,9 @@ export default function ScanCheckout() {
   function reset() {
     clearDraft();
     setNeedsCode(false);
-    setScanVersion(value => value + 1);
+    setQrRejection('');
+    merchantCheck.current++;
+    setCheckingMerchant(false);
     setDraftPhoto('');
     setEmployeeCode('');
     clearApplication();
@@ -471,7 +492,8 @@ export default function ScanCheckout() {
           </div>
 
           {stage === 'start' && <>
-            {restored && !needsCode && !merchantCode && <RestaurantQrScanner key={scanVersion} onScan={scanRestaurant} />}
+            {restored && !needsCode && !merchantCode && !qrRejection && <RestaurantQrScanner onScan={scanRestaurant} />}
+            {qrRejection && <div className="sq-error" role="alert"><strong>QR code rejected</strong><p>{qrRejection}</p></div>}
             {needsCode && !merchantVerified && <div className="sq-fields">
               <label>Restaurant code<input aria-label="Restaurant code below the QR" autoCapitalize="characters" value={merchantCode} maxLength={6} onChange={event => setMerchantCode(event.target.value.toUpperCase())} placeholder="ABC123" /></label>
               <button className="sq-primary" disabled={!online || checkingMerchant || !/^[A-Z]{3}[0-9]{3}$/.test(merchantCode)} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button>
@@ -479,11 +501,11 @@ export default function ScanCheckout() {
             {merchantVerified && <div className="sq-notice"><CircleCheck size={19} /><span><strong>{merchant}</strong><small>{waiterName ? `Your waiter: ${waiterName} · ` : ''}Restaurant code verified</small></span></div>}
             {checkingMerchant && <p role="status" className="sq-note">Checking restaurant…</p>}
             {error && <p className="sq-error" role="alert">{error}</p>}
-            {(needsCode || merchantCode) && <button className="sq-text-button" type="button" onClick={() => {
+            {(needsCode || merchantCode || qrRejection) && <button className={qrRejection ? 'sq-primary' : 'sq-text-button'} type="button" onClick={() => {
               setMerchantCode(''); setEmployeeCode(''); setMerchantVerified(false); setNeedsCode(false); setError('');
-              setScanVersion(value => value + 1);
+              setQrRejection(''); merchantCheck.current++; setCheckingMerchant(false);
             }}>Scan another QR</button>}
-            {(merchantVerified || (!online && (!!merchantCode || needsCode))) && <button className="sq-primary" disabled={!ready} onClick={() => go('capture')}>Capture bill <ArrowRight size={19} /></button>}
+            {!qrRejection && (merchantVerified || (!online && (needsCode || !!merchantCode))) && <button className="sq-primary" disabled={!ready} onClick={() => go('capture')}>{merchantVerified ? 'Capture bill' : 'Prepare bill draft'} <ArrowRight size={19} /></button>}
             {online && <a className="sq-secondary" href="/register">Sign up for XTRA-CASH <ChevronRight size={17} /></a>}
           </>}
 
