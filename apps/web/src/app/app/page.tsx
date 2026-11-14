@@ -51,19 +51,22 @@ export default function ConsumerHome() {
     { label: '🎁 Get a voucher', href: '/app/vouchers', size: 'col-span-3' },
   ];
 
-  return <div className="xc-app-theme relative min-h-[100dvh] overflow-hidden bg-[#1b1030] text-white">
+  return <div className="xc-app-theme relative min-h-[100dvh] overflow-clip bg-[#1b1030] text-white">
     <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_15%_8%,rgba(166,23,211,.65),transparent_36%),radial-gradient(ellipse_at_95%_70%,rgba(217,31,99,.55),transparent_35%),linear-gradient(165deg,#1b1030_0%,#5c2394_44%,#d91f63_78%,#fb9320_115%)]" />
     <div aria-hidden className="pointer-events-none absolute -right-20 top-56 h-72 w-72 rounded-full bg-fuchsia-500/30 blur-3xl" />
     <div aria-hidden className="pointer-events-none absolute -left-32 bottom-24 h-80 w-80 rounded-full bg-orange-500/20 blur-3xl" />
 
-    <CustomerHeader />
-    <div className="relative mx-auto min-h-[100dvh] w-full max-w-[520px] px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom,0px))] pt-2">
-
-      <section className="mt-5 flex items-center gap-3" aria-label="Account overview">
+    <div className="sticky top-0 z-30 bg-[#510079]/95 backdrop-blur">
+      <CustomerHeader />
+      <section className="mx-auto flex w-full max-w-[520px] items-center gap-3 px-4 py-3" aria-label="Account overview">
         <div className="grid h-[58px] w-[58px] shrink-0 place-items-center rounded-full border-[3px] border-white bg-gradient-to-br from-orange-300 via-pink-400 to-purple-700 text-lg font-black text-white shadow-[0_0_18px_rgba(255,95,222,.65)]">{initials}</div>
-        <div className="min-w-0 flex-1"><h1 className="truncate text-xl font-black leading-tight">Hi {name} <span aria-hidden>👋</span></h1><p className="mt-1 text-sm text-white/85">How can I help you today?</p></div>
+        <div className="min-w-0 flex-1"><h1 className="truncate text-xl font-black leading-tight">Hi {name} <span aria-hidden>👋</span></h1></div>
         <Link href="/app/loans" className="min-w-[112px] rounded-2xl border border-white/70 bg-white/90 px-3 py-2 text-left text-ink shadow-lg shadow-purple-950/25"><span className="block text-[11px] font-medium">Available Credit</span><strong className="mt-0.5 block truncate text-lg font-black leading-tight">{b ? formatZAR(b.creditCents) : 'Check limit'}</strong></Link>
       </section>
+    </div>
+    <div className="relative mx-auto min-h-[100dvh] w-full max-w-[520px] px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom,0px))] pt-2">
+
+
 
       <Link href="/app/assistant" className="group mt-5 flex w-full items-center gap-3 rounded-full border-[3px] border-white bg-gradient-to-r from-[#ecd8f8] via-white to-[#fbe7ee] px-4 py-3 text-left text-[#1b1030] shadow-[0_0_12px_#a617d3,0_0_30px_rgba(217,31,99,.5)] transition active:scale-[.99]">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white"><Sparkles className="h-5 w-5" /></span><span className="min-w-0 flex-1 truncate text-xl font-bold">Ask XTRA-CASH…</span><Mic className="h-6 w-6 shrink-0 text-[#5c2394]" />
