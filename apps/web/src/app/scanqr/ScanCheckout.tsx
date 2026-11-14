@@ -74,7 +74,7 @@ function Signature({ signed, onChange }: { signed: boolean; onChange: (value: bo
 }
 
 export default function ScanCheckout() {
-  const { client, me, loading: authLoading } = useAuth();
+  const { client, me, refreshMe, loading: authLoading } = useAuth();
   const [online, setOnline] = useState(true);
   const [restored, setRestored] = useState(false);
   const [draftPhoto, setDraftPhoto] = useState('');
@@ -127,7 +127,8 @@ export default function ScanCheckout() {
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
     update();
-    window.addEventListener('online', update);
+    const reconnect = () => { update(); void refreshMe(); };
+    window.addEventListener('online', reconnect);
     window.addEventListener('offline', update);
 
     const params = new URLSearchParams(window.location.search);
@@ -156,10 +157,10 @@ export default function ScanCheckout() {
     if (table && /^[a-f0-9]{64}$/.test(table)) setLiveToken(table);
     setRestored(true);
     return () => {
-      window.removeEventListener('online', update);
+      window.removeEventListener('online', reconnect);
       window.removeEventListener('offline', update);
     };
-  }, []);
+  }, [refreshMe]);
 
   async function verifyMerchant(input = merchantCode, employee = employeeCode) {
     if (!navigator.onLine) return;
@@ -373,7 +374,7 @@ export default function ScanCheckout() {
       clearDraft();
       window.history.pushState(null, '', `/scanqr/?table=${created.shareToken}`);
       setLiveToken(created.shareToken);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create the shared bill.'); }
+    } catch (cause) { if (navigator.onLine && !(cause instanceof TypeError)) setError(cause instanceof Error ? cause.message : 'Could not create the shared bill.'); }
     finally { setCreatingLive(false); }
   }
 
@@ -449,7 +450,7 @@ export default function ScanCheckout() {
             {!merchantVerified && <div className="sq-fields"><label>Restaurant code<input aria-label="Restaurant code below the QR" autoCapitalize="characters" value={merchantCode} maxLength={36} onChange={e => { setMerchantCode(e.target.value.toUpperCase()); setMerchantVerified(false); }} placeholder="ABC123" /></label><button className="sq-secondary" disabled={!online || checkingMerchant || merchantCode.trim().length < 6} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button></div>}
             {merchantVerified && <div className="sq-notice"><CircleCheck size={19} /><span><strong>{merchant}</strong><small>{waiterName ? `Your waiter: ${waiterName} · ` : ''}Restaurant code verified</small></span></div>}
             {error && <p className="sq-error" role="alert">{error}</p>}
-            <button className="sq-primary" disabled={!ready || (online && !merchantVerified)} onClick={() => go('capture')}>Start with your bill <ArrowRight size={19} /></button>
+            <button className="sq-primary" disabled={!ready} onClick={() => go('capture')}>Start with your bill <ArrowRight size={19} /></button>
             {online && <a className="sq-secondary" href="/register">Sign up for XTRA-CASH <ChevronRight size={17} /></a>}
             <p className="sq-footnote"><LockKeyhole size={14} /> Use sample details in this preview.</p>
           </>}
