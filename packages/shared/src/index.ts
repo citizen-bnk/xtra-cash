@@ -6,3 +6,5 @@ export * from './types';
 export * from './settlement';
 export * from './client';
 export * from './payday';
+
+export * from './restaurant-qr';

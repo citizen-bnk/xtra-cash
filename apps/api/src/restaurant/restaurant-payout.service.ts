@@ -26,24 +26,25 @@ export class RestaurantPayoutService {
       const displayCode = printedCode();
       try {
         await this.pool.query('INSERT INTO restaurant_merchants(id,qr_code,display_code,trading_name,portal_user_id,settlement_reference,bank_account_mask,bank_recipient_token) VALUES($1,$2,$3,$4,$5,$6,$7,$8)', [id, qrCode, displayCode, name, owner.rows[0].id, input.settlementReference?.trim() || null, input.bankAccountMask?.trim().slice(0, 30) || null, input.bankRecipientToken?.trim() || null]);
-        return { id, displayCode, qrUrl: `${checkoutBase()}/scanqr/?merchant=${qrCode}` };
+        return { id, displayCode, qrUrl: `${checkoutBase()}/scanqr?code=${displayCode}` };
       } catch (error) { if ((error as { code?: string }).code !== '23505') throw error; }
     }
     throw new ConflictException('Could not allocate a unique restaurant code. Try again.');
   }
 
   async listMerchants() {
-    const result = await this.pool.query('SELECT id,trading_name,status,display_code,qr_code,payout_mode,tips_enabled,bank_account_mask,bank_recipient_token IS NOT NULL AS bank_recipient_configured,settlement_reference,portal_user_id,created_at FROM restaurant_merchants ORDER BY created_at DESC LIMIT 200');
-    return result.rows.map(row => ({ ...row, qr_url: `${checkoutBase()}/scanqr/?merchant=${row.qr_code}`, qr_code: undefined }));
+    const result = await this.pool.query('SELECT id,trading_name,status,display_code,qr_code,payout_mode,tips_enabled,is_training,qr_checked_at,portal_user_id,settlement_reference,bank_account_mask,bank_recipient_token IS NOT NULL AS bank_recipient_configured,created_at FROM restaurant_merchants ORDER BY created_at DESC LIMIT 200');
+    return result.rows.map(row => ({ ...row, qr_url: `${checkoutBase()}/scanqr?code=${row.display_code ?? row.qr_code}`, qr_code: undefined }));
   }
 
-  async configureMerchant(id: string, input: { status?: string; payoutMode?: string; tipsEnabled?: boolean; settlementReference?: string; bankAccountMask?: string; bankRecipientToken?: string; portalEmail?: string }) {
+  async configureMerchant(id: string, input: { status?: string; payoutMode?: string; tipsEnabled?: boolean; qrChecked?: boolean; settlementReference?: string; bankAccountMask?: string; bankRecipientToken?: string; portalEmail?: string }) {
     if (!validId(id)) throw new NotFoundException();
     const db = await this.pool.connect();
     try {
       await db.query('BEGIN');
       const current = await db.query('SELECT * FROM restaurant_merchants WHERE id=$1 FOR UPDATE', [id]);
       if (!current.rows[0]) throw new NotFoundException();
+      if (current.rows[0].is_training) throw new ForbiddenException('Training restaurants cannot be configured for launch.');
       const status = input.status ?? current.rows[0].status;
       const mode = input.payoutMode ?? current.rows[0].payout_mode;
       if (!['DRAFT','ACTIVE','SUSPENDED'].includes(status) || !['ON_DEMAND','DAILY'].includes(mode)) throw new BadRequestException('Invalid restaurant setting.');
@@ -57,7 +58,11 @@ export class RestaurantPayoutService {
       const mask = input.bankAccountMask?.trim().slice(0, 30) || current.rows[0].bank_account_mask;
       const recipient = input.bankRecipientToken?.trim() || current.rows[0].bank_recipient_token;
       if (status === 'ACTIVE' && (!settlement || !recipient || !mask || !owner)) throw new BadRequestException('Verify the restaurant contact, bank recipient and settlement reference before activation.');
-      await db.query('UPDATE restaurant_merchants SET status=$1,payout_mode=$2,portal_user_id=$3,settlement_reference=$4,bank_account_mask=$5,bank_recipient_token=$6,tips_enabled=$8 WHERE id=$7', [status, mode, owner, settlement, mask, recipient, id, input.tipsEnabled ?? current.rows[0].tips_enabled]);
+      const qrCheckedAt = input.qrChecked === true ? new Date() : current.rows[0].qr_checked_at;
+      if (status === 'ACTIVE' && current.rows[0].status !== 'ACTIVE' && !qrCheckedAt) {
+        throw new BadRequestException('Scan the printed QR and confirm the restaurant before activation.');
+      }
+      await db.query('UPDATE restaurant_merchants SET status=$1,payout_mode=$2,portal_user_id=$3,settlement_reference=$4,bank_account_mask=$5,bank_recipient_token=$6,tips_enabled=$8,qr_checked_at=$9 WHERE id=$7', [status, mode, owner, settlement, mask, recipient, id, input.tipsEnabled ?? current.rows[0].tips_enabled, qrCheckedAt]);
       await db.query('COMMIT');
       return { updated: true };
     } catch (error) { await db.query('ROLLBACK'); throw error; }
@@ -67,7 +72,7 @@ export class RestaurantPayoutService {
   async dashboard(userId: string, roles: string[], merchantId?: string) {
     const admin = roles.includes('ADMIN') || roles.includes('SUPER_ADMIN');
     if (merchantId && !validId(merchantId)) throw new NotFoundException();
-    const merchant = await this.pool.query(`SELECT id,trading_name,status,display_code,qr_code,payout_mode,tips_enabled,bank_account_mask,bank_recipient_token IS NOT NULL AS bank_recipient_configured FROM restaurant_merchants WHERE ${merchantId ? 'id=$1 AND ($2=TRUE OR portal_user_id=$3)' : 'portal_user_id=$1'} LIMIT 1`, merchantId ? [merchantId, admin, userId] : [userId]);
+    const merchant = await this.pool.query(`SELECT id,trading_name,status,display_code,qr_code,payout_mode,tips_enabled,is_training,qr_checked_at,portal_user_id,settlement_reference,bank_account_mask,bank_recipient_token IS NOT NULL AS bank_recipient_configured FROM restaurant_merchants WHERE ${merchantId ? 'id=$1 AND ($2=TRUE OR portal_user_id=$3)' : 'portal_user_id=$1'} LIMIT 1`, merchantId ? [merchantId, admin, userId] : [userId]);
     if (!merchant.rows[0]) throw new NotFoundException('Restaurant account not found.');
     const id = merchant.rows[0].id;
     const [totals, transactions, payouts] = await Promise.all([
@@ -76,8 +81,8 @@ export class RestaurantPayoutService {
       this.pool.query('SELECT id,amount_cents,payout_reference,mode,status,bank_reference,failure_reason,created_at,paid_at FROM restaurant_payouts WHERE merchant_id=$1 ORDER BY created_at DESC LIMIT 50', [id]),
     ]);
     const { qr_code, ...safeMerchant } = merchant.rows[0];
-    const qrUrl = `${checkoutBase()}/scanqr/?merchant=${qr_code}`;
-    return { merchant: { ...safeMerchant, qrUrl, qr_url: qrUrl }, totals: totals.rows[0], transactions: transactions.rows, payouts: payouts.rows, eftEnabled: false };
+    const qrUrl = `${checkoutBase()}/scanqr?code=${safeMerchant.display_code ?? qr_code}`;
+    return { merchant: { ...safeMerchant, wallet_enabled: process.env.RESTAURANT_WALLET_PAYMENTS_ENABLED === 'true' && safeMerchant.status === 'ACTIVE' && !safeMerchant.is_training && !!safeMerchant.settlement_reference && safeMerchant.bank_recipient_configured, qrUrl, qr_url: qrUrl }, totals: totals.rows[0], transactions: transactions.rows, payouts: payouts.rows, eftEnabled: false };
   }
 
   async setTips(userId: string, merchantId: string, enabled: boolean) {
