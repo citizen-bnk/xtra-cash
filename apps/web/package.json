@@ -15,6 +15,7 @@
     "ai": "^7.0.127",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
+    "jsqr": "1.4.0",
     "leaflet": "1.9.4",
     "lucide-react": "^0.544.0",
     "next": "15.5.28",
