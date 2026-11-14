@@ -528,8 +528,20 @@ export const storedFiles = pgTable('stored_files', {
 // Restaurant bill claims and customer receipt archive. Payment state is written only with a wallet ledger journal.
 export const restaurantMerchants = pgTable('restaurant_merchants', {
   id: id(), qrCode: text('qr_code').notNull().unique(), tradingName: text('trading_name').notNull(),
-  status: text('status').notNull().default('DRAFT'), settlementReference: text('settlement_reference'), createdAt: createdAt(),
+  displayCode: text('display_code').unique(), status: text('status').notNull().default('DRAFT'),
+  payoutMode: text('payout_mode').notNull().default('ON_DEMAND'), portalUserId: text('portal_user_id').references(() => users.id),
+  settlementReference: text('settlement_reference'), bankAccountMask: text('bank_account_mask'), bankRecipientToken: text('bank_recipient_token'), createdAt: createdAt(),
 });
+export const restaurantPayouts = pgTable('restaurant_payouts', {
+  id: id(), merchantId: text('merchant_id').notNull().references(() => restaurantMerchants.id), amountCents: integer('amount_cents').notNull(),
+  payoutReference: text('payout_reference').notNull().unique(), mode: text('mode').notNull(), status: text('status').notNull().default('REQUESTED'),
+  bankReference: text('bank_reference'), failureReason: text('failure_reason'), requestedBy: text('requested_by').references(() => users.id), confirmedBy: text('confirmed_by').references(() => users.id),
+  createdAt: createdAt(), submittedAt: ts('submitted_at'), paidAt: ts('paid_at'),
+}, t => [index('restaurant_payouts_merchant_idx').on(t.merchantId, t.createdAt)]);
+export const restaurantPayoutItems = pgTable('restaurant_payout_items', {
+  payoutId: text('payout_id').notNull().references(() => restaurantPayouts.id, { onDelete: 'cascade' }),
+  itemId: text('item_id').notNull().unique().references(() => restaurantBillItems.id),
+}, t => [primaryKey({ columns: [t.payoutId, t.itemId] })]);
 export const restaurantBills = pgTable('restaurant_bills', {
   id: id(), shareToken: text('share_token').notNull().unique(), creatorId: text('creator_id').notNull().references(() => users.id),
   merchantId: text('merchant_id').references(() => restaurantMerchants.id),

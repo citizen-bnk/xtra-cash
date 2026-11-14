@@ -8,6 +8,9 @@ import { RestaurantService } from './restaurant.service';
 export class RestaurantController {
   constructor(private service: RestaurantService) {}
 
+  @Public() @Get('merchant/:code') @Throttle({ default: { limit: 12, ttl: 60000 } })
+  merchant(@Param('code') code: string) { return this.service.resolveMerchant(code); }
+
   @Roles('CONSUMER') @Post() @Throttle({ default: { limit: 8, ttl: 60000 } })
   create(@CurrentUser() user: AuthUser, @Body() body: { merchant: string; merchantCode?: string; reference: string; totalCents: number; items: { label: string; cents: number }[] }) { return this.service.create(user.id, body); }
 

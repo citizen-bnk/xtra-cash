@@ -6,25 +6,26 @@ const fs = require('node:fs');
 const { randomUUID } = require('node:crypto');
 const { PGlite } = require('@electric-sql/pglite');
 const { RestaurantService } = require('../dist/restaurant/restaurant.service');
+const { RestaurantPayoutService } = require('../dist/restaurant/restaurant-payout.service');
 
 async function main() {
   process.env.RESTAURANT_WALLET_PAYMENTS_ENABLED = 'true';
   const pg = new PGlite();
   try {
-    await pg.exec("CREATE TYPE role AS ENUM ('CONSUMER'); CREATE TABLE users(id text PRIMARY KEY,email text,first_name text,last_name text,roles role[],referral_code text,wallet_balance_cents integer NOT NULL DEFAULT 0); CREATE TABLE stored_files(key text PRIMARY KEY,original_name text,size_bytes integer,content bytea); CREATE TABLE ledger_journals(id text PRIMARY KEY,type text,ref_type text,ref_id text,memo text); CREATE TABLE ledger_entries(id text PRIMARY KEY,journal_id text REFERENCES ledger_journals(id),account text,amount_cents integer);");
+    await pg.exec("CREATE TYPE role AS ENUM ('CONSUMER'); CREATE TABLE users(id text PRIMARY KEY,email text,first_name text,last_name text,roles role[],referral_code text,status text NOT NULL DEFAULT 'ACTIVE',wallet_balance_cents integer NOT NULL DEFAULT 0); CREATE TABLE stored_files(key text PRIMARY KEY,original_name text,size_bytes integer,content bytea); CREATE TABLE ledger_journals(id text PRIMARY KEY,type text,ref_type text,ref_id text,memo text); CREATE TABLE ledger_entries(id text PRIMARY KEY,journal_id text REFERENCES ledger_journals(id),account text,amount_cents integer);");
     await pg.exec(fs.readFileSync(path.join(__dirname, '../drizzle/0021_restaurant_bills.sql'), 'utf8'));
+    await pg.exec(fs.readFileSync(path.join(__dirname, '../drizzle/0022_restaurant_payouts.sql'), 'utf8'));
     for (const [id, name] of [['diner-a', 'Amina'], ['diner-b', 'Busi']])
       await pg.query("INSERT INTO users(id,email,first_name,last_name,roles,referral_code) VALUES($1,$2,$3,'Diner',ARRAY['CONSUMER']::role[],$4)", [id, `${id}@example.test`, name, id]);
-    const code = 'pilot-restaurant-code-123456';
-    await pg.query("INSERT INTO restaurant_merchants(id,qr_code,trading_name,status,settlement_reference) VALUES('merchant-1',$1,'Table Cafe','ACTIVE','pilot-settlement-1')", [code]);
+    const merchantId = randomUUID(), code = 'A1'.repeat(18), printed = 'TBL123';
+    await pg.query("INSERT INTO restaurant_merchants(id,qr_code,display_code,trading_name,status,settlement_reference,bank_account_mask,bank_recipient_token,portal_user_id) VALUES($1,$2,$3,'Table Cafe','ACTIVE','pilot-settlement-1','Bank ····1234','recipient-1','diner-a')", [merchantId, code, printed]);
     const pool = { query: (...args) => pg.query(...args), connect: async () => ({ query: (...args) => pg.query(...args), release() {} }) };
     const storage = { put: async (buffer, originalname) => { const key = `${randomUUID()}.jpg`; await pg.query('INSERT INTO stored_files(key,original_name,size_bytes,content) VALUES($1,$2,$3,$4)', [key, originalname, buffer.length, buffer]); return key; }, get: async (key) => Buffer.from((await pg.query('SELECT content FROM stored_files WHERE key=$1', [key])).rows[0].content) };
     const service = new RestaurantService(pool, storage);
-    const unverified = await service.create('diner-a', { merchant: 'Unknown Cafe', reference: 'T-9', totalCents: 10000, items: [{ label: 'Tea', cents: 10000 }] });
-    assert.equal(unverified.canPayFromWallet, false);
-    await service.claim(unverified.shareToken, 'diner-a', [unverified.items[0].id]);
-    await assert.rejects(service.payFromWallet(unverified.shareToken, 'diner-a', 'unverified-pay-1'), /not ready/);
-    const created = await service.create('diner-a', { merchant: 'Table Cafe', merchantCode: code, reference: 'T-8', totalCents: 30000, items: [{ label: 'Soup', cents: 10000 }, { label: 'Pizza', cents: 20000 }] });
+    const payouts = new RestaurantPayoutService(pool);
+    await assert.rejects(service.create('diner-a', { merchant: 'Unknown Cafe', reference: 'T-9', totalCents: 10000, items: [{ label: 'Tea', cents: 10000 }] }), /restaurant code/);
+    assert.equal((await service.resolveMerchant(printed)).tradingName, 'Table Cafe');
+    const created = await service.create('diner-a', { merchant: 'Ignored OCR name', merchantCode: printed, reference: 'T-8', totalCents: 30000, items: [{ label: 'Soup', cents: 10000 }, { label: 'Pizza', cents: 20000 }] });
     assert.equal(created.canPayFromWallet, true);
     await assert.rejects(service.create('diner-b', { merchant: 'Table Cafe', merchantCode: code, reference: 'T-8', totalCents: 30000, items: [{ label: 'Soup', cents: 10000 }, { label: 'Pizza', cents: 20000 }] }), /already has a shared table/);
     const soup = created.items.find(item => item.label === 'Soup'), pizza = created.items.find(item => item.label === 'Pizza');
@@ -50,6 +51,18 @@ async function main() {
     assert.equal((await service.receipts('diner-b')).length, 1);
     assert.equal((await service.notifications('diner-a')).length, 1);
     assert.equal((await service.notifications('diner-b')).length, 1);
+    const before = await payouts.dashboard('diner-a', ['CONSUMER']);
+    assert.equal(Number(before.totals.available_cents), 30000);
+    await assert.rejects(payouts.requestPayout('diner-b', ['CONSUMER'], merchantId), /Forbidden/);
+    const payout = await payouts.requestPayout('diner-a', ['CONSUMER'], merchantId);
+    assert.equal(payout.amountCents, 30000);
+    await assert.rejects(payouts.requestPayout('diner-a', ['CONSUMER'], merchantId), /No paid transactions/);
+    assert.equal(Number((await payouts.dashboard('diner-a', ['CONSUMER'])).totals.available_cents), 0);
+    await payouts.recordBankOutcome(payout.id, true, 'BANKREF123');
+    assert.equal((await service.view(created.shareToken)).status, 'SETTLED');
+    assert.equal((await service.notifications('diner-a')).length, 2);
+    const payoutLedger = await pg.query("SELECT sum(amount_cents)::int AS total FROM ledger_entries WHERE account=$1", [`merchant_payable:${merchantId}`]);
+    assert.equal(payoutLedger.rows[0].total, 0);
     console.log('Restaurant bill wallet flow passed.');
   } finally { await pg.close(); }
 }

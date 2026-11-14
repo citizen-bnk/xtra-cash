@@ -12,19 +12,27 @@ type BillInput = { merchant: string; merchantCode?: string; reference: string; t
 export class RestaurantService {
   constructor(@Inject(PG_POOL) private pool: Pool, @Inject(FILE_STORAGE) private files: FileStorage) {}
 
+  async resolveMerchant(codeInput: string) {
+    const code = String(codeInput ?? '').trim().toUpperCase();
+    if (!(/^[A-Z]{3}[0-9]{3}$/.test(code) || /^[A-F0-9]{36}$/.test(code))) throw new BadRequestException('Enter the six character restaurant code, for example ABC123.');
+    const found = await this.pool.query("SELECT trading_name,display_code FROM restaurant_merchants WHERE (upper(qr_code)=$1 OR upper(display_code)=$1) AND status='ACTIVE'", [code]);
+    if (!found.rows[0]) throw new NotFoundException('Restaurant code not found or not active.');
+    return { tradingName: found.rows[0].trading_name, displayCode: found.rows[0].display_code };
+  }
+
   async create(userId: string, input: BillInput) {
     const merchant = String(input.merchant ?? '').trim().slice(0, 80);
     const reference = String(input.reference ?? '').trim().slice(0, 40);
     const items = input.items;
-    if (!merchant || !reference || !Number.isSafeInteger(input.totalCents) || input.totalCents < 100 || input.totalCents > 100000000 || !Array.isArray(items) || !items.length || items.length > 35) throw new BadRequestException('Check the bill details and items.');
+    if (!merchant || !reference || !input.merchantCode || !Number.isSafeInteger(input.totalCents) || input.totalCents < 100 || input.totalCents > 100000000 || !Array.isArray(items) || !items.length || items.length > 35) throw new BadRequestException('Check the restaurant code, bill details and items.');
     const normalized = items.map(item => ({ label: String(item.label ?? '').trim().slice(0, 70), cents: Number(item.cents) }));
     if (normalized.some(item => !item.label || !Number.isSafeInteger(item.cents) || item.cents < 1) || normalized.reduce((sum, item) => sum + item.cents, 0) !== input.totalCents) throw new BadRequestException('Items must add up to the bill total.');
     const id = randomUUID(), token = randomBytes(32).toString('hex');
     let approvedMerchant: { id: string; trading_name: string } | null = null;
     if (input.merchantCode) {
-      const code = String(input.merchantCode);
-      if (!/^[a-zA-Z0-9-]{16,100}$/.test(code)) throw new BadRequestException('Invalid restaurant QR code.');
-      const approved = await this.pool.query("SELECT id,trading_name FROM restaurant_merchants WHERE qr_code=$1 AND status='ACTIVE' AND settlement_reference IS NOT NULL", [code]);
+      const code = String(input.merchantCode).trim().toUpperCase();
+      if (!(/^[A-Z]{3}[0-9]{3}$/.test(code) || /^[A-F0-9]{36}$/.test(code))) throw new BadRequestException('Invalid restaurant code.');
+      const approved = await this.pool.query("SELECT id,trading_name FROM restaurant_merchants WHERE (upper(qr_code)=$1 OR upper(display_code)=$1) AND status='ACTIVE'", [code]);
       if (!approved.rows[0]) throw new BadRequestException('This restaurant QR is not active.');
       approvedMerchant = approved.rows[0];
     }
@@ -46,7 +54,7 @@ export class RestaurantService {
 
   async view(token: string) {
     if (!/^[a-f0-9]{64}$/.test(token)) throw new NotFoundException('Bill not found.');
-    const bill = await this.pool.query('SELECT b.id,b.merchant_name,b.bill_reference,b.total_cents,b.status,b.created_at,b.original_storage_key IS NOT NULL AS has_original,m.status AS merchant_status,m.settlement_reference IS NOT NULL AS settlement_configured FROM restaurant_bills b LEFT JOIN restaurant_merchants m ON m.id=b.merchant_id WHERE b.share_token=$1 AND b.expires_at>now()', [token]);
+    const bill = await this.pool.query('SELECT b.id,b.merchant_name,b.bill_reference,b.total_cents,b.status,b.created_at,b.original_storage_key IS NOT NULL AS has_original,m.status AS merchant_status,(m.settlement_reference IS NOT NULL AND m.bank_recipient_token IS NOT NULL) AS settlement_configured FROM restaurant_bills b LEFT JOIN restaurant_merchants m ON m.id=b.merchant_id WHERE b.share_token=$1 AND b.expires_at>now()', [token]);
     if (!bill.rows[0]) throw new NotFoundException('Bill not found.');
     const items = await this.pool.query(`SELECT i.id,i.label,i.amount_cents,i.status,i.claimed_by,u.first_name AS claimed_name FROM restaurant_bill_items i LEFT JOIN users u ON u.id=i.claimed_by WHERE i.bill_id=$1 ORDER BY i.position`, [bill.rows[0].id]);
     const { id, merchant_status, settlement_configured, ...publicBill } = bill.rows[0];
@@ -94,9 +102,9 @@ export class RestaurantService {
     try {
       await db.query('BEGIN');
       if (process.env.RESTAURANT_WALLET_PAYMENTS_ENABLED !== 'true') throw new ForbiddenException('Restaurant wallet payments are not activated.');
-      const bill = await db.query(`SELECT b.id,b.status,b.merchant_id,b.merchant_name,b.bill_reference,b.original_storage_key,m.status AS merchant_status,m.settlement_reference FROM restaurant_bills b LEFT JOIN restaurant_merchants m ON m.id=b.merchant_id WHERE b.share_token=$1 AND b.expires_at>now() FOR UPDATE OF b`, [token]);
+      const bill = await db.query(`SELECT b.id,b.status,b.merchant_id,b.merchant_name,b.bill_reference,b.original_storage_key,m.status AS merchant_status,m.settlement_reference,m.bank_recipient_token FROM restaurant_bills b LEFT JOIN restaurant_merchants m ON m.id=b.merchant_id WHERE b.share_token=$1 AND b.expires_at>now() FOR UPDATE OF b`, [token]);
       if (!bill.rows[0]) throw new NotFoundException('Bill not found.');
-      if (!bill.rows[0].merchant_id || bill.rows[0].merchant_status !== 'ACTIVE' || !bill.rows[0].settlement_reference) throw new ForbiddenException('This restaurant is not ready for wallet payments.');
+      if (!bill.rows[0].merchant_id || bill.rows[0].merchant_status !== 'ACTIVE' || !bill.rows[0].settlement_reference || !bill.rows[0].bank_recipient_token) throw new ForbiddenException('This restaurant is not ready for wallet payments.');
       const prior = await db.query("SELECT id FROM ledger_journals WHERE type='RESTAURANT_WALLET_PAYMENT' AND ref_type='restaurant_bill_payment' AND ref_id=$1 LIMIT 1", [`${bill.rows[0].id}:${userId}:${idempotencyKey}`]);
       if (prior.rows.length) { await db.query('COMMIT'); return this.view(token); }
       if (bill.rows[0].status !== 'OPEN') throw new ConflictException('This bill is closed.');
@@ -151,7 +159,7 @@ export class RestaurantService {
   }
 
   async receipts(userId: string) {
-    const result = await this.pool.query('SELECT id,kind,title,total_cents,digitized_json,original_storage_key IS NOT NULL AS has_original,created_at,emailed_at FROM customer_receipts WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100', [userId]);
+    const result = await this.pool.query('SELECT r.id,r.kind,r.title,r.total_cents,r.digitized_json,r.original_storage_key IS NOT NULL AS has_original,r.created_at,r.emailed_at,b.status AS merchant_settlement_status FROM customer_receipts r LEFT JOIN restaurant_bills b ON b.id=r.bill_id WHERE r.user_id=$1 ORDER BY r.created_at DESC LIMIT 100', [userId]);
     return result.rows;
   }
 
