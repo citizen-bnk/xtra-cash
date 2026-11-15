@@ -564,7 +564,7 @@ export const restaurantTips = pgTable('restaurant_tips', {
 }, t => [index('restaurant_tips_waiter_idx').on(t.waiterId, t.createdAt)]);
 export const restaurantBillItems = pgTable('restaurant_bill_items', {
   id: id(), billId: text('bill_id').notNull().references(() => restaurantBills.id, { onDelete: 'cascade' }),
-  label: text('label').notNull(), position: integer('position').notNull(), amountCents: integer('amount_cents').notNull(), claimedBy: text('claimed_by').references(() => users.id),
+  label: text('label').notNull(), position: integer('position').notNull(), amountCents: integer('amount_cents').notNull(), taxCents: integer('tax_cents').notNull().default(0), billTipCents: integer('bill_tip_cents').notNull().default(0), claimedBy: text('claimed_by').references(() => users.id),
   status: text('status').notNull().default('UNCLAIMED'), paymentReference: text('payment_reference'), paidAt: ts('paid_at'), createdAt: createdAt(),
 }, t => [index('restaurant_bill_items_bill_idx').on(t.billId)]);
 export const restaurantBillParticipants = pgTable('restaurant_bill_participants', {

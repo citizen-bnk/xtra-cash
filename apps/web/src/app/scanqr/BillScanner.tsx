@@ -49,7 +49,7 @@ export default function BillScanner({ file, onDone }: { file: File; onDone: (sca
       let parsed: ParsedBill;
       try {
         if (!navigator.onLine) {
-          onDone(new File([blob], 'scanned-bill.jpg', { type: 'image/jpeg' }), { merchant: '', reference: '', totalCents: 0, items: [], warnings: [] });
+          onDone(new File([blob], 'scanned-bill.jpg', { type: 'image/jpeg' }), { merchant: '', reference: '', totalCents: 0, items: [], warnings: [], taxCents: 0, taxIncluded: true, billTipCents: 0 });
           return;
         }
         const { createWorker } = await import('tesseract.js');

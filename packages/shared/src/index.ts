@@ -8,3 +8,4 @@ export * from './client';
 export * from './payday';
 
 export * from './restaurant-qr';
+export * from './restaurant-split';

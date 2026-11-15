@@ -7,7 +7,7 @@ import {
   Download, FileText, Fingerprint, ImagePlus, Landmark, LockKeyhole, PenLine,
   ReceiptText, RotateCcw, ScanLine, ShieldCheck, Utensils, Wallet, Share2, Plus, Trash2,
 } from 'lucide-react';
-import { ApiError, printedRestaurantCode, restaurantQrCode } from '@xtra/shared';
+import { ApiError, printedRestaurantCode, restaurantQrCode, splitCharge } from '@xtra/shared';
 import BillScanner from './BillScanner';
 import RestaurantQrScanner from './RestaurantQrScanner';
 import type { BillItem, ParsedBill } from './billScan';
@@ -17,7 +17,11 @@ import { useAuth } from '@xtra/ui';
 type Stage = 'start' | 'capture' | 'adjust' | 'bill' | 'split' | 'identity' | 'offer' | 'link' | 'terms' | 'sign' | 'pay' | 'receipt';
 type Repayment = 'card' | 'bank';
 const DRAFT_KEY = 'xc.restaurant.draft';
-type BillDraft = { merchant: string; bill: string; amount: string; items: BillItem[]; merchantCode?: string; employeeCode?: string; photo?: string };
+type Charges = { vat: string; included: boolean; gratuity: string };
+const noCharges: Charges = { vat: '', included: true, gratuity: '' };
+const toCents = (value: string) => /^\d{1,6}(?:[.,]\d{1,2})?$/.test(value.trim())
+  ? Math.round(Number(value.trim().replace(',', '.')) * 100) : 0;
+type BillDraft = { merchant: string; bill: string; amount: string; items: BillItem[]; merchantCode?: string; employeeCode?: string; photo?: string; charges?: Charges };
 
 const stages: Stage[] = ['start', 'capture', 'adjust', 'bill', 'split', 'identity', 'offer', 'link', 'terms', 'sign', 'pay', 'receipt'];
 const sample = { merchant: 'The Ember Table', bill: 'ET-1048', amount: '680.00' };
@@ -105,6 +109,7 @@ export default function ScanCheckout() {
   const [bill, setBill] = useState('');
   const [amount, setAmount] = useState('');
   const [items, setItems] = useState<BillItem[]>([]);
+  const [charges, setCharges] = useState<Charges>(noCharges);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [sharedSnapshot, setSharedSnapshot] = useState(false);
@@ -152,6 +157,7 @@ export default function ScanCheckout() {
     const sameRestaurant = !incomingCode || (draft?.merchantCode?.toUpperCase() === incomingCode.toUpperCase() && (draft?.employeeCode ?? '') === incomingEmployee);
     if (!table && !params.has('bill') && draft && sameRestaurant && Array.isArray(draft.items)) {
       setMerchant(draft.merchant); setBill(draft.bill); setAmount(draft.amount); setItems(draft.items);
+      setCharges(draft.charges ?? noCharges);
       if (draft.photo?.startsWith('data:image/jpeg;base64,')) {
         try {
           const bytes = Uint8Array.from(atob(draft.photo.split(',')[1]), char => char.charCodeAt(0));
@@ -207,7 +213,7 @@ export default function ScanCheckout() {
   useEffect(() => {
     if (restored && stage === 'bill' && !usingSample && !liveToken) saveDraft();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restored, stage, usingSample, liveToken, merchant, bill, amount, items, merchantCode, employeeCode, draftPhoto]);
+  }, [restored, stage, usingSample, liveToken, merchant, bill, amount, items, merchantCode, employeeCode, draftPhoto, charges]);
 
   useEffect(() => {
     const encoded = new URLSearchParams(window.location.search).get('bill');
@@ -217,7 +223,7 @@ export default function ScanCheckout() {
       if (parsed.v !== 1 || !Array.isArray(parsed.items) || parsed.items.length > 35 || !Number.isSafeInteger(parsed.amount)) return;
       const safeItems = parsed.items.filter(item => typeof item.id === 'string' && typeof item.label === 'string' && Number.isSafeInteger(item.cents) && item.cents > 0).map(item => ({ id: item.id.slice(0, 50), label: item.label.slice(0, 70), cents: item.cents }));
       setMerchant(String(parsed.merchant).slice(0, 80)); setBill(String(parsed.bill).slice(0, 40)); setAmount((parsed.amount / 100).toFixed(2));
-      setItems(safeItems); setSelectedIds([]); setSplitEnabled(true); setSharedSnapshot(true); setStage('split');
+      setItems(safeItems); setCharges({ vat: '', included: true, gratuity: '' }); setSelectedIds([]); setSplitEnabled(true); setSharedSnapshot(true); setStage('split');
       setShareReturnPath(`/scanqr/?bill=${encodeURIComponent(encoded)}`);
     } catch { /* Invalid shared preview links open the normal scan flow. */ }
   }, []);
@@ -237,7 +243,17 @@ export default function ScanCheckout() {
 
   const validAmount = /^\d{1,6}(?:[.,]\d{1,2})?$/.test(amount.trim());
   const total = validAmount ? Math.round(Number(amount.trim().replace(',', '.')) * 100) : 0;
-  const selectedTotal = items.filter(item => selectedIds.includes(item.id)).reduce((sum, item) => sum + item.cents, 0);
+  const taxCents = toCents(charges.vat);
+  const billTipCents = toCents(charges.gratuity);
+  const itemSubtotal = items.reduce((sum, item) => sum + item.cents, 0);
+  const reconciledTotal = itemSubtotal + (charges.included ? 0 : taxCents) + billTipCents;
+  const reconciled = reconciledTotal === total && (!charges.included || taxCents <= itemSubtotal)
+    && [charges.vat, charges.gratuity].every(value => !value.trim() || /^\d{1,6}(?:[.,]\d{1,2})?$/.test(value.trim()));
+  const weights = items.map(item => item.cents);
+  const taxShares = splitCharge(weights, charges.included ? 0 : taxCents);
+  const tipShares = splitCharge(weights, billTipCents);
+  const selectedTotal = items.reduce((sum, item, index) =>
+    selectedIds.includes(item.id) ? sum + item.cents + taxShares[index] + tipShares[index] : sum, 0);
   const checkoutTotal = splitEnabled ? selectedTotal : total;
   const unclaimedTotal = Math.max(0, total - selectedTotal);
   const advance = finance ? Math.floor(checkoutTotal * .75) : 0;
@@ -312,7 +328,7 @@ export default function ScanCheckout() {
     setMerchant('');
     setMerchantCode(''); setMerchantVerified(false); setVerifiedMerchantName('');
     setBill('');
-    setAmount('');
+    setAmount(''); setCharges(noCharges);
     setItems([]); setSelectedIds([]); setSplitEnabled(false); setSharedSnapshot(false); setScanWarnings([]); setShareNotice(''); setShareReturnPath('/scanqr/');
     setFinance(true);
     go('start');
@@ -333,7 +349,7 @@ export default function ScanCheckout() {
     setUsingSample(true);
     setMerchant(sample.merchant);
     setBill(sample.bill);
-    setAmount(sample.amount);
+    setAmount(sample.amount); setCharges(noCharges);
     setItems(sampleItems); setSelectedIds([]); setSplitEnabled(false); setSharedSnapshot(false); setScanWarnings([]);
     go('bill');
   }
@@ -355,7 +371,7 @@ export default function ScanCheckout() {
     setUsingSample(false);
     setMerchant(verifiedMerchantName);
     setBill('');
-    setAmount('');
+    setAmount(''); setCharges(noCharges);
     setItems([]); setSelectedIds([]); setSplitEnabled(false); setSharedSnapshot(false); setScanWarnings([]);
     go('adjust');
   }
@@ -367,7 +383,7 @@ export default function ScanCheckout() {
     setUsingSample(false);
     setMerchant(verifiedMerchantName);
     setBill('');
-    setAmount('');
+    setAmount(''); setCharges(noCharges);
     setItems([]); setSelectedIds([]); setSplitEnabled(false); setSharedSnapshot(false); setScanWarnings([]);
     go('bill');
   }
@@ -385,6 +401,8 @@ export default function ScanCheckout() {
     setBill(parsed.reference);
     setAmount(parsed.totalCents ? (parsed.totalCents / 100).toFixed(2) : '');
     setItems(parsed.items);
+    setCharges({ vat: parsed.taxCents ? (parsed.taxCents / 100).toFixed(2) : '',
+      included: parsed.taxIncluded, gratuity: parsed.billTipCents ? (parsed.billTipCents / 100).toFixed(2) : '' });
     setScanWarnings(parsed.warnings);
     go('bill');
   }
@@ -411,7 +429,7 @@ export default function ScanCheckout() {
   }
 
   function saveDraft() {
-    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ merchant, bill, amount, items, merchantCode, employeeCode, photo: draftPhoto })); }
+    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ merchant, bill, amount, items, merchantCode, employeeCode, photo: draftPhoto, charges })); }
     catch { /* The current draft remains in memory if storage is full. */ }
   }
 
@@ -420,10 +438,10 @@ export default function ScanCheckout() {
   }
 
   async function startLiveBill() {
-    if (previewOnly || !navigator.onLine || !me?.roles.includes('CONSUMER') || creatingLive || !merchantVerified || !merchant.trim() || !bill.trim() || total < 100 || items.length < 1 || items.reduce((sum, item) => sum + item.cents, 0) !== total) return;
+    if (previewOnly || !navigator.onLine || !me?.roles.includes('CONSUMER') || creatingLive || !merchantVerified || !merchant.trim() || !bill.trim() || total < 100 || items.length < 1 || !reconciled) return;
     setCreatingLive(true); setError('');
     try {
-      const created = await client.request<{ shareToken: string }>('POST', '/restaurant-bills', { merchant, merchantCode: merchantCode || undefined, employeeCode: employeeCode || undefined, reference: bill, totalCents: total, items: items.map(item => ({ label: item.label, cents: item.cents })) });
+      const created = await client.request<{ shareToken: string }>('POST', '/restaurant-bills', { merchant, merchantCode: merchantCode || undefined, employeeCode: employeeCode || undefined, reference: bill, totalCents: total, taxCents, taxIncluded: charges.included, billTipCents, items: items.map(item => ({ label: item.label, cents: item.cents })) });
       if (originalBill) {
         const form = new FormData(); form.append('file', originalBill);
         try { await client.request('POST', `/restaurant-bills/${created.shareToken}/original`, form); }
@@ -552,17 +570,25 @@ export default function ScanCheckout() {
             </div>
             {previewOnly && <p className="sq-note">This restaurant is still being set up. You can test the scanner and bill details here.</p>}
             {scanWarnings.length > 0 && <div className="sq-note" role="status">{scanWarnings.map(warning => <p key={warning}>{warning}</p>)}</div>}
+            <details className="sq-doc" open={taxCents > 0 || billTipCents > 0}>
+              <summary>VAT and printed gratuity</summary>
+              <div className="sq-fields">
+                <label>VAT on receipt<input inputMode="decimal" value={charges.vat} onChange={e => setCharges(value => ({ ...value, vat: e.target.value }))} placeholder="0.00" /></label>
+                <label className="sq-checkbox"><input type="checkbox" checked={charges.included} onChange={e => setCharges(value => ({ ...value, included: e.target.checked }))} /> VAT is included in item prices</label>
+                <label>Gratuity or service charge on receipt<input inputMode="decimal" value={charges.gratuity} onChange={e => setCharges(value => ({ ...value, gratuity: e.target.value }))} placeholder="0.00" /></label>
+              </div>
+            </details>
             <div className="sq-card sq-items"><div className="sq-row"><strong>Items on bill</strong><span>{items.length} found</span></div>{items.map(item => <div className="sq-row" key={item.id}><span>{item.label}</span><strong>{money(item.cents)}</strong><button type="button" className="sq-icon-button" aria-label={`Remove ${item.label}`} onClick={() => setItems(current => current.filter(row => row.id !== item.id))}><Trash2 size={14} /></button></div>)}</div>
             <div className="sq-add-item"><input aria-label="Item name" placeholder="Add missing item" value={newItem} onChange={e => setNewItem(e.target.value)} /><input aria-label="Item amount in rand" inputMode="decimal" placeholder="R amount" value={newItemAmount} onChange={e => setNewItemAmount(e.target.value)} /><button type="button" aria-label="Add item" onClick={addItem}><Plus size={18} /></button></div>
-            {items.length > 0 && total > 0 && items.reduce((sum, item) => sum + item.cents, 0) !== total && <p className="sq-note">Items add to {money(items.reduce((sum, item) => sum + item.cents, 0))}; bill total is {money(total)}. Correct missing items, tax or tip before splitting.</p>}
+            {items.length > 0 && total > 0 && !reconciled && <p className="sq-note">Items and charges add to {money(reconciledTotal)}. Check the receipt total {money(total)} before splitting.</p>}
             {!usingSample && <p className="sq-note">OCR may misread photos. Check every amount against the original bill.</p>}
             {error && <p className="sq-error" role="alert">{error}</p>}
-            {usingSample && <button className="sq-primary" disabled={!merchant.trim() || !bill.trim() || total < 100 || !items.length || items.reduce((sum, item) => sum + item.cents, 0) !== total} onClick={() => { clearApplication(); setSplitEnabled(true); go('split'); }}>Try choosing items <ArrowRight size={19} /></button>}
+            {usingSample && <button className="sq-primary" disabled={!merchant.trim() || !bill.trim() || total < 100 || !items.length || !reconciled} onClick={() => { clearApplication(); setSplitEnabled(true); go('split'); }}>Try choosing items <ArrowRight size={19} /></button>}
             {!usingSample && online && !merchantVerified && <div className="sq-fields">
               <label>Restaurant code<input autoCapitalize="characters" value={merchantCode} maxLength={36} onChange={event => setMerchantCode(event.target.value.toUpperCase())} placeholder="ABC123" /></label>
               <button className="sq-secondary" disabled={checkingMerchant || merchantCode.trim().length < 6} onClick={() => void verifyMerchant()}>{checkingMerchant ? 'Checking…' : 'Find restaurant'}</button>
             </div>}
-            {!usingSample && !previewOnly && online && me?.roles.includes('CONSUMER') && <button className="sq-primary" disabled={creatingLive || !merchantVerified || !bill.trim() || total < 100 || !items.length || items.reduce((sum, item) => sum + item.cents, 0) !== total} onClick={() => void startLiveBill()}><Share2 size={17} /> {creatingLive ? 'Creating shared bill…' : 'Start live shared bill'}</button>}
+            {!usingSample && !previewOnly && online && me?.roles.includes('CONSUMER') && <button className="sq-primary" disabled={creatingLive || !merchantVerified || !bill.trim() || total < 100 || !items.length || !reconciled} onClick={() => void startLiveBill()}><Share2 size={17} /> {creatingLive ? 'Creating shared bill…' : 'Start live shared bill'}</button>}
             {!usingSample && !previewOnly && online && !authLoading && !me && <a className="sq-primary" href="/login?next=%2Fscanqr%2F%3Frestore%3D1" onClick={saveDraft}>Log in to start a live shared bill</a>}
           </>}
 

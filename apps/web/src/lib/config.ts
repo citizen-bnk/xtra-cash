@@ -6,8 +6,9 @@ export const WEB_URL = (process.env.NEXT_PUBLIC_WEB_URL ?? 'https://xtra-cash.ve
 import type { Me } from '@xtra/shared';
 /** Where a user lands after signing in. */
 export function homeFor(me: Pick<Me, 'roles'>): string {
+  if (me.roles.includes('CONSUMER') || me.roles.includes('ADMIN') || me.roles.includes('SUPER_ADMIN')) return '/app';
   if (me.roles.includes('LENDER')) return '/lender';
-  if (me.roles.includes('CONSUMER')) return '/app';
   if (me.roles.includes('AFFILIATE')) return '/affiliate';
+  if (me.roles.includes('SALES_REP')) return '/team';
   return '/app';
 }

@@ -27,6 +27,8 @@ const tiles: { screen: Screen; label: string; icon: typeof FileText }[] = [
   { screen: 'help', label: 'Help & Support', icon: CircleHelp },
 ];
 
+import { WorkspaceLinks } from '@/components/RoleWorkspace';
+
 export default function ProfilePage() {
   const { me, client, refreshMe, logout } = useAuth();
   const router = useRouter(), toast = useToast();
@@ -94,6 +96,7 @@ export default function ProfilePage() {
         </div>
         <div className="mt-2 flex items-center gap-3">{avatar('h-12 w-12 text-base')}<div><h1 className="text-xl font-black text-white">{screen === 'overview' ? `Hi ${me.firstName || 'there'} 👋` : ({ personal: 'Personal details', documents: 'My documents', security: 'Security', linked: 'Linked accounts', notifications: 'Notifications', help: 'Help & support', logout: 'Log out', saved: 'Profile updated' })[screen]}</h1></div></div>
       </header>
+      {screen === 'overview' && <WorkspaceLinks roles={me.roles} />}
       <div className="mt-5 rounded-[30px] border border-white/80 bg-[linear-gradient(145deg,#fff9ff,#f3e8fb_64%,#fff5ff)] p-4 text-[#1b1030] shadow-[0_0_0_3px_rgba(238,0,255,.35),0_12px_28px_rgba(33,0,55,.27)] sm:p-6">
         {screen === 'overview' && <><div className="mb-3 flex items-center justify-end"><button type="button" onClick={() => open('personal')} className="inline-flex items-center gap-2 rounded-full border-2 border-[#9000d2] px-4 py-2 text-sm font-bold text-[#6900a7]"><Pencil className="h-4 w-4" /> Edit Profile</button></div>{detail('Full Name', name, UserRound)}{detail('Mobile Number', me.phone || 'Not added', Phone)}{detail('Email', me.email || 'Not added', Mail)}{detail('Address', profile.data?.address || 'Not added', MapPin)}{detail('ID Number', identity ? `••••••••${identity.slice(-4)}` : 'Not added', IdCard)}</>}
         {screen === 'personal' && <><div className="flex items-center justify-between gap-2"><div><h2 className="text-xl font-black">Personal Details</h2><p className="text-xs text-muted">Keep your information up to date.</p></div><button type="button" onClick={() => void saveName()} disabled={busy} className={`rounded-full px-4 py-2 text-sm font-bold ${gradient}`}>{busy ? 'Saving…' : 'Save Changes'}</button></div><div className="my-5 flex flex-col items-center">{avatar('h-28 w-28 text-3xl')}<button type="button" onClick={() => setPhotoOpen(!photoOpen)} aria-expanded={photoOpen} className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#9000d2] px-4 py-1.5 text-sm font-bold text-[#6900a7]"><Camera className="h-4 w-4" /> Change Photo</button>{photoOpen && <PhotoCrop onSave={async blob => {

@@ -1,4 +1,4 @@
-import { restaurantQrCode } from '@xtra/shared';
+import { restaurantQrCode, splitCharge } from '@xtra/shared';
 import { randomBytes, randomUUID } from 'crypto';
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
@@ -7,7 +7,7 @@ import { FILE_STORAGE } from '../integrations/integrations.module';
 import type { FileStorage } from '../integrations/storage';
 
 type ItemInput = { label: string; cents: number };
-type BillInput = { merchant: string; merchantCode?: string; employeeCode?: string; reference: string; totalCents: number; items: ItemInput[] };
+export type BillInput = { merchant: string; merchantCode?: string; employeeCode?: string; reference: string; totalCents: number; items: ItemInput[]; taxCents?: number; taxIncluded?: boolean; billTipCents?: number };
 
 @Injectable()
 export class RestaurantService {
@@ -35,7 +35,17 @@ export class RestaurantService {
     const items = input.items;
     if (!merchant || !reference || !input.merchantCode || !Number.isSafeInteger(input.totalCents) || input.totalCents < 100 || input.totalCents > 100000000 || !Array.isArray(items) || !items.length || items.length > 35) throw new BadRequestException('Check the restaurant code, bill details and items.');
     const normalized = items.map(item => ({ label: String(item.label ?? '').trim().slice(0, 70), cents: Number(item.cents) }));
-    if (normalized.some(item => !item.label || !Number.isSafeInteger(item.cents) || item.cents < 1) || normalized.reduce((sum, item) => sum + item.cents, 0) !== input.totalCents) throw new BadRequestException('Items must add up to the bill total.');
+    const subtotal = normalized.reduce((sum, item) => sum + item.cents, 0);
+    const tax = input.taxCents ?? 0;
+    const billTip = input.billTipCents ?? 0;
+    const included = input.taxIncluded === true;
+    const validCharge = (value: number) => Number.isSafeInteger(value) && value >= 0 && value <= input.totalCents;
+    if (normalized.some(item => !item.label || !Number.isSafeInteger(item.cents) || item.cents < 1)
+      || !validCharge(tax) || !validCharge(billTip) || (included && tax > subtotal)
+      || subtotal + (included ? 0 : tax) + billTip !== input.totalCents)
+      throw new BadRequestException('Items, VAT and printed gratuity must reconcile to the receipt total.');
+    const taxes = splitCharge(normalized.map(item => item.cents), tax);
+    const tips = splitCharge(normalized.map(item => item.cents), billTip);
     const id = randomUUID(), token = randomBytes(32).toString('hex');
     let approvedMerchant: { id: string; trading_name: string } | null = null;
     let waiterId: string | null = null;
@@ -57,7 +67,11 @@ export class RestaurantService {
     try {
       await db.query('BEGIN');
       await db.query('INSERT INTO restaurant_bills(id,share_token,creator_id,merchant_id,waiter_id,merchant_name,bill_reference,total_cents) VALUES($1,$2,$3,$4,$5,$6,$7,$8)', [id, token, userId, approvedMerchant?.id ?? null, waiterId, approvedMerchant?.trading_name ?? merchant, reference, input.totalCents]);
-      for (const [position, item] of normalized.entries()) await db.query('INSERT INTO restaurant_bill_items(id,bill_id,label,position,amount_cents) VALUES($1,$2,$3,$4,$5)', [randomUUID(), id, item.label, position, item.cents]);
+      for (const [position, item] of normalized.entries()) {
+        const amount = item.cents + (included ? 0 : taxes[position]) + tips[position];
+        await db.query('INSERT INTO restaurant_bill_items(id,bill_id,label,position,amount_cents,tax_cents,bill_tip_cents) VALUES($1,$2,$3,$4,$5,$6,$7)',
+          [randomUUID(), id, item.label, position, amount, taxes[position], tips[position]]);
+      }
       await db.query('INSERT INTO restaurant_bill_participants(bill_id,user_id) VALUES($1,$2)', [id, userId]);
       await db.query('COMMIT');
       return this.view(token);
@@ -73,7 +87,7 @@ export class RestaurantService {
     if (!/^[a-f0-9]{64}$/.test(token)) throw new NotFoundException('Bill not found.');
     const bill = await this.pool.query('SELECT b.id,b.merchant_name,b.bill_reference,b.total_cents,b.status,b.created_at,b.original_storage_key IS NOT NULL AS has_original,m.status AS merchant_status,m.tips_enabled,s.status AS waiter_status,s.shift_expires_at,u.first_name AS waiter_name,(m.settlement_reference IS NOT NULL AND m.bank_recipient_token IS NOT NULL) AS settlement_configured FROM restaurant_bills b LEFT JOIN restaurant_merchants m ON m.id=b.merchant_id LEFT JOIN restaurant_staff s ON s.id=b.waiter_id LEFT JOIN users u ON u.id=s.user_id WHERE b.share_token=$1 AND b.expires_at>now()', [token]);
     if (!bill.rows[0]) throw new NotFoundException('Bill not found.');
-    const items = await this.pool.query(`SELECT i.id,i.label,i.amount_cents,i.status,i.claimed_by,u.first_name AS claimed_name FROM restaurant_bill_items i LEFT JOIN users u ON u.id=i.claimed_by WHERE i.bill_id=$1 ORDER BY i.position`, [bill.rows[0].id]);
+    const items = await this.pool.query(`SELECT i.id,i.label,i.amount_cents,i.tax_cents,i.bill_tip_cents,i.status,i.claimed_by,u.first_name AS claimed_name FROM restaurant_bill_items i LEFT JOIN users u ON u.id=i.claimed_by WHERE i.bill_id=$1 ORDER BY i.position`, [bill.rows[0].id]);
     const { id, merchant_status, settlement_configured, waiter_status, shift_expires_at, ...publicBill } = bill.rows[0];
     return { ...publicBill, tips_enabled: !!publicBill.tips_enabled && waiter_status === 'ACTIVE' && new Date(shift_expires_at ?? 0).getTime() > Date.now(), canPayFromWallet: process.env.RESTAURANT_WALLET_PAYMENTS_ENABLED === 'true' && merchant_status === 'ACTIVE' && settlement_configured, items: items.rows, shareToken: token };
   }
@@ -126,11 +140,12 @@ export class RestaurantService {
       const prior = await db.query("SELECT id FROM ledger_journals WHERE type='RESTAURANT_WALLET_PAYMENT' AND ref_type='restaurant_bill_payment' AND ref_id=$1 LIMIT 1", [`${bill.rows[0].id}:${userId}:${idempotencyKey}`]);
       if (prior.rows.length) { await db.query('COMMIT'); return this.view(token); }
       if (bill.rows[0].status !== 'OPEN') throw new ConflictException('This bill is closed.');
-      const selected = await db.query("SELECT id,label,amount_cents FROM restaurant_bill_items WHERE bill_id=$1 AND claimed_by=$2 AND status='CLAIMED' FOR UPDATE", [bill.rows[0].id, userId]);
+      const selected = await db.query("SELECT id,label,amount_cents,tax_cents,bill_tip_cents FROM restaurant_bill_items WHERE bill_id=$1 AND claimed_by=$2 AND status='CLAIMED' FOR UPDATE", [bill.rows[0].id, userId]);
       const amount = selected.rows.reduce((sum, row) => sum + Number(row.amount_cents), 0);
       if (!amount || !Number.isSafeInteger(amount)) throw new BadRequestException('Claim items before paying.');
       if (tipCents > 0 && (!bill.rows[0].tips_enabled || !bill.rows[0].waiter_id || bill.rows[0].waiter_status !== 'ACTIVE' || new Date(bill.rows[0].shift_expires_at ?? 0).getTime() <= Date.now() || bill.rows[0].waiter_user_id === userId)) throw new ForbiddenException('Tips are unavailable for this bill.');
-      if (tipCents > amount) throw new BadRequestException('The tip cannot exceed your bill share.');
+      const printedTip = selected.rows.reduce((sum, row) => sum + row.bill_tip_cents, 0);
+      if (tipCents > amount - printedTip) throw new BadRequestException('The extra tip cannot exceed the picked items and VAT.');
       const debit = await db.query('UPDATE users SET wallet_balance_cents=wallet_balance_cents-$1 WHERE id=$2 AND wallet_balance_cents >= $1 RETURNING wallet_balance_cents', [amount + tipCents, userId]);
       if (!debit.rows.length) throw new ConflictException('Not enough money in your XTRA-CASH wallet.');
       const journalId = randomUUID();
@@ -143,7 +158,10 @@ export class RestaurantService {
       }
       const itemIds = selected.rows.map(row => row.id);
       await db.query("UPDATE restaurant_bill_items SET status='PAID',paid_at=now(),payment_reference=$1 WHERE bill_id=$2 AND id=ANY($3::text[])", [journalId, bill.rows[0].id, itemIds]);
-      const digitized = { merchant: bill.rows[0].merchant_name, reference: bill.rows[0].bill_reference, items: selected.rows.map(row => ({ label: row.label, cents: row.amount_cents })), tipCents, walletJournalId: journalId, merchantSettlement: 'PENDING' };
+      const digitized = { merchant: bill.rows[0].merchant_name, reference: bill.rows[0].bill_reference,
+        items: selected.rows.map(row => ({ label: row.label, cents: row.amount_cents, taxCents: row.tax_cents, billTipCents: row.bill_tip_cents })),
+        taxCents: selected.rows.reduce((sum, row) => sum + row.tax_cents, 0), billTipCents: printedTip,
+        tipCents, walletJournalId: journalId, merchantSettlement: 'PENDING' };
       await db.query("INSERT INTO customer_receipts(id,user_id,bill_id,kind,title,original_storage_key,digitized_json,total_cents) VALUES($1,$2,$3,'RESTAURANT_SHARE',$4,$5,$6,$7)", [randomUUID(), userId, bill.rows[0].id, `${bill.rows[0].merchant_name} · ${bill.rows[0].bill_reference}`, bill.rows[0].original_storage_key, digitized, amount + tipCents]);
       const remaining = await db.query("SELECT count(*)::int AS count FROM restaurant_bill_items WHERE bill_id=$1 AND status<>'PAID'", [bill.rows[0].id]);
       if (remaining.rows[0].count === 0) {

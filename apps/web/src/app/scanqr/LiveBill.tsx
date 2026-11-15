@@ -5,13 +5,20 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@xtra/ui';
 import { ArrowLeft, CircleCheck, Clock3, LockKeyhole, Share2, Wallet } from 'lucide-react';
 
-type LiveItem = { id: string; label: string; amount_cents: number; status: 'UNCLAIMED' | 'CLAIMED' | 'PAYMENT_PENDING' | 'PAID'; claimed_by: string | null; claimed_name: string | null };
+type LiveItem = { id: string; label: string; amount_cents: number; tax_cents: number; bill_tip_cents: number; status: 'UNCLAIMED' | 'CLAIMED' | 'PAYMENT_PENDING' | 'PAID'; claimed_by: string | null; claimed_name: string | null };
 type LiveData = { merchant_name: string; bill_reference: string; total_cents: number; status: 'OPEN' | 'FUNDED' | 'SETTLED' | 'CANCELLED'; canPayFromWallet: boolean; tips_enabled: boolean; waiter_name: string | null; has_original: boolean; items: LiveItem[]; shareToken: string };
 const money = (cents: number) => `R${(cents / 100).toFixed(2)}`;
 
 export default function LiveBill({ token, onBack }: { token: string; onBack: () => void }) {
   const { client, me, loading } = useAuth();
-  const [loanOpen, setLoanOpen] = useState(false);
+  const [funding, setFunding] = useState<'wallet' | 'loan' | null>(null);
+  useEffect(() => {
+    if (!me?.id) return;
+    const key = 'xc.checkout.' + me.id + '.' + token;
+    try {
+      if (sessionStorage.getItem(key + '.offer') || sessionStorage.getItem(key + '.application')) setFunding('loan');
+    } catch { /* Optional session memory. */ }
+  }, [me?.id, token]);
   const [online, setOnline] = useState(true);
   const [bill, setBill] = useState<LiveData | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -20,7 +27,7 @@ export default function LiveBill({ token, onBack }: { token: string; onBack: () 
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [tipMode, setTipMode] = useState<'percent' | 'amount'>('percent');
-  const [tipPercent, setTipPercent] = useState('10');
+  const [tipOverride, setTipPercent] = useState<string | null>(null);
   const [tipAmount, setTipAmount] = useState('0.00');
   const refresh = useCallback(async () => {
     const latest = await client.request<LiveData>('GET', `/restaurant-bills/${token}`);
@@ -44,8 +51,12 @@ export default function LiveBill({ token, onBack }: { token: string; onBack: () 
 
   const mine = bill?.items.filter(item => item.claimed_by === me?.id && item.status === 'CLAIMED') ?? [];
   const myTotal = mine.reduce((sum, item) => sum + item.amount_cents, 0);
-  const tipCents = bill?.tips_enabled && myTotal > 0 ? tipMode === 'percent' ? Math.round(myTotal * (Number(tipPercent) || 0) / 100) : Math.round((Number(tipAmount) || 0) * 100) : 0;
-  const tipValid = Number.isSafeInteger(tipCents) && tipCents >= 0 && tipCents <= myTotal;
+  const tax = mine.reduce((sum, item) => sum + (item.tax_cents ?? 0), 0);
+  const printedTip = mine.reduce((sum, item) => sum + (item.bill_tip_cents ?? 0), 0);
+  const tipBase = myTotal - printedTip;
+  const tipPercent = tipOverride ?? (printedTip > 0 ? '0' : '10');
+  const tipCents = bill?.tips_enabled && myTotal > 0 ? tipMode === 'percent' ? Math.round(tipBase * (Number(tipPercent) || 0) / 100) : Math.round((Number(tipAmount) || 0) * 100) : 0;
+  const tipValid = Number.isSafeInteger(tipCents) && tipCents >= 0 && tipCents <= tipBase;
   const paymentTotal = myTotal + (tipValid ? tipCents : 0);
   const paidTotal = bill?.items.filter(item => item.status === 'PAID').reduce((sum, item) => sum + item.amount_cents, 0) ?? 0;
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/scanqr/?table=${token}` : '';
@@ -85,11 +96,24 @@ export default function LiveBill({ token, onBack }: { token: string; onBack: () 
         {selected.length > 0 && <button className="sq-primary" disabled={!online || busy || !me} onClick={() => void act(() => client.request('POST', `/restaurant-bills/${token}/claim`, { itemIds: selected }))}>Claim {selected.length} item{selected.length === 1 ? '' : 's'}</button>}
         {!loading && !me && <div className="sq-notice"><LockKeyhole size={19} /><span><strong>Sign in to claim and pay</strong><small>Your items and wallet payment will be linked to your account.</small></span></div>}
         {!loading && !me && <div className="sq-text-row"><a className="sq-secondary" href={`/register?next=${encodeURIComponent(`/scanqr/?table=${token}`)}`}>Create account</a><a className="sq-secondary" href={`/login?next=${encodeURIComponent(`/scanqr/?table=${token}`)}`}>Log in</a></div>}
-        {bill.tips_enabled && myTotal > 0 && <div className="sq-card sq-schedule"><strong>Tip {bill.waiter_name ?? 'your waiter'} (optional)</strong><div className="sq-text-row"><button type="button" className="sq-secondary" onClick={() => { setTipMode('percent'); setTipPercent('0'); }}>No tip</button><button type="button" className="sq-secondary" onClick={() => { setTipMode('percent'); setTipPercent('10'); }}>10%</button><button type="button" className="sq-secondary" onClick={() => { setTipMode('percent'); setTipPercent('15'); }}>15%</button></div><div className="sq-text-row"><label>Percentage<input className="w-24 rounded-lg border p-2" type="number" min="0" max="100" step="0.1" value={tipMode === 'percent' ? tipPercent : myTotal ? (tipCents / myTotal * 100).toFixed(1) : '0'} onChange={e => { setTipMode('percent'); setTipPercent(e.target.value); }} />%</label><label>Amount<input className="w-28 rounded-lg border p-2" type="number" min="0" max={myTotal / 100} step="0.01" value={tipMode === 'amount' ? tipAmount : (tipCents / 100).toFixed(2)} onChange={e => { setTipMode('amount'); setTipAmount(e.target.value); }} /></label></div><p>{tipValid ? `${money(tipCents)} tip · ${myTotal ? (tipCents / myTotal * 100).toFixed(1) : '0'}%` : 'Tip cannot exceed your selected items.'}</p></div>}
-        {me?.roles.includes('CONSUMER') && <div className="sq-card sq-schedule"><div className="sq-row"><span>Your claimed items</span><strong>{money(myTotal)}</strong></div>{tipCents > 0 && tipValid && <div className="sq-row"><span>Waiter tip</span><strong>{money(tipCents)}</strong></div>}<div className="sq-row"><span>XTRA-CASH wallet</span><strong>{wallet === null ? 'Loading…' : money(wallet)}</strong></div></div>}
-        {myTotal > 0 && wallet !== null && wallet < paymentTotal && <div className="sq-notice"><Wallet size={20} /><span><strong>Top up your wallet first</strong><small>You need {money(paymentTotal - wallet)} more. Wallet top-up collection is awaiting activation; a funded loan can also add money after approval.</small></span></div>}
-        {myTotal > 0 && wallet !== null && wallet < paymentTotal && <div className="sq-text-row"><a className="sq-secondary" href="/app/pay">Top up wallet</a><button type="button" className="sq-secondary" onClick={() => setLoanOpen(true)}>Use a personal loan</button></div>}
-        {loanOpen && wallet !== null && <PersonalLoanCheckout tableToken={token} shortfall={Math.max(0,paymentTotal-wallet)} onClose={() => setLoanOpen(false)} />}
+        {bill.tips_enabled && myTotal > 0 && <div className="sq-card sq-schedule"><strong>Extra tip for {bill.waiter_name ?? 'your waiter'} (optional)</strong><div className="sq-text-row"><button type="button" className="sq-secondary" onClick={() => { setTipMode('percent'); setTipPercent('0'); }}>No tip</button><button type="button" className="sq-secondary" onClick={() => { setTipMode('percent'); setTipPercent('10'); }}>10%</button><button type="button" className="sq-secondary" onClick={() => { setTipMode('percent'); setTipPercent('15'); }}>15%</button></div><div className="sq-text-row"><label>Percentage<input className="w-24 rounded-lg border p-2" type="number" min="0" max="100" step="0.1" value={tipMode === 'percent' ? tipPercent : tipBase ? (tipCents / tipBase * 100).toFixed(1) : '0'} onChange={e => { setTipMode('percent'); setTipPercent(e.target.value); }} />%</label><label>Amount<input className="w-28 rounded-lg border p-2" type="number" min="0" max={tipBase / 100} step="0.01" value={tipMode === 'amount' ? tipAmount : (tipCents / 100).toFixed(2)} onChange={e => { setTipMode('amount'); setTipAmount(e.target.value); }} /></label></div><p>{tipValid ? `${money(tipCents)} tip · ${tipBase ? (tipCents / tipBase * 100).toFixed(1) : '0'}%` : 'Tip cannot exceed your selected items.'}</p></div>}
+        {me?.roles.includes('CONSUMER') && <div className="sq-card sq-schedule"><div className="sq-row"><span>Your picked items</span><strong>{money(myTotal - tax - printedTip)}</strong></div>{tax > 0 && <div className="sq-row"><span>Your VAT</span><strong>{money(tax)}</strong></div>}{printedTip > 0 && <div className="sq-row"><span>Your printed gratuity</span><strong>{money(printedTip)}</strong></div>}{tipCents > 0 && tipValid && <div className="sq-row"><span>Waiter tip</span><strong>{money(tipCents)}</strong></div>}<div className="sq-row"><span>XTRA-CASH wallet</span><strong>{wallet === null ? 'Loading…' : money(wallet)}</strong></div></div>}
+        {bill.canPayFromWallet && myTotal > 0 && wallet !== null && wallet < paymentTotal && !funding && <section className="sq-card sq-schedule">
+          <div className="sq-row"><strong>Wallet shortfall</strong><strong>{money(paymentTotal - wallet)}</strong></div>
+          <div className="sq-text-row">
+            <button type="button" className="sq-secondary" onClick={() => setFunding('wallet')}>Top up wallet</button>
+            <button type="button" className="sq-secondary" onClick={() => setFunding('loan')}>Use a personal loan</button>
+          </div>
+        </section>}
+        {funding === 'wallet' && <section className="sq-card sq-schedule">
+          <div className="sq-row"><strong>Top up wallet</strong><button className="sq-text-button" onClick={() => setFunding(null)}>Back to bill</button></div>
+          <p className="sq-note">Wallet top-ups await a connected payment service. You can use a personal loan here or return to your bill.</p>
+          <div className="sq-text-row">
+            <button type="button" className="sq-secondary" disabled={busy || !online} onClick={() => void refresh().catch(cause => setError(cause instanceof Error ? cause.message : 'Could not check your wallet.'))}>Check wallet balance</button>
+            <button type="button" className="sq-secondary" onClick={() => setFunding('loan')}>Use a personal loan</button>
+          </div>
+        </section>}
+        {funding === 'loan' && me?.roles.includes('CONSUMER') && wallet !== null && <PersonalLoanCheckout tableToken={token} shortfall={Math.max(0,paymentTotal-wallet)} onClose={() => setFunding(null)} />}
         {myTotal > 0 && <button className="sq-primary" disabled={!online || busy || !tipValid || !bill.canPayFromWallet || wallet === null || wallet < paymentTotal} onClick={() => void act(() => client.request('POST', `/restaurant-bills/${token}/pay-wallet`, { idempotencyKey: crypto.randomUUID(), tipCents }))}><Wallet size={18} /> Pay {money(paymentTotal)} from wallet</button>}
         {mine.length > 0 && <button className="sq-text-button sq-centred" disabled={!online || busy} onClick={() => void act(() => client.request('POST', `/restaurant-bills/${token}/release`, { itemIds: mine.map(item => item.id) }))}>Release my unpaid items</button>}
         <button className="sq-secondary" disabled={!bill.items.some(item => item.status === 'CLAIMED' || item.status === 'PAID') || !bill.items.some(item => item.status === 'UNCLAIMED')} onClick={() => void share()}><Share2 size={17} /> Share remaining items</button>

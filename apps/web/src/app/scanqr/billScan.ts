@@ -1,6 +1,6 @@
 export type Point = { x: number; y: number };
 export type BillItem = { id: string; label: string; cents: number };
-export type ParsedBill = { merchant: string; reference: string; totalCents: number; items: BillItem[]; warnings: string[] };
+export type ParsedBill = { merchant: string; reference: string; totalCents: number; items: BillItem[]; warnings: string[]; taxCents: number; taxIncluded: boolean; billTipCents: number };
 
 const amountAtEnd = /(?:\bR\s*)?(\d{1,5}(?:[ ,.']\d{3})*[.,]\d{2})\s*$/i;
 const centsOf = (value: string) => {
@@ -18,21 +18,30 @@ export function parseBillText(text: string): ParsedBill {
   const totalLine = [...lines].reverse().find(line => /(?:grand\s*total|amount\s*due|balance\s*due|^total\b)/i.test(line) && amountAtEnd.test(line));
   const totalCents = totalLine ? centsOf(totalLine.match(amountAtEnd)![1]) : 0;
   const items = lines.flatMap((line, index) => {
-    if (/\b(total|subtotal|vat|tax|change|cash|balance|discount|tip|service|card|payment|paid)\b/i.test(line)) return [];
+    if (/\b(total|subtotal|vat|tax|change|cash|balance|discount|tip|gratuity|service|card|payment|paid)\b/i.test(line)) return [];
     const match = line.match(amountAtEnd);
     if (!match) return [];
     const cents = centsOf(match[1]);
     const label = line.slice(0, match.index).replace(/^\d+\s*[xX*]\s*/, '').replace(/[.·\s-]+$/, '').trim();
     return cents > 0 && label.length > 1 ? [{ id: `item-${index}`, label: label.slice(0, 70), cents }] : [];
   }).slice(0, 35);
+  const charge = (pattern: RegExp) => {
+    const line = lines.find(value => pattern.test(value) && amountAtEnd.test(value));
+    return line ? centsOf(line.match(amountAtEnd)![1]) : 0;
+  };
+  const subtotal = items.reduce((sum, item) => sum + item.cents, 0);
+  const taxCents = charge(/^(?:vat|tax)\b/i);
+  const printedTip = charge(/^(?:tip|gratuity|service charge)\b/i);
+  const billTipCents = totalCents > subtotal ? printedTip : 0;
+  const taxIncluded = subtotal + billTipCents + taxCents !== totalCents;
   if (!merchant) warnings.push('Restaurant name needs confirmation.');
   if (!reference) warnings.push('Bill reference needs confirmation.');
   if (!totalCents) warnings.push('Total was not read. Enter it from the bill.');
   if (!items.length) warnings.push('Items were not read. Add them manually to split this bill.');
-  if (items.length && totalCents && items.reduce((sum, item) => sum + item.cents, 0) !== totalCents) {
+  if (items.length && totalCents && subtotal + (taxIncluded ? 0 : taxCents) + billTipCents !== totalCents) {
     warnings.push('The scanned items do not match the total. Check charges, discounts and quantities before paying.');
   }
-  return { merchant, reference, totalCents, items, warnings };
+  return { merchant, reference, totalCents, items, warnings, taxCents, taxIncluded, billTipCents };
 }
 
 export function detectCorners(image: ImageData): Point[] {
