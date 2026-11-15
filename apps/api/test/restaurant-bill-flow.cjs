@@ -5,6 +5,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { randomUUID } = require('node:crypto');
 const { PGlite } = require('@electric-sql/pglite');
+const { splitCharge } = require('@xtra/shared');
 const { RestaurantService } = require('../dist/restaurant/restaurant.service');
 const { RestaurantPayoutService } = require('../dist/restaurant/restaurant-payout.service');
 
@@ -16,6 +17,8 @@ async function main() {
     await pg.exec(fs.readFileSync(path.join(__dirname, '../drizzle/0021_restaurant_bills.sql'), 'utf8'));
     await pg.exec(fs.readFileSync(path.join(__dirname, '../drizzle/0022_restaurant_payouts.sql'), 'utf8'));
     await pg.exec(fs.readFileSync(path.join(__dirname, '../drizzle/0023_restaurant_staff_tips.sql'), 'utf8'));
+    await pg.exec(fs.readFileSync(path.join(__dirname, '../drizzle/0034_restaurant_split_charges.sql'), 'utf8'));
+    assert.deepEqual(splitCharge([1000, 1000, 1000], 2), [1, 1, 0]);
     for (const [id, name] of [['diner-a', 'Amina'], ['diner-b', 'Busi'], ['waiter', 'Lebo']])
       await pg.query("INSERT INTO users(id,email,first_name,last_name,roles,referral_code) VALUES($1,$2,$3,'Diner',ARRAY['CONSUMER']::role[],$4)", [id, `${id}@example.test`, name, id]);
     const merchantId = randomUUID(), code = 'A1'.repeat(18), printed = 'TBL123';
@@ -52,10 +55,17 @@ async function main() {
     const shift = await payouts.startShift('waiter');
     await assert.rejects(service.create('diner-a', { merchant: 'Unknown Cafe', reference: 'T-9', totalCents: 10000, items: [{ label: 'Tea', cents: 10000 }] }), /restaurant code/);
     assert.equal((await service.resolveMerchant(printed)).tradingName, 'Table Cafe');
-    const created = await service.create('diner-a', { merchant: 'Ignored OCR name', merchantCode: printed, employeeCode: shift.employee_code, reference: 'T-8', totalCents: 30000, items: [{ label: 'Soup', cents: 10000 }, { label: 'Pizza', cents: 20000 }] });
+    const created = await service.create('diner-a', { merchant: 'Ignored OCR name', merchantCode: printed, employeeCode: shift.employee_code, reference: 'T-8', totalCents: 30000, taxCents: 2500, taxIncluded: true, billTipCents: 3000, items: [{ label: 'Soup', cents: 9000 }, { label: 'Pizza', cents: 18000 }] });
     assert.equal(created.canPayFromWallet, true);
     await assert.rejects(service.create('diner-b', { merchant: 'Table Cafe', merchantCode: code, reference: 'T-8', totalCents: 30000, items: [{ label: 'Soup', cents: 10000 }, { label: 'Pizza', cents: 20000 }] }), /already has a shared table/);
     const soup = created.items.find(item => item.label === 'Soup'), pizza = created.items.find(item => item.label === 'Pizza');
+    assert.deepEqual([soup.amount_cents, soup.tax_cents, soup.bill_tip_cents], [10000, 833, 1000]);
+    assert.deepEqual([pizza.amount_cents, pizza.tax_cents, pizza.bill_tip_cents], [20000, 1667, 2000]);
+    const exclusive = await service.create('diner-a', {
+      merchant: 'Table Cafe', merchantCode: code, reference: 'T-VAT', totalCents: 12100,
+      taxCents: 1100, billTipCents: 1000, items: [{ label: 'A', cents: 4000 }, { label: 'B', cents: 6000 }],
+    });
+    assert.deepEqual(exclusive.items.map(item => item.amount_cents), [4840, 7260]);
     await service.claim(created.shareToken, 'diner-a', [soup.id]);
     await assert.rejects(service.claim(created.shareToken, 'diner-b', [soup.id]), /claimed/);
     await service.claim(created.shareToken, 'diner-b', [pizza.id]);
@@ -76,7 +86,11 @@ async function main() {
     const journals = await pg.query("SELECT journal_id,sum(amount_cents)::int AS sum FROM ledger_entries GROUP BY journal_id");
     assert.equal(journals.rows.length, 2);
     assert.ok(journals.rows.every(row => row.sum === 0));
-    assert.equal((await service.receipts('diner-a')).length, 1);
+    const [receipt] = await service.receipts('diner-a');
+    assert.equal(receipt.total_cents, 11000);
+    assert.equal(receipt.digitized_json.taxCents, 833);
+    assert.equal(receipt.digitized_json.billTipCents, 1000);
+    assert.equal(receipt.digitized_json.tipCents, 1000);
     assert.equal((await service.receipts('diner-b')).length, 1);
     assert.equal((await service.notifications('diner-a')).length, 1);
     assert.equal((await service.notifications('diner-b')).length, 1);

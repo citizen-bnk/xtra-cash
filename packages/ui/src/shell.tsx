@@ -13,6 +13,7 @@ export interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
   exact?: boolean;
+  group?: string;
 }
 
 type LinkLike = React.ComponentType<{ href: string; className?: string; children: React.ReactNode; onClick?: () => void }>;
@@ -54,10 +55,14 @@ export function AppShell({
 }) {
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [expanded, setExpanded] = useState<{ pathname: string; group: string }>();
   const isActive = (n: NavItem) => (n.exact ? pathname === n.href : pathname === n.href || pathname.startsWith(n.href + '/'));
   // Phone tab bar: up to five sections fit; beyond that, four tabs plus "More".
-  const tabs = nav.length <= 5 ? nav : nav.slice(0, 4);
-  const more = nav.length <= 5 ? [] : nav.slice(4);
+  const grouped = nav.some(item => item.group);
+  const groups = [...new Set(nav.flatMap(item => item.group ? [item.group] : []))];
+  const activeGroup = expanded?.pathname === pathname ? expanded.group : nav.find(isActive)?.group;
+  const tabs = grouped ? nav.filter(item => !item.group) : nav.length <= 5 ? nav : nav.slice(0, 4);
+  const more = grouped ? nav.filter(item => item.group) : nav.length <= 5 ? [] : nav.slice(4);
   const moreBadge = more.reduce((sum, n) => sum + (n.badge ?? 0), 0);
   const initials =
     userName
@@ -67,23 +72,43 @@ export function AppShell({
       .map((w) => w[0]?.toUpperCase())
       .join('') || '•';
 
-  const links = (
-    <nav className="flex flex-col gap-0.5">
-      {nav.map((n) => (
+  const renderLinks = (items: NavItem[], mobile: boolean) =>
+      items.map((n) => (
         <Link
           key={n.href}
           href={n.href}
           onClick={() => setOpen(false)}
           className={cx(
             'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition',
-            isActive(n) ? 'bg-brand-orange text-[#1b1030] shadow-sm' : 'text-white/75 hover:bg-white/10 hover:text-white',
+            mobile ? (isActive(n) ? 'bg-brand-soft text-brand-purple' : 'text-ink hover:bg-surface')
+              : (isActive(n) ? 'bg-brand-orange text-[#1b1030] shadow-sm' : 'text-white/90 hover:bg-white/10'),
           )}
         >
-          <n.icon className={cx('h-4 w-4', isActive(n) ? 'text-[#1b1030]' : 'text-white/70')} />
+          <n.icon className="h-4 w-4 shrink-0" />
           <span className="flex-1">{n.label}</span>
           {n.badge ? <span className="rounded-full bg-brand px-1.5 text-xs font-bold text-white">{n.badge}</span> : null}
         </Link>
-      ))}
+      ));
+  const renderGroups = (mobile: boolean) => groups.map(group => {
+    const items = nav.filter(item => item.group === group);
+    const badge = items.reduce((sum, item) => sum + (item.badge ?? 0), 0);
+    const expandedGroup = activeGroup === group;
+    return <div key={group}>
+      <button type="button" aria-expanded={expandedGroup}
+        onClick={() => setExpanded({ pathname, group: expandedGroup ? '' : group })}
+        className={cx('flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold',
+          mobile ? 'text-ink hover:bg-surface' : 'text-white hover:bg-white/10')}>
+        <span className="flex-1">{group}</span>
+        {badge > 0 && <span className="rounded-full bg-brand px-1.5 text-xs font-bold text-white">{badge}</span>}
+        <ChevronDown className={cx('h-4 w-4', expandedGroup && 'rotate-180')} />
+      </button>
+      {expandedGroup && <div className="border-l border-current/15 pl-2">{renderLinks(items, mobile)}</div>}
+    </div>;
+  });
+  const links = (
+    <nav aria-label="Workspace navigation" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain pb-2">
+      {renderLinks(grouped ? tabs : nav, false)}
+      {grouped && renderGroups(false)}
     </nav>
   );
 
@@ -125,7 +150,7 @@ export function AppShell({
           </button>
         </div>
       </header>
-      {tabs.length > 1 && (
+      {(tabs.length > 1 || more.length > 0) && (
         <nav aria-label={section} className="safe-pb fixed inset-x-0 bottom-0 z-30 border-t border-line/70 bg-white/95 backdrop-blur-md lg:hidden">
           <div className="mx-auto grid max-w-lg" style={{ gridTemplateColumns: `repeat(${tabs.length + (more.length ? 1 : 0)}, minmax(0, 1fr))` }}>
             {tabs.map((n) => (
@@ -164,7 +189,7 @@ export function AppShell({
               </button>
             </div>
             <nav className="grid gap-1 p-3">
-              {(tabs.length > 1 ? more : nav).map((n) => (
+              {grouped ? renderGroups(true) : (tabs.length > 1 ? more : nav).map((n) => (
                 <Link key={n.href} href={n.href} onClick={() => setOpen(false)} className={cx('pressable flex min-h-12 items-center gap-3 rounded-2xl px-3 text-sm font-semibold', isActive(n) ? 'bg-brand-soft text-ink' : 'text-ink')}>
                   <span className="grid h-9 w-9 place-items-center rounded-xl bg-surface"><n.icon className={cx('h-5 w-5', isActive(n) ? 'text-brand' : 'text-muted')} /></span>
                   <span className="flex-1">{n.label}</span>

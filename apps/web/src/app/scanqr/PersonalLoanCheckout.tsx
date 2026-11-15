@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useApi, useAuth } from '@xtra/ui';
+import { CandidateOffers, useApi, useAuth } from '@xtra/ui';
 import { formatZAR } from '@xtra/shared';
 import { SimpleLoanRequest } from '@/components/SimpleLoanRequest';
 
@@ -12,7 +12,9 @@ type ApprovedOffer = {
 type Offers = { offers: ApprovedOffer[]; configuration: { enabled: boolean; agreementsEnabled: boolean } };
 
 export default function PersonalLoanCheckout({ tableToken, shortfall, onClose }: { tableToken: string; shortfall: number; onClose: () => void }) {
-  const { client } = useAuth();
+  const { client, me } = useAuth();
+  const storageKey = 'xc.checkout.' + me?.id + '.' + tableToken;
+  const [applicationId, setApplicationId] = useState('');
   const data = useApi(c => c.request<Offers>('GET', '/personal-checkout'));
   const [selected, setSelected] = useState('');
   const [apply, setApply] = useState(false);
@@ -24,12 +26,24 @@ export default function PersonalLoanCheckout({ tableToken, shortfall, onClose }:
   const canvas = useRef<HTMLCanvasElement>(null);
   const point = useRef<{x:number;y:number}|null>(null);
   const offer = data.data?.offers.find(item => item.id === selected);
+  const applications = useApi(c => applicationId ? c.consumer.personalApplications() : Promise.resolve(undefined), [applicationId]);
+  const application = applications.data?.find(item => item.id === applicationId);
+  const awaitingLenders = application && ['SUBMITTED', 'REFERRED', 'UNDER_REVIEW', 'ACTION_REQUIRED'].includes(application.status);
   useEffect(() => {
-    try { setSelected(sessionStorage.getItem('xc.checkout.offer.'+tableToken) || ''); } catch { /* Optional session memory. */ }
-  }, [tableToken]);
+    try { setSelected(sessionStorage.getItem(storageKey + '.offer') || ''); setApplicationId(sessionStorage.getItem(storageKey + '.application') || ''); } catch { /* Optional session memory. */ }
+  }, [storageKey]);
+  useEffect(() => {
+    const refresh = window.setInterval(() => {
+      if (!document.hidden && navigator.onLine) {
+        void data.reload();
+        if (applicationId) void applications.reload();
+      }
+    }, 15000);
+    return () => window.clearInterval(refresh);
+  }, [data.reload, applications.reload, applicationId]);
   function select(id: string) {
     setSelected(id); setAcknowledged(false); setSignature(''); setPassword(''); setMessage('');
-    try { sessionStorage.setItem('xc.checkout.offer.'+tableToken,id); } catch { /* Optional session memory. */ }
+    try { sessionStorage.setItem(storageKey + '.offer', id); } catch { /* Optional session memory. */ }
   }
   async function run(task:()=>Promise<void>) {
     if (busy) return;
@@ -40,16 +54,30 @@ export default function PersonalLoanCheckout({ tableToken, shortfall, onClose }:
   return <section className="sq-card sq-schedule">
     <div className="sq-row"><strong>Personal loan</strong><button className="sq-text-button" type="button" onClick={onClose}>Back to bill</button></div>
     <p className="sq-note">Wallet shortfall {formatZAR(shortfall)}</p>
-    {data.loading && <p>Checking your offers…</p>}
+    {data.loading && !data.data && <p>Checking your offers…</p>}
     {data.error && <p role="alert" className="sq-error">{data.error}</p>}
     {data.data && !offer && !apply && <>
       {data.data.offers.map(item => <button key={item.id} type="button" className="sq-secondary" onClick={() => select(item.id)}>
         {item.lender_name} · {formatZAR(item.terms.principalCents)} · {item.terms.termMonths} months
       </button>)}
-      {!data.data.offers.length && <p className="sq-note">Submit a personal loan request to receive lender offers.</p>}
-      <button className="sq-secondary" type="button" onClick={() => setApply(true)}>New loan request</button>
+      {awaitingLenders && <CandidateOffers key={applicationId} applicationId={applicationId} autoRefresh onSelected={() => {
+        select(applicationId);
+        void data.reload();
+        void applications.reload();
+      }} />}
+      {application?.status === 'DISBURSED' && <p className="sq-note">Your loan was disbursed. Check your wallet to pay the bill.</p>}
+      {application && !awaitingLenders && application.status !== 'DISBURSED' && <p className="sq-note">Latest request: {application.status.toLowerCase().replaceAll('_', ' ')}.</p>}
+      {!data.data.offers.length && !applicationId && <p className="sq-note">Submit a personal loan request to receive lender offers.</p>}
+      {!awaitingLenders && !applications.loading && <button className="sq-secondary" type="button" onClick={() => setApply(true)}>New loan request</button>}
     </>}
-    {apply && <SimpleLoanRequest onSubmitted={() => { setApply(false); data.reload(); setMessage('Request submitted. Lender offers will appear here when available.'); }} />}
+    {apply && <SimpleLoanRequest initialAmountCents={Math.min(10000000, Math.max(50000, shortfall))}
+      onSubmitted={id => {
+        setApplicationId(id);
+        setApply(false);
+        void data.reload();
+        setMessage('Request submitted. Lender offers will appear here when available.');
+        try { sessionStorage.setItem(storageKey + '.application', id); } catch { /* Optional session memory. */ }
+      }} />}
     {offer && <>
       <h2 className="font-bold">{offer.lender_name}</h2>
       <div className="sq-row"><span>Wallet funding</span><strong>{formatZAR(offer.terms.principalCents)}</strong></div>

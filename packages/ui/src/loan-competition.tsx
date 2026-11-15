@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, BadgeCheck, CheckCircle2, Clock3, FileCheck2, HandCoins, WalletCards } from "lucide-react";
 import { formatZAR, type LoanOffer } from "@xtra/shared";
 import { useApi, useAuth } from "./api";
@@ -195,10 +195,17 @@ export function CompetitionRelease({
   );
 }
 type CandidateOffer = { id: string; rank: number; lenderName: string; offerName: string; monthlyInterestRateBps: number; initiationFeeCents: number; monthlyServiceFeeCents: number; monthlyInstallmentCents: number; totalRepayableCents: number; costOfCreditCents: number };
-export function CandidateOffers({ applicationId, onSelected }: { applicationId: string; onSelected: () => void }) {
+export function CandidateOffers({ applicationId, onSelected, autoRefresh = false }: { applicationId: string; onSelected: () => void; autoRefresh?: boolean }) {
   const { client } = useAuth();
   const offers = useApi((c) => c.request<CandidateOffer[]>('GET', `/loan-operations/competitions/${applicationId}/offers`), [applicationId]);
   const [busy, setBusy] = useState(''), [error, setError] = useState('');
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const timer = window.setInterval(() => {
+      if (!document.hidden && navigator.onLine) void offers.reload();
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [autoRefresh, offers.reload]);
   if (!offers.data?.length && !offers.error) return <Alert tone="blue">Your request is with active accredited lenders. You will be notified when an offer is ready.</Alert>;
   async function select(id: string) {
     setBusy(id); setError('');

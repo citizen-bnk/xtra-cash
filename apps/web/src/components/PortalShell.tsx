@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { AppShell, useAuth, type NavItem } from '@xtra/ui';
+import { ADMIN_URL } from '@/lib/config';
 
 export function PortalShell({ nav, section, children, footer }: { nav: NavItem[]; section: string; children: React.ReactNode; footer?: React.ReactNode }) {
   const pathname = usePathname();
@@ -16,9 +17,9 @@ export function PortalShell({ nav, section, children, footer }: { nav: NavItem[]
       userName={me ? `${me.firstName} ${me.lastName}` : ''}
       userEmail={me?.email}
       switchApps={[
-        ...(me?.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN') ? [{ label: 'Back office', href: 'https://xtra-cash-admin.vercel.app' }] : []),
-        { label: 'Customer app', href: 'https://xtra-cash.vercel.app/app', current: !pathname.startsWith('/lender') && !pathname.startsWith('/affiliate') },
-        ...(me?.roles.includes('LENDER') ? [{ label: 'Lender workspace', href: 'https://xtra-cash.vercel.app/lender', current: pathname.startsWith('/lender') }] : []),
+        ...(me?.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN') ? [{ label: 'Back office', href: ADMIN_URL }] : []),
+        { label: 'Customer app', href: '/app', current: !pathname.startsWith('/lender') && !pathname.startsWith('/affiliate') },
+        ...(me?.roles.includes('LENDER') ? [{ label: 'Lender workspace', href: '/lender', current: pathname.startsWith('/lender') }] : []),
       ]}
       footer={footer}
       onLogout={async () => {

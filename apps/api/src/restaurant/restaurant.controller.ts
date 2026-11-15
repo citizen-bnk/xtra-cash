@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, StreamableFile, UploadedFile
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser, Public, Roles, type AuthUser } from '../common/auth';
-import { RestaurantService } from './restaurant.service';
+import { RestaurantService, type BillInput } from './restaurant.service';
 
 @Controller('restaurant-bills')
 export class RestaurantController {
@@ -12,7 +12,7 @@ export class RestaurantController {
   merchant(@Param('code') code: string, @Query('employee') employee?: string) { return this.service.resolveMerchant(code, employee); }
 
   @Roles('CONSUMER') @Post() @Throttle({ default: { limit: 8, ttl: 60000 } })
-  create(@CurrentUser() user: AuthUser, @Body() body: { merchant: string; merchantCode?: string; employeeCode?: string; reference: string; totalCents: number; items: { label: string; cents: number }[] }) { return this.service.create(user.id, body); }
+  create(@CurrentUser() user: AuthUser, @Body() body: BillInput) { return this.service.create(user.id, body); }
 
   @Public() @Get(':token') @Throttle({ default: { limit: 30, ttl: 60000 } })
   view(@Param('token') token: string) { return this.service.view(token); }

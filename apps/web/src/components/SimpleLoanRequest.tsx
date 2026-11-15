@@ -11,10 +11,10 @@ type Phase = 'REQUEST' | 'IDENTITY' | 'BANK' | 'SUMMARY';
 type Check = { id: string; result?: { steps?: { pillar: 'ID' | 'RISK' | 'INCOME' | 'FRAUD'; status: string }[] }; steps?: { pillar: 'ID' | 'RISK' | 'INCOME' | 'FRAUD'; status: string }[] };
 const primary = 'w-full bg-gradient-to-r from-[#8c00cf] to-[#d91f63] text-white hover:brightness-105';
 
-export function SimpleLoanRequest({ onSubmitted }: { onSubmitted: () => void }) {
+export function SimpleLoanRequest({ onSubmitted, initialAmountCents = 500000 }: { onSubmitted: (applicationId: string) => void; initialAmountCents?: number }) {
   const { client, me, refreshMe } = useAuth();
   const [phase, setPhase] = useState<Phase>('REQUEST');
-  const [amount, setAmount] = useState<number | null>(500000), [term, setTerm] = useState(3);
+  const [amount, setAmount] = useState<number | null>(initialAmountCents), [term, setTerm] = useState(3);
   const [idNumber, setIdNumber] = useState('');
   const [province, setProvince] = useState(''), [employment, setEmployment] = useState<EmploymentStatus | ''>('');
   const [income, setIncome] = useState<number | null>(null), [expenses, setExpenses] = useState<number | null>(null);
@@ -45,8 +45,8 @@ export function SimpleLoanRequest({ onSubmitted }: { onSubmitted: () => void }) 
       const steps = check.result?.steps ?? check.steps ?? [];
       const responses = (['ID', 'RISK', 'INCOME', 'FRAUD'] as const).map(pillar => ({ pillar, disposition: steps.find(step => step.pillar === pillar)?.status === 'VERIFIED' || steps.find(step => step.pillar === pillar)?.status === 'CALCULATED' ? 'CONFIRMED' : 'SKIPPED' }));
       await client.request('PUT', `/personal-loans/vault/application-validations/${check.id}`, { responses });
-      await client.request('POST', '/personal-loans/applications', { amountCents: amount, termMonths: term, consent: true, routingConsent: true, idempotencyKey: idempotencyKey.current, vaultValidationId: check.id });
-      onSubmitted();
+      const application = await client.request<{ id: string }>('POST', '/personal-loans/applications', { amountCents: amount, termMonths: term, consent: true, routingConsent: true, idempotencyKey: idempotencyKey.current, vaultValidationId: check.id });
+      onSubmitted(application.id);
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not submit your loan request'); }
     finally { setBusy(false); }
   }

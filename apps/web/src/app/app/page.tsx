@@ -9,9 +9,12 @@ import { PAY_EVENT } from '@/lib/pay-event';
 import { CustomerBottomNav } from '@/components/CustomerBottomNav';
 import { CustomerHeader } from '@/components/CustomerHeader';
 
+import { RoleHome } from '@/components/RoleWorkspace';
+
 export default function ConsumerHome() {
   const { me } = useAuth();
-  const balance = useApi((c) => c.consumer.balance());
+  const hasCustomerAccess = me?.roles.includes('CONSUMER') ?? false;
+  const balance = useApi(c => hasCustomerAccess ? c.consumer.balance() : Promise.resolve(undefined), [hasCustomerAccess]);
   const [notice, setNotice] = useState('');
   const router = useRouter();
   const b = balance.data;
@@ -61,18 +64,20 @@ export default function ConsumerHome() {
       <section className="mx-auto flex w-full max-w-[520px] items-center gap-3 px-4 py-3" aria-label="Account overview">
         <div className="grid h-[58px] w-[58px] shrink-0 place-items-center rounded-full border-[3px] border-white bg-gradient-to-br from-orange-300 via-pink-400 to-purple-700 text-lg font-black text-white shadow-[0_0_18px_rgba(255,95,222,.65)]">{initials}</div>
         <div className="min-w-0 flex-1"><h1 className="truncate text-xl font-black leading-tight">Hi {name} <span aria-hidden>👋</span></h1></div>
-        <Link href="/app/loans" className="min-w-[112px] rounded-2xl border border-white/70 bg-white/90 px-3 py-2 text-left text-ink shadow-lg shadow-purple-950/25"><span className="block text-[11px] font-medium">Available Credit</span><strong className="mt-0.5 block truncate text-lg font-black leading-tight">{b ? formatZAR(b.creditCents) : 'Check limit'}</strong></Link>
+        {hasCustomerAccess && <Link href="/app/loans" className="min-w-[112px] rounded-2xl border border-white/70 bg-white/90 px-3 py-2 text-left text-ink shadow-lg shadow-purple-950/25"><span className="block text-[11px] font-medium">Available Credit</span><strong className="mt-0.5 block truncate text-lg font-black leading-tight">{b ? formatZAR(b.creditCents) : 'Check limit'}</strong></Link>}
       </section>
     </div>
     <div className="relative mx-auto min-h-[100dvh] w-full max-w-[520px] px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom,0px))] pt-2">
 
 
 
+      {me && <RoleHome key={me.id} roles={me.roles} />}
+
       <Link href="/app/assistant" className="group mt-5 flex w-full items-center gap-3 rounded-full border-[3px] border-white bg-gradient-to-r from-[#ecd8f8] via-white to-[#fbe7ee] px-4 py-3 text-left text-[#1b1030] shadow-[0_0_12px_#a617d3,0_0_30px_rgba(217,31,99,.5)] transition active:scale-[.99]">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white"><Sparkles className="h-5 w-5" /></span><span className="min-w-0 flex-1 truncate text-xl font-bold">Ask XTRA-CASH…</span><Mic className="h-6 w-6 shrink-0 text-[#5c2394]" />
       </Link>
 
-      <nav aria-label="Suggested actions" className="mt-4 grid grid-cols-6 gap-2">
+      {hasCustomerAccess && <><nav aria-label="Suggested actions" className="mt-4 grid grid-cols-6 gap-2">
         {suggestions.map(item => item.href ? <Link key={item.label} href={item.href} className={`${item.size} flex min-h-10 items-center justify-center rounded-full border border-white/80 bg-white/95 px-2 text-center text-[11px] font-bold text-ink shadow-md sm:text-xs`}>{item.label}</Link> : <button key={item.label} type="button" onClick={() => unavailable(item.label.replace(/^[^ ]+ /, ''))} className={`${item.size} flex min-h-10 items-center justify-center rounded-full border border-white/80 bg-white/95 px-2 text-center text-[11px] font-bold text-ink shadow-md sm:text-xs`}>{item.label}</button>)}
       </nav>
 
@@ -93,7 +98,7 @@ export default function ConsumerHome() {
         <span aria-hidden className="absolute -right-8 -top-12 h-44 w-44 rounded-full bg-yellow-300/50 blur-2xl" />
         <span className="relative z-10 ml-28 min-w-0 flex-1"><strong className="block text-lg font-black italic leading-tight">A personal loan<br />when you need it</strong><span className="mt-2 block text-[11px] font-semibold text-white/95">Choose an amount · review lender offers · track repayments</span><span className="mt-2 inline-flex items-center gap-1 text-xs font-black">Start a request <ArrowRight className="h-4 w-4" /></span></span>
         <span className="relative z-10 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-[#5c2394] shadow"><ArrowRight className="h-5 w-5" /></span>
-      </Link>
+      </Link></>}
     </div>
 
     <CustomerBottomNav />
