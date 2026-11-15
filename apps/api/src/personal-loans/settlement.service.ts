@@ -524,11 +524,19 @@ export class SettlementService {
       return {ok:true,depositReference:reference};
     });
   }
-  async fund(a: AuthUser, id: string) {
+  async fund(a: AuthUser, id: string, customerCheckout = false) {
     this.connector.requireReady();
     return this.db.transaction(async (tx) => {
       const app = await this.app(a, id, tx, true);
-      if (app.userId === a.id || !isAdmin(a)) throw new ForbiddenException();
+      if (customerCheckout) {
+        if (app.userId !== a.id) throw new ForbiddenException();
+        if (process.env.PERSONAL_CHECKOUT_ENABLED !== 'true') throw new ForbiddenException('Personal loan checkout is awaiting activation.');
+        const proof = await tx.execute(sql`SELECT c.application_id FROM personal_checkout c
+          JOIN personal_agreements g ON g.application_id=c.application_id AND g.digest=c.agreement_digest AND g.mandate_reference=c.mandate_reference
+          WHERE c.application_id=${id} AND c.user_id=${a.id} AND g.user_id=${a.id} AND g.accepted_by=${a.id}
+          AND g.status='ACCEPTED' AND c.signature_png IS NOT NULL AND c.signed_at IS NOT NULL`);
+        if (!proof.rows.length) throw new ForbiddenException('Complete your agreement and repayment setup first.');
+      } else if (app.userId === a.id || !isAdmin(a)) throw new ForbiddenException();
       const [ag] = await tx
         .select()
         .from(agreements)
