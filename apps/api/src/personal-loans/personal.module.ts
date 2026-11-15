@@ -1,3 +1,4 @@
+import { PersonalCheckoutController } from "./checkout";
 import { Module } from "@nestjs/common";
 import { LenderAccessService, LenderAccessController } from './lender-access';
 import {RoutingService,RoutingController} from './routing';
@@ -34,6 +35,7 @@ import { CustomerAssistantController } from './customer-assistant';
 @Module({
   imports: [ConsumerModule,LenderModule],
   controllers: [
+    PersonalCheckoutController,
     LoanOperationsController,
     RoutingController,
     LenderAccessController,

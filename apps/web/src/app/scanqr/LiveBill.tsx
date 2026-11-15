@@ -1,5 +1,6 @@
 'use client';
 
+import PersonalLoanCheckout from './PersonalLoanCheckout';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@xtra/ui';
 import { ArrowLeft, CircleCheck, Clock3, LockKeyhole, Share2, Wallet } from 'lucide-react';
@@ -10,6 +11,7 @@ const money = (cents: number) => `R${(cents / 100).toFixed(2)}`;
 
 export default function LiveBill({ token, onBack }: { token: string; onBack: () => void }) {
   const { client, me, loading } = useAuth();
+  const [loanOpen, setLoanOpen] = useState(false);
   const [online, setOnline] = useState(true);
   const [bill, setBill] = useState<LiveData | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -86,7 +88,8 @@ export default function LiveBill({ token, onBack }: { token: string; onBack: () 
         {bill.tips_enabled && myTotal > 0 && <div className="sq-card sq-schedule"><strong>Tip {bill.waiter_name ?? 'your waiter'} (optional)</strong><div className="sq-text-row"><button type="button" className="sq-secondary" onClick={() => { setTipMode('percent'); setTipPercent('0'); }}>No tip</button><button type="button" className="sq-secondary" onClick={() => { setTipMode('percent'); setTipPercent('10'); }}>10%</button><button type="button" className="sq-secondary" onClick={() => { setTipMode('percent'); setTipPercent('15'); }}>15%</button></div><div className="sq-text-row"><label>Percentage<input className="w-24 rounded-lg border p-2" type="number" min="0" max="100" step="0.1" value={tipMode === 'percent' ? tipPercent : myTotal ? (tipCents / myTotal * 100).toFixed(1) : '0'} onChange={e => { setTipMode('percent'); setTipPercent(e.target.value); }} />%</label><label>Amount<input className="w-28 rounded-lg border p-2" type="number" min="0" max={myTotal / 100} step="0.01" value={tipMode === 'amount' ? tipAmount : (tipCents / 100).toFixed(2)} onChange={e => { setTipMode('amount'); setTipAmount(e.target.value); }} /></label></div><p>{tipValid ? `${money(tipCents)} tip · ${myTotal ? (tipCents / myTotal * 100).toFixed(1) : '0'}%` : 'Tip cannot exceed your selected items.'}</p></div>}
         {me?.roles.includes('CONSUMER') && <div className="sq-card sq-schedule"><div className="sq-row"><span>Your claimed items</span><strong>{money(myTotal)}</strong></div>{tipCents > 0 && tipValid && <div className="sq-row"><span>Waiter tip</span><strong>{money(tipCents)}</strong></div>}<div className="sq-row"><span>XTRA-CASH wallet</span><strong>{wallet === null ? 'Loading…' : money(wallet)}</strong></div></div>}
         {myTotal > 0 && wallet !== null && wallet < paymentTotal && <div className="sq-notice"><Wallet size={20} /><span><strong>Top up your wallet first</strong><small>You need {money(paymentTotal - wallet)} more. Wallet top-up collection is awaiting activation; a funded loan can also add money after approval.</small></span></div>}
-        {myTotal > 0 && wallet !== null && wallet < paymentTotal && <div className="sq-text-row"><a className="sq-secondary" href="/app/pay">Top up wallet</a><a className="sq-secondary" href="/app/loans">Apply for a loan</a></div>}
+        {myTotal > 0 && wallet !== null && wallet < paymentTotal && <div className="sq-text-row"><a className="sq-secondary" href="/app/pay">Top up wallet</a><button type="button" className="sq-secondary" onClick={() => setLoanOpen(true)}>Use a personal loan</button></div>}
+        {loanOpen && wallet !== null && <PersonalLoanCheckout tableToken={token} shortfall={Math.max(0,paymentTotal-wallet)} onClose={() => setLoanOpen(false)} />}
         {myTotal > 0 && <button className="sq-primary" disabled={!online || busy || !tipValid || !bill.canPayFromWallet || wallet === null || wallet < paymentTotal} onClick={() => void act(() => client.request('POST', `/restaurant-bills/${token}/pay-wallet`, { idempotencyKey: crypto.randomUUID(), tipCents }))}><Wallet size={18} /> Pay {money(paymentTotal)} from wallet</button>}
         {mine.length > 0 && <button className="sq-text-button sq-centred" disabled={!online || busy} onClick={() => void act(() => client.request('POST', `/restaurant-bills/${token}/release`, { itemIds: mine.map(item => item.id) }))}>Release my unpaid items</button>}
         <button className="sq-secondary" disabled={!bill.items.some(item => item.status === 'CLAIMED' || item.status === 'PAID') || !bill.items.some(item => item.status === 'UNCLAIMED')} onClick={() => void share()}><Share2 size={17} /> Share remaining items</button>
