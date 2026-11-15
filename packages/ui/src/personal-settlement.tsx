@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { BadgeCheck } from "lucide-react";
 import { CandidateOffers, LoanJourney } from "./loan-competition";
+import { RequestGuarantee } from './personal-guarantees';
 import {
   formatZAR,
   type LoanOffer,
@@ -203,6 +204,7 @@ export function PersonalSettlementView({
         </Card>
       )}
       {!reviewer && !ag && reviewStates.includes(d.application.status) && <CandidateOffers applicationId={applicationId} onSelected={data.reload} />}
+      {!reviewer && !ag && reviewStates.includes(d.application.status) && <RequestGuarantee applicationId={applicationId} />}
       {isOffice && intervening && !reviewer && reviewStates.includes(d.application.status) && <Card className="space-y-3"><Field label="Intervention message"><Textarea value={message} maxLength={500} onChange={e => setMessage(e.target.value)}/></Field><Button loading={busy} disabled={message.trim().length < 3} onClick={() => act('information', {message})}>Request clarification</Button></Card>}
       <Modal open={decisionOpen} title={preparationMode === 'AI' ? 'Prepare lender offer' : 'Lender decision'} onClose={() => setDecisionOpen(false)}>
         {preparationMode === 'AI' ? <DecisionAiWorkspace applicationId={applicationId} onAdvanced={() => { setDecisionOpen(false); data.reload(); }} /> : <ManualDecisionForm request={{ amountCents: d.application.amountCents, termMonths: d.application.termMonths, offerId: d.application.offerId }} applicationId={applicationId} onAdvanced={() => { setDecisionOpen(false); data.reload(); }} />}

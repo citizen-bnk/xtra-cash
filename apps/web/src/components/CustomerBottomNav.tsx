@@ -8,6 +8,7 @@ import { Logo, useAuth } from '@xtra/ui';
 export const moreLinks = [
   { label: 'My wallet', href: '/app/wallet' },
   { label: 'My card', href: '/app/card' },
+  { label: 'My guarantees', href: '/app/guarantees' },
   { label: 'Transactions', href: '/app/activity' },
   { label: 'Pay bills', href: '/app/bills' },
   { label: 'Shop now, pay later', href: '/app/bnpl' },

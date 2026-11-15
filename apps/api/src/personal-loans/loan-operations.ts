@@ -641,6 +641,20 @@ export class LoanOperationsService {
       .select()
       .from(loanNotificationReceipts)
       .where(eq(loanNotificationReceipts.userId, a.id));
+    const guarantees = await this.db.execute<{ id: string; status: string; signer: boolean }>(sql`
+      SELECT g.id,g.status,g.signer_id=${a.id} AS signer FROM personal_guarantees g
+      JOIN personal_loan_applications a ON a.id=g.application_id
+      WHERE (g.signer_id=${a.id} AND g.status='READY' AND g.expires_at>now()
+        AND a.status IN ('SUBMITTED','REFERRED','UNDER_REVIEW','ACTION_REQUIRED'))
+        OR (g.applicant_id=${a.id} AND g.status IN ('SIGNED','DECLINED'))
+      ORDER BY g.created_at LIMIT 20
+    `);
+    for (const guarantee of guarantees.rows) notifications.unshift({
+      key: `guarantee:${guarantee.id}:${guarantee.status}`, applicationId: guarantee.id,
+      title: guarantee.signer ? 'Review a guarantee request' : guarantee.status === 'SIGNED' ? 'Your guarantor signed' : 'Guarantee request declined',
+      description: guarantee.signer ? 'Read the terms and decide whether to sign.' : 'View the status of your guarantee request.',
+      cta: 'View guarantees', kind: 'GUARANTEE', owner: guarantee.signer ? 'Guarantor' : 'Applicant',
+    });
     return {
       notifications: notifications.slice(0, 100).map((n) => ({
         ...n,

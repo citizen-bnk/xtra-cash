@@ -33,10 +33,12 @@ import {
 import { VaultService } from './vault.service';
 import { CustomerAssistantController } from './customer-assistant';
 import { MarketingModule } from '../marketing/marketing.module';
+import { PersonalGuaranteesController } from './guarantees';
 @Module({
   imports: [ConsumerModule, LenderModule, MarketingModule],
   controllers: [
     PersonalCheckoutController,
+    PersonalGuaranteesController,
     LoanOperationsController,
     RoutingController,
     LenderAccessController,
