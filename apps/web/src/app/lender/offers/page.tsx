@@ -78,6 +78,8 @@ export default function OffersPage() {
                   <Kv k="Initiation fee" v={formatZAR(o.initiationFeeCents)} />
                   <Kv k="Service fee" v={`${formatZAR(o.monthlyServiceFeeCents)} / month`} />
                   <Kv k="Minimum income" v={formatZAR(o.minMonthlyIncomeCents, { decimals: false })} />
+                  <Kv k="Welcome offer" v={o.welcomeOnly ? 'First loan only' : 'Standard'} />
+                  <Kv k="Income multiple" v={o.incomeMultiple ? `${o.incomeMultiple} × offer limit` : 'Minimum income'} />
                   <Kv k="Minimum credit score" v={o.minCreditScore || 'Any'} />
                   <Kv k="Age range" v={`${o.minAge}–${o.maxAge}`} />
                   <Kv k="Employment" v={o.employmentStatuses.length ? o.employmentStatuses.map((e) => EMPLOYMENT_LABELS[e]).join(', ') : 'Any employment'} />
@@ -159,8 +161,9 @@ function OfferEditor({ offer, draft, activationBlocked, onClose, onSaved }: { of
   return (
     <Modal open onClose={onClose} title={offer ? 'Edit offer' : 'New offer'}>
       <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
-        <Field label="Product"><select className="h-10 w-full rounded-xl border border-line px-3 text-sm" value={f.productType} onChange={e => setF({ ...f, productType: e.target.value as 'BNPL' | 'PERSONAL' })}><option value="BNPL">BNPL · card purchases</option><option value="PERSONAL">Personal loan · application & review</option></select></Field>
+        <Field label="Product"><select className="h-10 w-full rounded-xl border border-line px-3 text-sm" value={f.productType} onChange={e => setF({ ...f, productType: e.target.value as 'BNPL' | 'PERSONAL', welcomeOnly: e.target.value === 'BNPL' && (f.welcomeOnly ?? false) })}><option value="BNPL">BNPL · card purchases</option><option value="PERSONAL">Personal loan · application & review</option></select></Field>
         <Field label="Offer name"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Everyday Xtra" /></Field>
+        {f.productType === 'BNPL' && <label className="flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={f.welcomeOnly ?? false} onChange={e => setF({ ...f, welcomeOnly: e.target.checked })} /> Welcome offer · first loan only</label>}
         <Field label="Description (shown to shoppers)"><Textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
         <LocationTargetPicker value={f.locationTarget ?? null} onChange={locationTarget => setF({ ...f, locationTarget })} />
         <div className="text-xs font-bold uppercase tracking-wide text-muted">Pricing</div>
@@ -182,6 +185,9 @@ function OfferEditor({ offer, draft, activationBlocked, onClose, onSaved }: { of
           </div>
         )}
         <div className="text-xs font-bold uppercase tracking-wide text-muted">Who you lend to</div>
+        <Field label="Monthly income as a multiple of the offer limit" hint="4 × a R4,000 limit requires R16,000 income. Zero uses the minimum income below.">
+          <Input type="number" min={0} max={20} value={f.incomeMultiple ?? 0} onChange={num('incomeMultiple')} />
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Min monthly income"><MoneyInput cents={f.minMonthlyIncomeCents} onCents={(c) => setF({ ...f, minMonthlyIncomeCents: c ?? 0 })} /></Field>
           <Field label="Min credit score" hint="0 = any"><Input type="number" min={0} max={999} value={f.minCreditScore} onChange={num('minCreditScore')} /></Field>

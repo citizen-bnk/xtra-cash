@@ -80,6 +80,8 @@ export interface OfferCriteria {
 }
 
 export interface LoanOffer extends OfferCriteria {
+  welcomeOnly?: boolean;
+  incomeMultiple?: number;
   locationTarget?: LocationTarget | null;
   productType?: 'BNPL' | 'PERSONAL';
   id: string;

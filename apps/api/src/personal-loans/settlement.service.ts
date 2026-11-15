@@ -299,6 +299,10 @@ export class SettlementService {
         throw new BadRequestException(
           "Select a current personal-loan product matching this application.",
         );
+      const [profile] = await tx.select({ income: kycProfiles.monthlyIncomeCents })
+        .from(kycProfiles).where(eq(kycProfiles.userId, app.userId));
+      if (offer.incomeMultiple > 0 && (!profile || profile.income < offer.maxAmountPerUserCents * offer.incomeMultiple))
+        throw new BadRequestException('Verified income does not meet the lender offer requirement.');
       const [lender] = await tx
         .select()
         .from(lenderOrgs)
