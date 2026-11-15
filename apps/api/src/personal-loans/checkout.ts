@@ -31,8 +31,9 @@ export class PersonalCheckoutController {
     const rows = await this.db.execute(sql`SELECT a.id,a.status,g.content,g.digest,g.terms,g.expires_at,l.name AS lender_name
       FROM personal_loan_applications a JOIN personal_agreements g ON g.application_id=a.id
       JOIN lender_orgs l ON l.id=g.lender_id
+      JOIN loan_offers o ON o.id=g.terms->>'offerId'
       WHERE a.user_id=${actor.id} AND l.accreditation_status='ACCREDITED'
-      AND ((a.status='OFFERED' AND g.status='OFFERED' AND g.expires_at>now())
+      AND ((a.status='OFFERED' AND g.status='OFFERED' AND g.expires_at>now() AND o.active)
         OR (a.status IN ('ACCEPTED','FUNDING_PENDING') AND g.status='ACCEPTED'))
       ORDER BY g.created_at DESC LIMIT 10`);
     const configuration = this.settlement.configuration();

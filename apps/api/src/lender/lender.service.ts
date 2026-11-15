@@ -377,6 +377,8 @@ export class LenderService {
   private validateOffer(dto: Partial<Record<keyof OfferDto, unknown>> & Partial<Pick<OfferDto, "monthlyInterestRateBps" | "monthlyServiceFeeCents" | "minAmountCents" | "maxAmountPerUserCents" | "minAge" | "maxAge">>, s: PlatformSettings) {
     if (dto.welcomeOnly && dto.productType === 'PERSONAL')
       throw new BadRequestException('Welcome offers must use BNPL.');
+    if (dto.suspended && dto.active)
+      throw new BadRequestException('Resume the suspended offer before activating it.');
     const target = dto.locationTarget as OfferDto['locationTarget'];
     if (target && target.radiusMeters % 50 !== 0) throw new BadRequestException('Choose a radius in 50-metre increments');
     if (dto.monthlyInterestRateBps !== undefined && dto.monthlyInterestRateBps > s.maxRateBps) {
@@ -399,7 +401,7 @@ export class LenderService {
     const org = await this.orgFor(user.id);
     this.validateOffer(dto, await this.settings.get());
     const commitment = await this.feeCommitment(org.id);
-    const active = dto.active ?? !commitment.required;
+    const active = dto.suspended ? false : dto.active ?? !commitment.required;
     if (active) await this.checkOfferActivation(org.id, dto.productType);
     const [o] = await this.db.insert(loanOffers).values({ ...dto, active, lenderId: org.id }).returning();
     await this.audit.log(user, 'offer.created', 'offer', o.id, { name: o.name });

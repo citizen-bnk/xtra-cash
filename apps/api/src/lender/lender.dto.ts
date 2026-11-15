@@ -50,6 +50,7 @@ export class CriteriaDto {
 }
 
 export class OfferDto extends CriteriaDto {
+  @IsOptional() @IsBoolean() suspended?: boolean;
   @IsOptional() @IsBoolean() welcomeOnly?: boolean;
   @IsOptional() @IsInt() @Min(0) @Max(20) incomeMultiple?: number;
   @IsOptional() @ValidateNested() @Type(() => LocationTargetDto) locationTarget?: LocationTargetDto | null;

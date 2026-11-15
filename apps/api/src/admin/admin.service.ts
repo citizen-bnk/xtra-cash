@@ -292,14 +292,15 @@ export class AdminService {
     return this.db.query.loanOffers.findMany({ with: { lender: { columns: { id: true, name: true } } }, orderBy: desc(loanOffers.createdAt) });
   }
 
-  async setOfferActive(actor: AuthUser, id: string, active: boolean) {
+  async setOfferActive(actor: AuthUser, id: string, active: boolean, suspended?: boolean) {
+    if (active && suspended) throw new BadRequestException('A suspended offer cannot be active.');
     if (active) {
       const offer = await this.db.query.loanOffers.findFirst({ where: eq(loanOffers.id, id) });
       if (offer) await this.lenders.checkOfferActivation(offer.lenderId, offer.productType);
     }
-    const [o] = await this.db.update(loanOffers).set({ active }).where(eq(loanOffers.id, id)).returning();
+    const [o] = await this.db.update(loanOffers).set({ active, suspended: active ? false : suspended }).where(eq(loanOffers.id, id)).returning();
     if (!o) throw new NotFoundException();
-    await this.audit.log(actor, active ? 'offer.enabled' : 'offer.disabled', 'offer', id);
+    await this.audit.log(actor, active ? 'offer.enabled' : o.suspended ? 'offer.suspended' : 'offer.disabled', 'offer', id);
     return o;
   }
 

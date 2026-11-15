@@ -215,6 +215,7 @@ export const loanOffers = pgTable(
     locationTarget: jsonb('location_target').$type<import('@xtra/shared').LocationTarget | null>(),
     productType: text('product_type').$type<'BNPL' | 'PERSONAL'>().notNull().default('BNPL'),
       welcomeOnly: boolean('welcome_only').notNull().default(false),
+      suspended: boolean('suspended').notNull().default(false),
       incomeMultiple: integer('income_multiple').notNull().default(0),
     active: boolean('active').notNull().default(true),
     monthlyInterestRateBps: integer('monthly_interest_rate_bps').notNull(),

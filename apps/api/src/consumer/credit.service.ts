@@ -146,6 +146,12 @@ export class CreditService {
       .map(({ _rank, ...o }) => o);
 
     const creditCents = total.fundedCents;
+    const visibleOffers = offers.filter(offer => offer.availableCents > 0);
+    if (visibleOffers.length) await this.db.execute(sql`
+      INSERT INTO lender_offer_followers (offer_id,user_id)
+      VALUES ${sql.join(visibleOffers.map(offer => sql`(${offer.offerId},${userId})`), sql`,`)}
+      ON CONFLICT DO NOTHING
+    `);
     return {
       walletCents: ctx.walletCents,
       creditCents,

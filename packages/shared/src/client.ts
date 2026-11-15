@@ -82,6 +82,7 @@ export interface PurchaseInput {
 }
 
 export type OfferInput = OfferCriteria & {
+  suspended?: boolean;
   welcomeOnly?: boolean;
   incomeMultiple?: number;
   locationTarget?: import('./types').LocationTarget | null;
