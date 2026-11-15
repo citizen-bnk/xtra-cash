@@ -11,6 +11,10 @@ async function main() {
       "SELECT count(*)::int AS count FROM audit_logs WHERE action = 'lender.capacity_initialized'",
     );
     console.log(`Lenders initialised from reconciled funds: ${rows[0].count}`);
+    const welcome = await pool.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM loan_offers WHERE welcome_only AND active",
+    );
+    console.log(`Active Welcome BNPL offers: ${welcome.rows[0].count}`);
   }
   await pool.end();
   console.log('Migrations applied');

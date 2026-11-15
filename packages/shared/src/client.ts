@@ -82,6 +82,8 @@ export interface PurchaseInput {
 }
 
 export type OfferInput = OfferCriteria & {
+  welcomeOnly?: boolean;
+  incomeMultiple?: number;
   locationTarget?: import('./types').LocationTarget | null;
   productType?: 'BNPL' | 'PERSONAL';
   name: string;

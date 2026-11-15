@@ -84,7 +84,9 @@ export class CreditService {
       .innerJoin(lenderOrgs, eq(loanOffers.lenderId, lenderOrgs.id))
       .where(and(eq(loanOffers.active, true), eq(loanOffers.productType, productType), eq(lenderOrgs.accreditationStatus, 'ACCREDITED'), sql`${lenderOrgs.ownerUserId} <> ${userId}`));
 
+    const priorLoan = await conn.select({ id: loans.id }).from(loans).where(eq(loans.userId, userId)).limit(1);
     const eligible = rows
+      .filter(({ offer }) => !offer.welcomeOnly || (priorLoan.length === 0 && pendingPersonal.length === 0))
       .map<CandidateOffer>(({ offer, lenderName, lenderAvailable }) => ({
         offerId: offer.id,
         offerName: offer.name,
@@ -96,7 +98,7 @@ export class CreditService {
         monthlyServiceFeeCents: offer.monthlyServiceFeeCents,
         minAmountCents: offer.minAmountCents,
         maxAmountPerUserCents: offer.maxAmountPerUserCents,
-        minMonthlyIncomeCents: offer.minMonthlyIncomeCents,
+        minMonthlyIncomeCents: Math.max(offer.minMonthlyIncomeCents, offer.maxAmountPerUserCents * offer.incomeMultiple),
         minCreditScore: offer.minCreditScore,
         minAge: offer.minAge,
         maxAge: offer.maxAge,

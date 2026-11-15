@@ -358,13 +358,25 @@ export class LenderService {
     }
   }
 
-  async checkOfferActivation(lenderId: string) {
+  async checkOfferActivation(lenderId: string, productType?: string) {
     const commitment = await this.feeCommitment(lenderId);
     if (commitment.required && !commitment.paidAt)
       throw new ForbiddenException('Pay the platform fee commitment before activating offers.');
+    if (commitment.required && productType === 'PERSONAL') {
+      const welcome = await this.db.execute(sql`
+        SELECT 1 FROM loan_offers o JOIN lender_capacity c ON c.lender_id = o.lender_id
+        WHERE o.lender_id = ${lenderId} AND o.active AND o.welcome_only
+          AND c.bnpl_limit - c.bnpl_committed >= o.min_amount_cents
+          AND c.bnpl_customer_limit >= o.min_amount_cents LIMIT 1
+      `);
+      if (!welcome.rows.length)
+        throw new ForbiddenException('Activate a funded Welcome BNPL offer before activating personal loan offers.');
+    }
   }
 
   private validateOffer(dto: Partial<Record<keyof OfferDto, unknown>> & Partial<Pick<OfferDto, "monthlyInterestRateBps" | "monthlyServiceFeeCents" | "minAmountCents" | "maxAmountPerUserCents" | "minAge" | "maxAge">>, s: PlatformSettings) {
+    if (dto.welcomeOnly && dto.productType === 'PERSONAL')
+      throw new BadRequestException('Welcome offers must use BNPL.');
     const target = dto.locationTarget as OfferDto['locationTarget'];
     if (target && target.radiusMeters % 50 !== 0) throw new BadRequestException('Choose a radius in 50-metre increments');
     if (dto.monthlyInterestRateBps !== undefined && dto.monthlyInterestRateBps > s.maxRateBps) {
@@ -388,7 +400,7 @@ export class LenderService {
     this.validateOffer(dto, await this.settings.get());
     const commitment = await this.feeCommitment(org.id);
     const active = dto.active ?? !commitment.required;
-    if (active) await this.checkOfferActivation(org.id);
+    if (active) await this.checkOfferActivation(org.id, dto.productType);
     const [o] = await this.db.insert(loanOffers).values({ ...dto, active, lenderId: org.id }).returning();
     await this.audit.log(user, 'offer.created', 'offer', o.id, { name: o.name });
     return o;
@@ -398,7 +410,7 @@ export class LenderService {
     const org = await this.orgFor(user.id);
     const existing = await this.db.query.loanOffers.findFirst({ where: and(eq(loanOffers.id, id), eq(loanOffers.lenderId, org.id)) });
     if (!existing) throw new NotFoundException('Offer not found');
-    if (dto.active) await this.checkOfferActivation(org.id);
+    if (dto.active) await this.checkOfferActivation(org.id, dto.productType ?? existing.productType);
     this.validateOffer({ ...existing, ...dto }, await this.settings.get());
     const [o] = await this.db.update(loanOffers).set(dto).where(eq(loanOffers.id, id)).returning();
     await this.audit.log(user, 'offer.updated', 'offer', o.id, dto as any);
