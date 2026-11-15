@@ -69,7 +69,17 @@ export class CreditService {
     const affordable = affordableInstallmentCents(profile, existingInstallments, s.affordabilityRatioBps);
 
     const rows = await conn
-      .select({ offer: loanOffers, lenderName: lenderOrgs.name, lenderAvailable: lenderOrgs.availableCents })
+      .select({
+        offer: loanOffers,
+        lenderName: lenderOrgs.name,
+        lenderAvailable: sql<number>`LEAST(${lenderOrgs.availableCents}, (
+          SELECT CASE WHEN ${productType} = 'BNPL' THEN LEAST(c.bnpl_limit - c.bnpl_committed,
+            c.bnpl_customer_limit - COALESCE(u.committed, 0))
+          ELSE c.personal_limit - c.personal_committed END
+          FROM lender_capacity c LEFT JOIN lender_bnpl_usage u ON u.lender_id = c.lender_id AND u.user_id = ${userId}
+          WHERE c.lender_id = ${lenderOrgs.id}
+        ))`,
+      })
       .from(loanOffers)
       .innerJoin(lenderOrgs, eq(loanOffers.lenderId, lenderOrgs.id))
       .where(and(eq(loanOffers.active, true), eq(loanOffers.productType, productType), eq(lenderOrgs.accreditationStatus, 'ACCREDITED'), sql`${lenderOrgs.ownerUserId} <> ${userId}`));

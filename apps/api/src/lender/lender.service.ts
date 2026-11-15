@@ -14,7 +14,7 @@ import type { FileStorage } from '../integrations/storage';
 import type { PaymentGateway } from '../integrations/payments';
 import type { AuthUser } from '../common/auth';
 import { CriteriaDto, FundingDto, LenderOrgDto, OfferDto } from './lender.dto';
-import type { FeeCommitmentDto, FeeCommitmentPaymentDto } from './lender.dto';
+import type { FeeCommitmentDto, FeeCommitmentPaymentDto, LenderCapacityDto } from './lender.dto';
 
 const EDITABLE = ['DRAFT', 'REJECTED', 'SUBMITTED'];
 
@@ -171,12 +171,25 @@ export class LenderService {
     if (dto.type === 'WITHDRAWAL') {
       // Reserve the funds immediately so they can't be lent out while the payout is pending.
       return this.db.transaction(async (tx) => {
+        await tx.select({ id: lenderOrgs.id }).from(lenderOrgs).where(eq(lenderOrgs.id, org.id)).for('update');
         const r = await tx
           .update(lenderOrgs)
           .set({ availableCents: sql`${lenderOrgs.availableCents} - ${dto.amountCents}` })
-          .where(and(eq(lenderOrgs.id, org.id), gte(lenderOrgs.availableCents, dto.amountCents)))
+          .where(and(eq(lenderOrgs.id, org.id), sql`
+            ${lenderOrgs.availableCents} - ${dto.amountCents} >= COALESCE((
+              SELECT c.bnpl_limit - c.bnpl_committed + c.personal_limit + c.guarantee_limit
+                - COALESCE((
+                  SELECT SUM(r.principal)
+                  FROM lender_agreement_reservations r
+                  JOIN personal_agreements a ON a.id = r.agreement_id
+                  JOIN personal_loan_applications app ON app.id = a.application_id
+                  WHERE r.lender_id = c.lender_id AND app.status IN ('FUNDING_PENDING','DISBURSED')
+                ), 0)
+              FROM lender_capacity c WHERE c.lender_id = ${org.id}
+            ), 0)
+          `))
           .returning({ id: lenderOrgs.id });
-        if (!r.length) throw new BadRequestException('Withdrawal exceeds your available funds');
+        if (!r.length) throw new BadRequestException('The withdrawal exceeds funds available outside your active allocations.');
         const [f] = await tx.insert(lenderFunding).values({ lenderId: org.id, type: 'WITHDRAWAL', amountCents: dto.amountCents, reference }).returning();
         await this.audit.log(user, 'lender.withdrawal_requested', 'funding', f.id, { amountCents: dto.amountCents }, tx);
         return f;
@@ -231,6 +244,53 @@ export class LenderService {
   }
 
   // ---------------- offers ----------------
+  async capacity(lenderId: string, conn: DbOrTx = this.db) {
+    const { rows } = await conn.execute<LenderCapacityDto & {
+      bnplCommitted: number; personalCommitted: number; availableCents: number; configured: boolean;
+    } & Record<string, unknown>>(sql`
+      SELECT c.bnpl_limit AS "bnplLimit", c.personal_limit AS "personalLimit",
+        c.guarantee_limit AS "guaranteeLimit", c.bnpl_customer_limit AS "bnplCustomerLimit",
+        COALESCE(c.bnpl_committed, 0) AS "bnplCommitted",
+        COALESCE(c.personal_committed, 0) AS "personalCommitted",
+        l.available_cents AS "availableCents", c.lender_id IS NOT NULL AS configured
+      FROM lender_orgs l LEFT JOIN lender_capacity c ON c.lender_id = l.id WHERE l.id = ${lenderId}
+    `);
+    if (!rows[0]) throw new NotFoundException('Lender not found');
+    return rows[0];
+  }
+
+  async saveCapacity(actor: AuthUser, lenderId: string, input: LenderCapacityDto) {
+    const { bnplLimit, personalLimit, guaranteeLimit, bnplCustomerLimit } = input;
+    if (bnplCustomerLimit > bnplLimit)
+      throw new BadRequestException('The BNPL customer cap must fit within the BNPL allocation.');
+    return this.db.transaction(async tx => {
+      await tx.select({ id: lenderOrgs.id }).from(lenderOrgs).where(eq(lenderOrgs.id, lenderId)).for('update');
+      const current = await this.capacity(lenderId, tx);
+      if (bnplLimit < current.bnplCommitted || personalLimit < current.personalCommitted)
+        throw new BadRequestException('Allocations cannot fall below existing commitments.');
+      const funded = await tx.execute<{ amount: number }>(sql`
+        SELECT COALESCE(SUM(r.principal), 0)::integer AS amount
+        FROM lender_agreement_reservations r JOIN personal_agreements a ON a.id = r.agreement_id
+        JOIN personal_loan_applications app ON app.id = a.application_id
+        WHERE r.lender_id = ${lenderId} AND app.status IN ('FUNDING_PENDING','DISBURSED')
+      `);
+      const remainingCashNeeded = bnplLimit + personalLimit + guaranteeLimit - current.bnplCommitted - funded.rows[0].amount;
+      if (remainingCashNeeded > current.availableCents)
+        throw new BadRequestException('The remaining allocations exceed the lender’s available funds.');
+      const { rows } = await tx.execute(sql`
+        SELECT 1 FROM lender_bnpl_usage WHERE lender_id = ${lenderId} AND committed > ${bnplCustomerLimit} LIMIT 1
+      `);
+      if (rows.length) throw new BadRequestException('The customer cap cannot fall below existing BNPL commitments.');
+      await tx.execute(sql`
+        INSERT INTO lender_capacity (lender_id, bnpl_limit, personal_limit, guarantee_limit, bnpl_customer_limit)
+        VALUES (${lenderId}, ${bnplLimit}, ${personalLimit}, ${guaranteeLimit}, ${bnplCustomerLimit})
+        ON CONFLICT (lender_id) DO UPDATE SET bnpl_limit = excluded.bnpl_limit, personal_limit = excluded.personal_limit,
+          guarantee_limit = excluded.guarantee_limit, bnpl_customer_limit = excluded.bnpl_customer_limit
+      `);
+      await this.audit.log(actor, 'lender.capacity_updated', 'lender', lenderId, { ...input }, tx);
+      return this.capacity(lenderId, tx);
+    });
+  }
   async feeCommitment(lenderId: string, conn: DbOrTx = this.db) {
     const result = await conn.execute<{
       required: boolean;

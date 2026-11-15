@@ -6,6 +6,12 @@ import { createDb } from './client';
 async function main() {
   const { db, pool } = createDb();
   await migrate(db, { migrationsFolder: path.join(__dirname, '../../drizzle') });
+  if (process.env.VERCEL_ENV === 'production') {
+    const { rows } = await pool.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM audit_logs WHERE action = 'lender.capacity_initialized'",
+    );
+    console.log(`Lenders initialised from reconciled funds: ${rows[0].count}`);
+  }
   await pool.end();
   console.log('Migrations applied');
 }

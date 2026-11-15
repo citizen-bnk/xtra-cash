@@ -8,7 +8,7 @@ import { AuditService } from '../common/audit.service';
 import { KycService } from '../consumer/kyc.service';
 import { LoansService } from '../consumer/loans.service';
 import { LenderService } from '../lender/lender.service';
-import { FeeCommitmentDto, FeeCommitmentPaymentDto } from '../lender/lender.dto';
+import { FeeCommitmentDto, FeeCommitmentPaymentDto, LenderCapacityDto } from '../lender/lender.dto';
 import { AffiliateService } from '../affiliate/affiliate.service';
 import { AdminService } from './admin.service';
 
@@ -106,6 +106,16 @@ export class AdminController {
   @Get('lenders/:id/fee-commitment')
   feeCommitment(@Param('id') id: string) {
     return this.lenders.feeCommitment(id);
+  }
+
+  @Get('lenders/:id/capacity')
+  capacity(@Param('id') id: string) {
+    return this.lenders.capacity(id);
+  }
+
+  @Put('lenders/:id/capacity')
+  saveCapacity(@CurrentUser() actor: AuthUser, @Param('id') id: string, @Body() input: LenderCapacityDto) {
+    return this.lenders.saveCapacity(actor, id, input);
   }
 
   @Put('lenders/:id/fee-commitment')
