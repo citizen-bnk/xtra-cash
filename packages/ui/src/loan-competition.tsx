@@ -199,15 +199,41 @@ export function CandidateOffers({ applicationId, onSelected }: { applicationId: 
   const { client } = useAuth();
   const offers = useApi((c) => c.request<CandidateOffer[]>('GET', `/loan-operations/competitions/${applicationId}/offers`), [applicationId]);
   const [busy, setBusy] = useState(''), [error, setError] = useState('');
-  if (!offers.data?.length && !offers.error) return <Alert tone="blue">Your request is with active accredited lenders. XTRA-CASH will notify you when three comparable offers are ready.</Alert>;
+  if (!offers.data?.length && !offers.error) return <Alert tone="blue">Your request is with active accredited lenders. You will be notified when an offer is ready.</Alert>;
   async function select(id: string) {
     setBusy(id); setError('');
     try { await client.request('POST', `/loan-operations/competitions/${applicationId}/offers/${id}/select`, {}); onSelected(); }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not select this offer'); }
     finally { setBusy(''); }
   }
-  return <section className="xc-offer-journey space-y-3"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.15em] text-brand-purple">Lender offers</p><h2 className="text-xl font-bold">Choose your offer</h2><p className="text-sm text-muted">Compare the final costs before accepting.</p></div><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#f3e7f8] text-brand-purple"><BadgeCheck className="h-5 w-5" /></span></div>{offers.data && offers.data.length < 3 ? <Alert tone="blue">{offers.data.length} of 3 offers received. We’ll notify you when comparison is ready.</Alert> : null}{(error || offers.error) ? <Alert tone="red">{error || offers.error}</Alert> : null}<div className="space-y-3">{offers.data?.map((offer) => <Card key={offer.id} className={`overflow-hidden p-0 ${offer.rank === 1 ? 'border-brand/40' : ''}`}><div className={`flex items-center justify-between gap-3 px-4 py-3 ${offer.rank === 1 ? 'bg-gradient-to-r from-[#5c2394] to-[#a617d3] text-white' : 'bg-[#f8f2fc]'}`}><div><span className="text-[10px] font-bold uppercase tracking-wider opacity-75">Offer {offer.rank}</span><strong className="block">{offer.offerName}</strong><span className="text-xs opacity-80">{offer.lenderName}</span></div>{offer.rank === 1 ? <span className="rounded-full bg-white/15 px-2 py-1 text-[10px] font-semibold">Best total cost</span> : <ArrowRight className="h-5 w-5 text-brand-purple" />}</div><dl className="grid grid-cols-2 gap-x-3 gap-y-2 px-4 py-3 text-xs"><div><dt className="text-muted">Monthly instalment</dt><dd className="mt-0.5 text-sm font-bold">{formatZAR(offer.monthlyInstallmentCents)}</dd></div><div><dt className="text-muted">Total repayment</dt><dd className="mt-0.5 text-sm font-bold">{formatZAR(offer.totalRepayableCents)}</dd></div><div><dt className="text-muted">Cost of credit</dt><dd className="mt-0.5 font-semibold">{formatZAR(offer.costOfCreditCents)}</dd></div><div><dt className="text-muted">Interest / month</dt><dd className="mt-0.5 font-semibold">{(offer.monthlyInterestRateBps / 100).toFixed(2)}%</dd></div></dl><div className="px-4 pb-4"><Button className="w-full bg-gradient-to-r from-[#8c00cf] to-[#d91f63] text-white hover:brightness-105" loading={busy === offer.id} disabled={(offers.data?.length ?? 0) < 3 || !!busy} onClick={() => select(offer.id)}>Review this offer <ArrowRight className="h-4 w-4" /></Button></div></Card>)}</div><p className="text-center text-[11px] text-muted">Selecting creates the agreement for you to review. It does not move money.</p></section>;
+  return (
+    <section className="space-y-3" aria-label="Lender offers">
+      <h2 className="text-lg font-bold">Choose your offer</h2>
+      {(error || offers.error) && <Alert tone="red">{error || offers.error}</Alert>}
+      {offers.data?.map(offer => (
+        <Card key={offer.id} className="space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="break-words font-bold text-ink">{offer.offerName}</h3>
+              <p className="text-sm text-ink">{offer.lenderName}</p>
+            </div>
+            {offer.rank === 1 && offers.data!.length > 1 && <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-semibold text-purple-900">Lowest total cost</span>}
+          </div>
+          <dl className="grid grid-cols-2 gap-3 text-sm text-ink">
+            <div><dt>Monthly instalment</dt><dd className="font-bold">{formatZAR(offer.monthlyInstallmentCents)}</dd></div>
+            <div><dt>Total repayment</dt><dd className="font-bold">{formatZAR(offer.totalRepayableCents)}</dd></div>
+          </dl>
+          <details className="text-sm text-ink">
+            <summary className="cursor-pointer font-semibold text-purple-800">Interest and fees</summary>
+            <p className="mt-2">{(offer.monthlyInterestRateBps / 100).toFixed(2)}% monthly interest · {formatZAR(offer.initiationFeeCents)} initiation fee · {formatZAR(offer.monthlyServiceFeeCents)} monthly service fee</p>
+          </details>
+          <Button className="w-full sm:w-auto" loading={busy === offer.id} disabled={!!busy} onClick={() => select(offer.id)}>Review agreement <ArrowRight size={16} /></Button>
+        </Card>
+      ))}
+    </section>
+  );
 }
+
 export function LoanJourney({
   status,
   reviewer,
