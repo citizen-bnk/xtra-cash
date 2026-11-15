@@ -4,6 +4,7 @@ import type { Response } from 'express';
 import { CurrentUser, Roles, type AuthUser } from '../common/auth';
 import { LoansService } from '../consumer/loans.service';
 import { LenderService } from './lender.service';
+import { LenderCapacityDto } from './lender.dto';
 import { SettingsService } from '../common/settings.service';
 import { CriteriaDto, DocumentDto, FundingDto, LenderOrgDto, OfferDto, SubmitAccreditationDto, UpdateOfferDto } from './lender.dto';
 import { OfferAssistantService } from './offer-assistant.service';
@@ -22,6 +23,16 @@ class AssistantDto {
 @Controller('lender')
 export class LenderController {
   constructor(private lender: LenderService, private loans: LoansService, private settings: SettingsService, private assistant: OfferAssistantService) {}
+
+  @Get('capacity')
+  async capacity(@CurrentUser() user: AuthUser) {
+    return this.lender.capacity((await this.lender.orgFor(user.id)).id);
+  }
+
+  @Put('capacity')
+  async saveCapacity(@CurrentUser() user: AuthUser, @Body() input: LenderCapacityDto) {
+    return this.lender.saveCapacity(user, (await this.lender.orgFor(user.id)).id, input);
+  }
 
   @Get('fee-commitment')
   async feeCommitment(@CurrentUser() user: AuthUser) {

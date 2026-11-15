@@ -426,7 +426,12 @@ export class SettlementService {
       await tx
         .update(agreements)
         .set({ status: "ACCEPTED", acceptedBy: a.id, acceptedAt: new Date() })
-        .where(eq(agreements.id, ag.id));
+        .where(eq(agreements.id, ag.id))
+        .catch((error: { code?: string; cause?: { code?: string; message?: string }; message?: string }) => {
+          const cause = error.cause ?? error;
+          if (cause.code === 'PXC01') throw new ConflictException(cause.message);
+          throw error;
+        });
       await tx
         .update(applications)
         .set({ status: "ACCEPTED" })
@@ -604,7 +609,7 @@ export class SettlementService {
           .filter((p) => p.terms.offerId === ag.terms.offerId)
           .reduce((n, p) => n + p.terms.principalCents, 0);
       if (
-        !product?.active ||
+        !product ||
         committedPrincipal + ag.terms.principalCents >
           product.maxAmountPerUserCents
       )

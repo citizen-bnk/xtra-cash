@@ -83,11 +83,13 @@ export function allocate(
   const allocations: Allocation[] = [];
   let remaining = amountCents;
   let installmentLeft = affordableCents;
+  const usedByLender = new Map<string, number>();
 
   for (let i = 0; i < sorted.length; i++) {
     const offer = sorted[i];
     if (remaining <= 0) break;
-    const cap = offerCapacity(offer, installmentLeft);
+    const alreadyAllocated = usedByLender.get(offer.lenderId) ?? 0;
+    const cap = offerCapacity({ ...offer, lenderAvailableCents: offer.lenderAvailableCents - alreadyAllocated }, installmentLeft);
     if (cap <= 0) continue;
     let take = Math.min(cap, remaining);
     // If this lender can't cover everything, leave at least the next lender's minimum for them.
@@ -103,6 +105,7 @@ export function allocate(
     }
     const q = quoteLoan(take, offer);
     allocations.push({ offer, principalCents: take, monthlyInstallmentCents: q.monthlyInstallmentCents });
+    usedByLender.set(offer.lenderId, alreadyAllocated + take);
     remaining -= take;
     installmentLeft -= q.monthlyInstallmentCents;
   }

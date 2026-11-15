@@ -4,6 +4,7 @@ import { Banknote, BadgeCheck, Layers3, Plus, ShoppingCart, Users } from 'lucide
 import { bpsToPercent, EMPLOYMENT_LABELS, EmploymentStatus, formatZAR, PROVINCES, quoteLoan, type LoanOffer, type OfferInput } from '@xtra/shared';
 import { Alert, Button, Card, cx, Empty, Field, Input, Loading, Modal, MoneyInput, PageHeader, RecordActions, RecordLine, Textarea, useAction, useApi, useAuth, useToast } from '@xtra/ui';
 import { OfferAssistant } from '@/components/OfferAssistant';
+import { LenderCapacity } from '@xtra/ui';
 import { LocationTargetPicker } from '@/components/LocationTargetPicker';
 
 const blank: OfferInput = {
@@ -61,6 +62,7 @@ export default function OffersPage() {
       {activationBlocked && <Alert tone="amber" title="Platform fee commitment">
         {commitment.data?.commitmentCents == null ? 'Awaiting your three-month fee forecast.' : `${formatZAR(commitment.data.commitmentCents)} due before offer activation.`} You can save draft offers.
       </Alert>}
+      <LenderCapacity path="/lender/capacity" />
       <OfferAssistant onManual={() => { setDraft(null); setEditing('new'); }} onReview={d => { setDraft(d); setEditing('new'); }} />
       <h2 className="mb-4 text-lg font-bold">Your offers</h2>
       {offers.data.length === 0 ? (

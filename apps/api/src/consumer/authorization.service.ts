@@ -57,6 +57,8 @@ export class AuthorizationService {
       const txId = await this.db.transaction(async (tx) => this.approve(tx, card, input));
       return (await this.findByKey(input.idempotencyKey, txId))!;
     } catch (e: any) {
+      const databaseError = e?.cause ?? e;
+      if (databaseError?.code === 'PXC01') e = new Decline(databaseError.message);
       if (e?.code === '23505' && String(e?.constraint ?? '').includes('idempotency')) {
         return (await this.findByKey(input.idempotencyKey))!;
       }
@@ -126,11 +128,11 @@ export class AuthorizationService {
     }
 
     const now = new Date();
-    for (const a of plan) {
+    for (const a of [...plan].sort((left, right) => left.offer.lenderId.localeCompare(right.offer.lenderId))) {
       const reserved = await tx
         .update(lenderOrgs)
         .set({ availableCents: sql`${lenderOrgs.availableCents} - ${a.principalCents}` })
-        .where(and(eq(lenderOrgs.id, a.offer.lenderId), gte(lenderOrgs.availableCents, a.principalCents)))
+        .where(and(eq(lenderOrgs.id, a.offer.lenderId), eq(lenderOrgs.accreditationStatus, 'ACCREDITED'), gte(lenderOrgs.availableCents, a.principalCents)))
         .returning({ id: lenderOrgs.id });
       if (!reserved.length) throw new Decline('Lender funds changed, please retry');
 

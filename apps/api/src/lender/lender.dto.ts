@@ -76,3 +76,10 @@ export class FeeCommitmentPaymentDto {
   @IsString() @MinLength(3) @MaxLength(120) paymentReference: string;
   @IsInt() @Min(1) @Max(30_000_000) amountCents: number;
 }
+
+export class LenderCapacityDto {
+  @IsInt() @Min(0) @Max(1_000_000_000) bnplLimit: number;
+  @IsInt() @Min(0) @Max(1_000_000_000) personalLimit: number;
+  @IsInt() @Min(0) @Max(1_000_000_000) guaranteeLimit: number;
+  @IsInt() @Min(0) @Max(10_000_000) bnplCustomerLimit: number;
+}

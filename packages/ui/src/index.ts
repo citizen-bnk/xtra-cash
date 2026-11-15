@@ -10,3 +10,4 @@ export * from './routing';
 export * from './loan-actions';
 export * from './loan-competition';
 export * from './lender-review';
+export * from './lender-capacity';
