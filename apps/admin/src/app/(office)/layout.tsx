@@ -48,6 +48,7 @@ export default function OfficeLayout({ children }: { children: React.ReactNode }
     { href: '/offers', label: 'Loan offers', icon: Tags },
     { href: '/loans', label: 'Loan book', icon: FileStack },
     { href: '/applications', label: 'Loan applications', icon: FileStack },
+    { href: '/guarantees', label: 'Guarantee requests', icon: FileStack },
     { href: '/reports', label: 'Revenue & ledger', icon: ScrollText },
     { href: '/transactions', label: 'Card transactions', icon: Activity },
     { href: '/billers', label: 'Biller network', icon: FileStack },

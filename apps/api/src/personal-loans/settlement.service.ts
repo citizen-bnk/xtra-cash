@@ -323,6 +323,14 @@ export class SettlementService {
         throw new BadRequestException(
           "The selected product belongs to another lender.",
         );
+      const guarantee = await tx.execute<{ id: string; lender_id: string; principal_cents: number; term_months: number }>(sql`
+        SELECT id,lender_id,principal_cents,term_months FROM personal_guarantees
+        WHERE application_id=${app.id} AND status='SIGNED'
+      `);
+      const signedGuarantee = guarantee.rows[0];
+      if (signedGuarantee && (signedGuarantee.lender_id !== lender.id
+        || signedGuarantee.principal_cents !== app.amountCents || signedGuarantee.term_months !== app.termMonths))
+        throw new ConflictException('The signed guarantee belongs to a different lender or loan terms.');
       const offer = input.applicationOnly ? await createApplicationOffer(tx, template, app) : template;
       if (offer.termMonths !== app.termMonths || app.amountCents < offer.minAmountCents || app.amountCents > offer.maxAmountPerUserCents)
         throw new BadRequestException('The loan amount or term does not match the selected product.');
@@ -362,14 +370,17 @@ export class SettlementService {
         monthlyInstallmentCents: quote.monthlyInstallmentCents,
       };
       const content = `XTRA-CASH PERSONAL LOAN — PRE-AGREEMENT QUOTATION AND CREDIT AGREEMENT\nApplication: ${app.id}\nBorrower: ${u.firstName} ${u.lastName}\nLender: ${lender.name}\nNCR reference: ${lender.ncrNumber}\nLoan payment amount: ${formatZAR(app.amountCents)}\nMonthly interest: ${(offer.monthlyInterestRateBps / 100).toFixed(2)}%\nInitiation fee financed: ${formatZAR(offer.initiationFeeCents)}\nMonthly service fee: ${formatZAR(offer.monthlyServiceFeeCents)}\nTerm: ${offer.termMonths} months\nFirst monthly instalment: ${formatZAR(quote.monthlyInstallmentCents)}\nTotal repayable: ${formatZAR(quote.totalRepayableCents)}\nTotal credit cost: ${formatZAR(quote.costOfCreditCents)}\nCredit cost multiple: ${(quote.totalRepayableCents / app.amountCents).toFixed(4)}\nInstalment amounts: ${quote.schedule.map((i) => `${i.seq}: ${formatZAR(i.amountCents)}`).join("; ")}\nInstalment dates: monthly from one month after payment confirmation. Exact dates are issued on your funding receipt.\nOffer expires: ${expires.toISOString()}\nAcceptance alone does not confirm payment has been sent. A bank withdrawal is a separate transfer of your available cash and does not create another loan.\n\nLENDER-APPROVED TERMS\n${input.agreementTerms?.trim() || "Approved lender terms are recorded in the selected personal-loan product and will be shown to the applicant before acceptance."}`;
+      const guaranteeNotice = signedGuarantee ? `\n\nSigned guarantee reference: ${signedGuarantee.id}` : '';
+      const fullContent = content + guaranteeNotice +
+        `\n\nBANK DEPOSIT REFERENCE: ${terms.depositReference}\nThe lender pays the loan principal to the XTRA-CASH settlement account using this reference. After receipt is confirmed, the funds are credited to the applicant's XTRA-CASH wallet.`;
       const [agreement] = await tx
         .insert(agreements)
         .values({
           applicationId: id,
           userId: app.userId,
           lenderId: lender.id,
-          content: content + `\n\nBANK DEPOSIT REFERENCE: ${terms.depositReference}\nThe lender pays the loan principal to the XTRA-CASH settlement account using this reference. After receipt is confirmed, the funds are credited to the applicant's XTRA-CASH wallet.`,
-          digest: digest(content + `\n\nBANK DEPOSIT REFERENCE: ${terms.depositReference}\nThe lender pays the loan principal to the XTRA-CASH settlement account using this reference. After receipt is confirmed, the funds are credited to the applicant's XTRA-CASH wallet.`),
+          content: fullContent,
+          digest: digest(fullContent),
           terms,
           assessmentReference: input.assessmentReference?.trim() || `assessment-${id.slice(0, 8)}`,
           mandateReference: input.mandateReference?.trim() || `mandate-pending-${id.slice(0, 8)}`,

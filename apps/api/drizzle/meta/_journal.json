@@ -232,6 +232,13 @@
       "when": 1794773340000,
       "tag": "0032_application_offers",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794773400000,
+      "tag": "0033_guarantee_requests",
+      "breakpoints": true
     }
   ]
 }
