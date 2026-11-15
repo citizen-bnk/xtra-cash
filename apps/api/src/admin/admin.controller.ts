@@ -8,6 +8,7 @@ import { AuditService } from '../common/audit.service';
 import { KycService } from '../consumer/kyc.service';
 import { LoansService } from '../consumer/loans.service';
 import { LenderService } from '../lender/lender.service';
+import { FeeCommitmentDto, FeeCommitmentPaymentDto } from '../lender/lender.dto';
 import { AffiliateService } from '../affiliate/affiliate.service';
 import { AdminService } from './admin.service';
 
@@ -102,6 +103,21 @@ export class AdminController {
   @Get('lenders') lendersList(@Query('status') status?: string) {
     return this.admin.lendersList(status);
   }
+  @Get('lenders/:id/fee-commitment')
+  feeCommitment(@Param('id') id: string) {
+    return this.lenders.feeCommitment(id);
+  }
+
+  @Put('lenders/:id/fee-commitment')
+  saveFeeCommitment(@CurrentUser() actor: AuthUser, @Param('id') id: string, @Body() dto: FeeCommitmentDto) {
+    return this.lenders.recordFeeCommitment(actor, id, dto);
+  }
+
+  @Post('lenders/:id/fee-commitment/payment')
+  confirmFeePayment(@CurrentUser() actor: AuthUser, @Param('id') id: string, @Body() dto: FeeCommitmentPaymentDto) {
+    return this.lenders.confirmFeePayment(actor, id, dto);
+  }
+
   @Get('lenders/:id') lender(@Param('id') id: string) {
     return this.admin.lender(id);
   }

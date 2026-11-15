@@ -14,6 +14,7 @@ import type { FileStorage } from '../integrations/storage';
 import type { PaymentGateway } from '../integrations/payments';
 import type { AuthUser } from '../common/auth';
 import { CriteriaDto, FundingDto, LenderOrgDto, OfferDto } from './lender.dto';
+import type { FeeCommitmentDto, FeeCommitmentPaymentDto } from './lender.dto';
 
 const EDITABLE = ['DRAFT', 'REJECTED', 'SUBMITTED'];
 
@@ -230,6 +231,79 @@ export class LenderService {
   }
 
   // ---------------- offers ----------------
+  async feeCommitment(lenderId: string, conn: DbOrTx = this.db) {
+    const result = await conn.execute<{
+      required: boolean;
+      projectedFeesCents: number | null;
+      commitmentCents: number | null;
+      agreementReference: string | null;
+      forecastBasis: string | null;
+      paidAt: string | null;
+    }>(sql`
+      SELECT l.fee_commitment_required AS required, c.projected_fees_cents AS "projectedFeesCents",
+        c.commitment_cents AS "commitmentCents", c.agreement_reference AS "agreementReference",
+        c.forecast_basis AS "forecastBasis", c.paid_at AS "paidAt"
+      FROM lender_orgs l LEFT JOIN lender_fee_commitments c ON c.lender_id = l.id
+      WHERE l.id = ${lenderId}
+    `);
+    const commitment = result.rows[0];
+    if (!commitment) throw new NotFoundException('Lender not found');
+    return commitment;
+  }
+
+  async recordFeeCommitment(actor: AuthUser, id: string, dto: FeeCommitmentDto) {
+    const agreementReference = dto.agreementReference.trim();
+    const forecastBasis = dto.forecastBasis.trim();
+    if (agreementReference.length < 3 || forecastBasis.length < 10)
+      throw new BadRequestException('Enter the signed agreement reference and forecast basis.');
+    return this.db.transaction(async tx => {
+      const saved = await tx.execute(sql`
+        INSERT INTO lender_fee_commitments (lender_id, projected_fees_cents, agreement_reference, forecast_basis)
+        SELECT id, ${dto.projectedFeesCents}, ${agreementReference}, ${forecastBasis} FROM lender_orgs WHERE id = ${id}
+        ON CONFLICT (lender_id) DO UPDATE SET projected_fees_cents = excluded.projected_fees_cents,
+          agreement_reference = excluded.agreement_reference, forecast_basis = excluded.forecast_basis
+        WHERE lender_fee_commitments.paid_at IS NULL
+        RETURNING commitment_cents
+      `);
+      const commitment = await this.feeCommitment(id, tx);
+      if (!saved.rows.length) throw new BadRequestException('A paid commitment cannot be edited.');
+      await this.audit.log(actor, 'lender.fee_commitment_recorded', 'lender', id, {
+        projectedFeesCents: dto.projectedFeesCents, commitmentCents: commitment.commitmentCents,
+        agreementReference, forecastBasis,
+      }, tx);
+      return commitment;
+    });
+  }
+
+  async confirmFeePayment(actor: AuthUser, id: string, dto: FeeCommitmentPaymentDto) {
+    const paymentReference = dto.paymentReference.trim().toUpperCase();
+    if (paymentReference.length < 3) throw new BadRequestException('Enter the verified bank payment reference.');
+    try {
+      return await this.db.transaction(async tx => {
+        const updated = await tx.execute(sql`
+          UPDATE lender_fee_commitments SET payment_reference = ${paymentReference}, paid_at = now()
+          WHERE lender_id = ${id} AND paid_at IS NULL AND commitment_cents = ${dto.amountCents}
+          RETURNING lender_id
+        `);
+        if (!updated.rows.length) throw new BadRequestException('The payment must match the recorded, unpaid commitment.');
+        await this.audit.log(actor, 'lender.fee_commitment_paid', 'lender', id, {
+          paymentReference, amountCents: dto.amountCents,
+        }, tx);
+        return this.feeCommitment(id, tx);
+      });
+    } catch (error) {
+      if ((error as { cause?: { code?: string } }).cause?.code === '23505')
+        throw new BadRequestException('That bank payment reference was already recorded.');
+      throw error;
+    }
+  }
+
+  async checkOfferActivation(lenderId: string) {
+    const commitment = await this.feeCommitment(lenderId);
+    if (commitment.required && !commitment.paidAt)
+      throw new ForbiddenException('Pay the platform fee commitment before activating offers.');
+  }
+
   private validateOffer(dto: Partial<Record<keyof OfferDto, unknown>> & Partial<Pick<OfferDto, "monthlyInterestRateBps" | "monthlyServiceFeeCents" | "minAmountCents" | "maxAmountPerUserCents" | "minAge" | "maxAge">>, s: PlatformSettings) {
     const target = dto.locationTarget as OfferDto['locationTarget'];
     if (target && target.radiusMeters % 50 !== 0) throw new BadRequestException('Choose a radius in 50-metre increments');
@@ -252,7 +326,10 @@ export class LenderService {
   async createOffer(user: AuthUser, dto: OfferDto) {
     const org = await this.orgFor(user.id);
     this.validateOffer(dto, await this.settings.get());
-    const [o] = await this.db.insert(loanOffers).values({ ...dto, lenderId: org.id }).returning();
+    const commitment = await this.feeCommitment(org.id);
+    const active = dto.active ?? !commitment.required;
+    if (active) await this.checkOfferActivation(org.id);
+    const [o] = await this.db.insert(loanOffers).values({ ...dto, active, lenderId: org.id }).returning();
     await this.audit.log(user, 'offer.created', 'offer', o.id, { name: o.name });
     return o;
   }
@@ -261,6 +338,7 @@ export class LenderService {
     const org = await this.orgFor(user.id);
     const existing = await this.db.query.loanOffers.findFirst({ where: and(eq(loanOffers.id, id), eq(loanOffers.lenderId, org.id)) });
     if (!existing) throw new NotFoundException('Offer not found');
+    if (dto.active) await this.checkOfferActivation(org.id);
     this.validateOffer({ ...existing, ...dto }, await this.settings.get());
     const [o] = await this.db.update(loanOffers).set(dto).where(eq(loanOffers.id, id)).returning();
     await this.audit.log(user, 'offer.updated', 'offer', o.id, dto as any);
