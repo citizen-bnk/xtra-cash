@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, desc, eq, gte, lte, ne, or, inArray } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lte, ne, or, inArray } from 'drizzle-orm';
 import { applicationLenderAccess, competitionConsents, loanCompetitions } from './lender-ai.schema';
 import {RoutingService} from './routing';
 import { ageOn, parseSaId, quoteLoan } from '@xtra/shared';
@@ -44,7 +44,7 @@ export class PersonalLoanService {
     const filters = [eq(loanOffers.productType, 'PERSONAL'), eq(loanOffers.active, true), eq(lenderOrgs.accreditationStatus, 'ACCREDITED')];
     if (dto.amountCents) filters.push(lte(loanOffers.minAmountCents, dto.amountCents), gte(loanOffers.maxAmountPerUserCents, dto.amountCents));
     if (dto.termMonths) filters.push(eq(loanOffers.termMonths, dto.termMonths));
-    const [option] = await this.db.select({ id: loanOffers.id }).from(loanOffers).innerJoin(lenderOrgs, eq(loanOffers.lenderId, lenderOrgs.id)).where(and(...filters)).limit(1);
+    const [option] = await this.db.select({ id: loanOffers.id }).from(loanOffers).innerJoin(lenderOrgs, eq(loanOffers.lenderId, lenderOrgs.id)).where(and(...filters, isNull(loanOffers.applicationId))).limit(1);
     // No identity lookup, credit decision, named lenders or raw identity logging on this public endpoint.
     return { potentialOptions: !!option, verificationRequired: true, message: option ? 'Personal loan products may fit your request. Complete KYC and FICA to check your match and see lenders.' : 'No personal loan products fit this request right now. You can still submit an application for platform review.', basis: 'Product availability only. Identity, affordability and lender approval are still required.' };
   }

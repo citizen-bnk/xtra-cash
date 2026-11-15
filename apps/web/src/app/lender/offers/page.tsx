@@ -52,7 +52,7 @@ export default function OffersPage() {
 
   return (
     <div>
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-gradient-to-r from-[#1b1030] to-[#7c239d] p-5 text-white">
+      <header className="xc-brand-banner mb-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl p-5 text-white">
         <div><h1 className="text-xl font-bold text-white">Your offers</h1><p className="mt-1 text-sm text-white">{activeOffers.length} active · {offers.data.length} total</p></div>
         <Button onClick={() => { setDraft(null); setEditing('new'); }}><Plus size={18} /> New offer</Button>
       </header>

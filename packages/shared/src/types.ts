@@ -80,6 +80,8 @@ export interface OfferCriteria {
 }
 
 export interface LoanOffer extends OfferCriteria {
+  applicationId?: string | null;
+  welcomeFallback?: boolean;
   suspended?: boolean;
   welcomeOnly?: boolean;
   incomeMultiple?: number;

@@ -79,11 +79,22 @@ h1, h2, h3, h4 {
   font-family: var(--font-display);
   letter-spacing: 0;
 }
-h1, h2 {
-  color: var(--color-brand-purple);
+@layer base {
+  h1, h2 {
+    color: var(--color-brand-purple);
+  }
+  :where(.xc-app-theme) :where(.text-white) :is(h1, h2, h3, h4) {
+    color: inherit;
+  }
 }
-.text-white h1, .text-white h2, h1.text-white, h2.text-white {
+
+.xc-brand-banner {
   color: #fff;
+  background: linear-gradient(112deg, #32104e 0%, #63209e 56%, #9b187c 100%);
+}
+
+.xc-brand-banner :is(h1, h2, h3, h4) {
+  color: inherit;
 }
 .font-display {
   font-family: var(--font-display);

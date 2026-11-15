@@ -3,6 +3,7 @@ const ref = z.string().trim().min(1).max(500);
 export const approveInput = z
   .object({
     offerId: z.string().min(1).max(100),
+    applicationOnly: z.literal(true).optional(),
     assessmentReference: ref.optional(),
     mandateReference: ref.optional(),
     legalReference: ref.optional(),

@@ -44,6 +44,7 @@ import { offerCapacity } from "../consumer/credit-engine";
 import { LenderService } from "../lender/lender.service";
 import { parse } from "../payday/payday.dto";
 import { approveInput } from "./settlement.dto";
+import { createApplicationOffer } from './application-offer';
 import { decryptIdentity, encryptIdentity } from "../auth/identity-crypto";
 import { quoteLoan } from "@xtra/shared";
 const openStates: (typeof applications.$inferSelect.status)[] = [
@@ -333,7 +334,7 @@ export class LoanOperationsService {
       const { competition } = await this.visible(id, tx);
       const org = await this.org(a, tx);
       if (app.userId === a.id) throw new NotFoundException();
-      const [product] = await tx
+      const [template] = await tx
         .select()
         .from(loanOffers)
         .where(
@@ -344,10 +345,11 @@ export class LoanOperationsService {
             eq(loanOffers.productType, "PERSONAL"),
           ),
         );
-      if (!product)
+      if (!template || (template.applicationId && template.applicationId !== id))
         throw new BadRequestException(
           "Choose your own active personal-loan product.",
         );
+      const product = input.applicationOnly ? await createApplicationOffer(tx, template, app) : template;
       const ctx = await this.credit.context(app.userId, tx, "PERSONAL", app),
         match = ctx.eligible.find((x) => x.offerId === product.id);
       if (
@@ -382,15 +384,23 @@ export class LoanOperationsService {
           );
       }
       const quote = quoteLoan(app.amountCents, product);
+      const decisionPayload = { ...input, applicationOnly: undefined, offerId: product.id };
       const [result] = await tx.insert(applicationCandidateOffers).values({
         applicationId: id,
         lenderId: org.id,
         offerId: product.id,
-        decisionPayload: input,
+        decisionPayload,
         monthlyInstallmentCents: quote.monthlyInstallmentCents,
         totalRepayableCents: quote.totalRepayableCents,
         costOfCreditCents: quote.costOfCreditCents,
-      }).onConflictDoUpdate({ target: [applicationCandidateOffers.applicationId, applicationCandidateOffers.lenderId], set: { offerId: product.id, decisionPayload: input, monthlyInstallmentCents: quote.monthlyInstallmentCents, totalRepayableCents: quote.totalRepayableCents, costOfCreditCents: quote.costOfCreditCents, status: 'SUBMITTED', updatedAt: new Date() } }).returning();
+      }).onConflictDoUpdate({
+        target: [applicationCandidateOffers.applicationId, applicationCandidateOffers.lenderId],
+        set: {
+          offerId: product.id, decisionPayload, monthlyInstallmentCents: quote.monthlyInstallmentCents,
+          totalRepayableCents: quote.totalRepayableCents, costOfCreditCents: quote.costOfCreditCents,
+          status: 'SUBMITTED', updatedAt: new Date(),
+        },
+      }).returning();
       await this.audit.log(
         a,
         "personal_loan.candidate_offer_submitted",

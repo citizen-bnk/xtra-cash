@@ -19,6 +19,8 @@ export interface ConsumerProfile {
 }
 
 export interface CandidateOffer extends LoanTerms {
+  welcomeOnly?: boolean;
+  welcomeFallback?: boolean;
   offerId: string;
   offerName: string;
   lenderId: string;

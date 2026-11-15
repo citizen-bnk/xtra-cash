@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { and, count, desc, eq, gte, inArray, lte, sql, SQL } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNull, lte, sql, SQL } from 'drizzle-orm';
 import { REQUIRED_DOCUMENTS, type PlatformSettings } from '@xtra/shared';
 import { InjectDb } from '../common/db.module';
 import { Db, DbOrTx } from '../db/client';
@@ -394,7 +394,7 @@ export class LenderService {
   }
 
   listOffers(lenderId: string) {
-    return this.db.query.loanOffers.findMany({ where: eq(loanOffers.lenderId, lenderId), orderBy: desc(loanOffers.createdAt) });
+    return this.db.query.loanOffers.findMany({ where: and(eq(loanOffers.lenderId, lenderId), isNull(loanOffers.applicationId)), orderBy: desc(loanOffers.createdAt) });
   }
 
   async createOffer(user: AuthUser, dto: OfferDto) {
@@ -410,8 +410,9 @@ export class LenderService {
 
   async updateOffer(user: AuthUser, id: string, dto: Partial<OfferDto>) {
     const org = await this.orgFor(user.id);
-    const existing = await this.db.query.loanOffers.findFirst({ where: and(eq(loanOffers.id, id), eq(loanOffers.lenderId, org.id)) });
+    const existing = await this.db.query.loanOffers.findFirst({ where: and(eq(loanOffers.id, id), eq(loanOffers.lenderId, org.id), isNull(loanOffers.applicationId)) });
     if (!existing) throw new NotFoundException('Offer not found');
+    if (existing.welcomeFallback) throw new ForbiddenException('The platform manages this welcome fallback.');
     if (dto.active) await this.checkOfferActivation(org.id, dto.productType ?? existing.productType);
     this.validateOffer({ ...existing, ...dto }, await this.settings.get());
     const [o] = await this.db.update(loanOffers).set(dto).where(eq(loanOffers.id, id)).returning();

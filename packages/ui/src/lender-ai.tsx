@@ -351,6 +351,7 @@ export function ManualDecisionForm({
         : c.lender.offers(),
     [me?.id],
   );
+  const [applicationOnly, setApplicationOnly] = useState(false);
   const [draft, setDraft] = useState({
       offerId: "",
       assessmentReference: "",
@@ -371,7 +372,10 @@ export function ManualDecisionForm({
         "POST",
         endpoint ?? `/personal-loans/applications/${applicationId}/approve`,
         {
-          ...draft,
+          offerId: draft.offerId,
+          ...Object.fromEntries(Object.entries(draft).filter(([key, value]) =>
+            !['offerId', 'assessedAt', 'expiresAt'].includes(key) && value.trim())),
+          ...(applicationOnly ? { applicationOnly: true } : {}),
           ...(draft.assessedAt ? { assessedAt: new Date(draft.assessedAt).toISOString() } : {}),
           ...(draft.expiresAt ? { expiresAt: new Date(draft.expiresAt).toISOString() } : {}),
           responsibleLendingConfirmed: true,
@@ -386,9 +390,16 @@ export function ManualDecisionForm({
   }
   return (
     <Card className="space-y-4">
-      <h2 className="text-xl font-bold">Guided lending decision</h2>
+      <h2 className="text-xl font-bold">Prepare an offer</h2>
       {error && <Alert tone="red">{error}</Alert>}
-      <Field label="Personal-loan product">
+      {request && <label className="flex min-h-10 items-center gap-2 text-sm font-semibold">
+        <input type="checkbox" checked={applicationOnly} onChange={event => {
+          setApplicationOnly(event.target.checked);
+          setDraft(value => ({ ...value, offerId: '' }));
+        }} />
+        Make a once-off offer for this application
+      </label>}
+      <Field label={applicationOnly ? 'Pricing and eligibility template' : 'Personal-loan product'}>
         <Select
           value={draft.offerId}
           onChange={(e) => setDraft({ ...draft, offerId: e.target.value })}
@@ -399,7 +410,8 @@ export function ManualDecisionForm({
               (o) =>
                 o.productType === "PERSONAL" &&
                 o.active &&
-                (!request ||
+                (applicationOnly ? !o.applicationId : !o.applicationId || o.applicationId === applicationId) &&
+                (applicationOnly || !request ||
                   (o.termMonths === request.termMonths &&
                     o.minAmountCents <= request.amountCents &&
                     o.maxAmountPerUserCents >= request.amountCents &&
@@ -462,7 +474,7 @@ export function ManualDecisionForm({
         responsible-lending checks and approved these terms and repayment
         arrangements.
       </label>
-      <Button disabled={!confirmed} loading={busy} onClick={submit}>
+      <Button disabled={!confirmed || !draft.offerId} loading={busy} onClick={submit}>
         Authorise offer and advance
       </Button>
     </Card>

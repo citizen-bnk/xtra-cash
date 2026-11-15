@@ -32,8 +32,9 @@ import {
 } from "./work-assistant";
 import { VaultService } from './vault.service';
 import { CustomerAssistantController } from './customer-assistant';
+import { MarketingModule } from '../marketing/marketing.module';
 @Module({
-  imports: [ConsumerModule,LenderModule],
+  imports: [ConsumerModule, LenderModule, MarketingModule],
   controllers: [
     PersonalCheckoutController,
     LoanOperationsController,
