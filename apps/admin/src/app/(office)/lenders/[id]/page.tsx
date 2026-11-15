@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { FeeCommitment } from './FeeCommitment';
 import { use, useState } from 'react';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { bpsToPercent, DOCUMENT_LABELS, formatZAR } from '@xtra/shared';
@@ -57,6 +58,7 @@ export default function LenderDetail({ params }: { params: Promise<{ id: string 
           </div>
         }
       />
+      <FeeCommitment lenderId={id} />
       {l.assistedAccreditation && (
         <Alert tone={l.accreditationFeePaid ? 'blue' : 'amber'} title="Assisted accreditation">
           Fee {formatZAR(l.accreditationFeeCents)} — {l.accreditationFeePaid ? 'paid' : 'not yet paid (cannot accredit until paid)'}. Compliance helps this lender obtain NCR registration and documents.

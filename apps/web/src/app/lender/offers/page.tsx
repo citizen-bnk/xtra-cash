@@ -30,6 +30,8 @@ export default function OffersPage() {
   const toast = useToast();
   const offers = useApi((c) => c.lender.offers());
   const org = useApi((c) => c.lender.org());
+  const commitment = useApi(c => c.request<{ required: boolean; commitmentCents: number | null; paidAt: string | null }>('GET', '/lender/fee-commitment'));
+  const activationBlocked = commitment.data?.required === true && !commitment.data.paidAt;
   const toggle = useAction(async (offer: LoanOffer) => {
     await client.lender.updateOffer(offer.id, { active: !offer.active });
     toast(offer.active ? 'Offer paused' : 'Offer activated');
@@ -56,6 +58,9 @@ export default function OffersPage() {
       />
       {!live && <div className="mb-4"><Alert tone="amber">Offers go live for shoppers once your stall is accredited.</Alert></div>}
       {toggle.error && <div className="mb-4"><Alert tone="red">{toggle.error}</Alert></div>}
+      {activationBlocked && <Alert tone="amber" title="Platform fee commitment">
+        {commitment.data?.commitmentCents == null ? 'Awaiting your three-month fee forecast.' : `${formatZAR(commitment.data.commitmentCents)} due before offer activation.`} You can save draft offers.
+      </Alert>}
       <OfferAssistant onManual={() => { setDraft(null); setEditing('new'); }} onReview={d => { setDraft(d); setEditing('new'); }} />
       <h2 className="mb-4 text-lg font-bold">Your offers</h2>
       {offers.data.length === 0 ? (
@@ -87,6 +92,7 @@ export default function OffersPage() {
         <OfferEditor
           offer={editing === 'new' ? null : editing}
           draft={draft}
+          activationBlocked={activationBlocked}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -108,7 +114,7 @@ function Kv({ k, v }: { k: string; v: React.ReactNode }) {
   );
 }
 
-function OfferEditor({ offer, draft, onClose, onSaved }: { offer: LoanOffer | null; draft: OfferInput | null; onClose: () => void; onSaved: () => void }) {
+function OfferEditor({ offer, draft, activationBlocked, onClose, onSaved }: { offer: LoanOffer | null; draft: OfferInput | null; activationBlocked: boolean; onClose: () => void; onSaved: () => void }) {
   const { client } = useAuth();
   const caps = useApi((c) => c.lender.fundingInstructions());
   const [f, setF] = useState<OfferInput>(() => offer ? { ...blank, ...offer, description: offer.description ?? '' } : draft ? { ...blank, ...draft } : { ...blank });
@@ -135,6 +141,7 @@ function OfferEditor({ offer, draft, onClose, onSaved }: { offer: LoanOffer | nu
 
   const save = useAction(async () => {
     const { id: _i, lenderId: _l, createdAt: _c, updatedAt: _u, lender: _x, ...payload } = f as any;
+    if (activationBlocked) payload.active = false;
     if (offer) await client.lender.updateOffer(offer.id, payload);
     else await client.lender.createOffer(payload);
     onSaved();
@@ -199,7 +206,7 @@ function OfferEditor({ offer, draft, onClose, onSaved }: { offer: LoanOffer | nu
           </div>
         )}
         {save.error && <Alert tone="red">{save.error}</Alert>}
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.active ?? true} onChange={e => setF({ ...f, active: e.target.checked })} /> Make this offer active when saved</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={activationBlocked} checked={!activationBlocked && (f.active ?? true)} onChange={e => setF({ ...f, active: e.target.checked })} /> Make this offer active when saved</label>
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>

@@ -293,6 +293,10 @@ export class AdminService {
   }
 
   async setOfferActive(actor: AuthUser, id: string, active: boolean) {
+    if (active) {
+      const offer = await this.db.query.loanOffers.findFirst({ where: eq(loanOffers.id, id) });
+      if (offer) await this.lenders.checkOfferActivation(offer.lenderId);
+    }
     const [o] = await this.db.update(loanOffers).set({ active }).where(eq(loanOffers.id, id)).returning();
     if (!o) throw new NotFoundException();
     await this.audit.log(actor, active ? 'offer.enabled' : 'offer.disabled', 'offer', id);

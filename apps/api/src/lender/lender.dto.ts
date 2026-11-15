@@ -65,3 +65,14 @@ export class OfferDto extends CriteriaDto {
 
 import { PartialType } from '@nestjs/swagger';
 export class UpdateOfferDto extends PartialType(OfferDto) {}
+
+export class FeeCommitmentDto {
+  @IsInt() @Min(100) @Max(1_000_000_000) projectedFeesCents: number;
+  @IsString() @MinLength(3) @MaxLength(120) agreementReference: string;
+  @IsString() @MinLength(10) @MaxLength(1000) forecastBasis: string;
+}
+
+export class FeeCommitmentPaymentDto {
+  @IsString() @MinLength(3) @MaxLength(120) paymentReference: string;
+  @IsInt() @Min(1) @Max(30_000_000) amountCents: number;
+}

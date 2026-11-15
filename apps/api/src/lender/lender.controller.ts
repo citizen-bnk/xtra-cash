@@ -23,6 +23,12 @@ class AssistantDto {
 export class LenderController {
   constructor(private lender: LenderService, private loans: LoansService, private settings: SettingsService, private assistant: OfferAssistantService) {}
 
+  @Get('fee-commitment')
+  async feeCommitment(@CurrentUser() user: AuthUser) {
+    const org = await this.lender.orgFor(user.id);
+    return this.lender.feeCommitment(org.id);
+  }
+
   @Post('offers/assistant')
   @HttpCode(200)
   @Throttle({ default: { limit: 8, ttl: 60000 } })
