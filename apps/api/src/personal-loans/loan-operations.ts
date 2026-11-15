@@ -469,6 +469,11 @@ export class LoanOperationsService {
         .orderBy(desc(applications.createdAt))
         .limit(100);
     const paidExternally = new Set((rows.length ? await this.db.select({id: externalLoanPayments.applicationId}).from(externalLoanPayments).where(inArray(externalLoanPayments.applicationId,rows.map(r=>r.id))) : []).map(r=>r.id));
+    const offeredProductIds = [...new Set(rows.filter(row => row.status === 'OFFERED' && row.offerId).map(row => row.offerId!))];
+    const inactiveOffers = new Set((offeredProductIds.length
+      ? await this.db.select({ id: loanOffers.id }).from(loanOffers)
+          .where(and(inArray(loanOffers.id, offeredProductIds), eq(loanOffers.active, false)))
+      : []).map(offer => offer.id));
     for (const app of rows) {
       let title = "",
         description = "",
@@ -514,7 +519,7 @@ export class LoanOperationsService {
         description = app.reviewNotes;
         cta = "View application";
         owner = "Applicant";
-      } else if (app.userId === a.id && app.status === "OFFERED") {
+      } else if (app.userId === a.id && app.status === "OFFERED" && !inactiveOffers.has(app.offerId ?? '')) {
         title = "Your loan offer is ready";
         description =
           "Read the quotation and agreement. Accept only if you agree to the lender’s terms.";
@@ -561,6 +566,21 @@ export class LoanOperationsService {
       const counts = candidateRows.reduce((map, row) => map.set(row.applicationId, (map.get(row.applicationId) ?? 0) + 1), new Map<string, number>());
       for (const [applicationId, count] of counts) if (count >= 3) notifications.unshift({ key: `application:${applicationId}:TOP_OFFERS:${count}`, applicationId, title: 'Your top loan offers are ready', description: 'Compare the three lowest-cost current offers. Select one to generate the agreement; no funds move until you accept and sign.', cta: 'Compare top offers', kind: 'APPLICATION', owner: 'Applicant' });
     }
+    const updates = await this.db.execute<{
+      id: string; application_id: string | null; title: string; description: string;
+    }>(sql`
+      SELECT id,application_id,title,description FROM lender_offer_updates
+      WHERE user_id = ${a.id} ORDER BY created_at DESC LIMIT 20
+    `);
+    for (const update of updates.rows.reverse()) notifications.unshift({
+      key: `offer-update:${update.id}`,
+      applicationId: update.application_id ?? 'offers',
+      title: update.title,
+      description: update.description,
+      cta: update.application_id ? 'View application' : 'View offers',
+      kind: update.application_id ? 'APPLICATION' : 'OFFERS',
+      owner: 'Applicant',
+    });
     const receipts = await this.db
       .select()
       .from(loanNotificationReceipts)

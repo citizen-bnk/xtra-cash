@@ -17,6 +17,10 @@ export default function LenderDetail({ params }: { params: Promise<{ id: string 
   const [ncr, setNcr] = useState('');
   const [documentDecision, setDocumentDecision] = useState<{ id: string; status: 'ACCEPTED' | 'REJECTED'; name: string } | null>(null);
   const [documentComment, setDocumentComment] = useState('');
+  const updateOffer = useAction(async (offerId: string, active: boolean, suspended = false) => {
+    await client.request('POST', `/admin/offers/${offerId}/active`, { active, suspended });
+    await lender.reload();
+  });
 
   const review = useAction(async () => {
     await client.admin.reviewLender(id, decision!, notes || undefined);
@@ -106,6 +110,7 @@ export default function LenderDetail({ params }: { params: Promise<{ id: string 
         </Card>
         <Card>
           <h2 className="mb-3 font-bold">Offers</h2>
+          {updateOffer.error && <Alert tone="red">{updateOffer.error}</Alert>}
           {l.offers.length === 0 && <p className="text-sm text-muted">No offers.</p>}
           <div className="space-y-2">
             {l.offers.map((o) => (
@@ -114,7 +119,13 @@ export default function LenderDetail({ params }: { params: Promise<{ id: string 
                   <div className="font-medium">{o.name}</div>
                   <div className="text-xs text-muted">{bpsToPercent(o.monthlyInterestRateBps)} p/m · {o.termMonths}m · up to {formatZAR(o.maxAmountPerUserCents, { decimals: false })}</div>
                 </div>
-                <Badge tone={o.active ? 'green' : 'gray'}>{o.active ? 'Active' : 'Paused'}</Badge>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Badge tone={o.active ? 'green' : 'gray'}>{o.suspended ? 'Suspended' : o.active ? 'Active' : 'Paused'}</Badge>
+                  <RecordActions label={`Actions for ${o.name}`} actions={[
+                    { label: o.active ? 'Pause' : 'Activate', disabled: updateOffer.loading, onSelect: () => updateOffer.run(o.id, !o.active) },
+                    ...(!o.suspended ? [{ label: 'Suspend', disabled: updateOffer.loading, onSelect: () => updateOffer.run(o.id, false, true) }] : []),
+                  ]} />
+                </div>
               </div>
             ))}
           </div>

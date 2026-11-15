@@ -39,6 +39,7 @@ class DocReviewDto {
 }
 class ActiveDto {
   @IsBoolean() active: boolean;
+  @IsOptional() @IsBoolean() suspended?: boolean;
 }
 class SettingsDto {
   @IsOptional() @IsInt() @Min(0) @Max(365) applicantProbationDays?: number;
@@ -161,7 +162,7 @@ export class AdminController {
     return this.admin.offers();
   }
   @HttpCode(200) @Post('offers/:id/active') offerActive(@CurrentUser() a: AuthUser, @Param('id') id: string, @Body() dto: ActiveDto) {
-    return this.admin.setOfferActive(a, id, dto.active);
+    return this.admin.setOfferActive(a, id, dto.active, dto.suspended);
   }
 
   // ----- lending book

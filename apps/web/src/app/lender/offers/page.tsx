@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Banknote, BadgeCheck, Layers3, Plus, ShoppingCart, Users } from 'lucide-react';
+import { Plus, Users } from 'lucide-react';
 import { bpsToPercent, EMPLOYMENT_LABELS, EmploymentStatus, formatZAR, PROVINCES, quoteLoan, type LoanOffer, type OfferInput } from '@xtra/shared';
 import { Alert, Button, Card, cx, Empty, Field, Input, Loading, Modal, MoneyInput, PageHeader, RecordActions, RecordLine, Textarea, useAction, useApi, useAuth, useToast } from '@xtra/ui';
 import { OfferAssistant } from '@/components/OfferAssistant';
@@ -34,45 +34,45 @@ export default function OffersPage() {
   const commitment = useApi(c => c.request<{ required: boolean; commitmentCents: number | null; paidAt: string | null }>('GET', '/lender/fee-commitment'));
   const activationBlocked = commitment.data?.required === true && !commitment.data.paidAt;
   const toggle = useAction(async (offer: LoanOffer) => {
-    await client.lender.updateOffer(offer.id, { active: !offer.active });
+    await client.lender.updateOffer(offer.id, { active: !offer.active, suspended: false });
     toast(offer.active ? 'Offer paused' : 'Offer activated');
+    offers.reload();
+  });
+  const suspend = useAction(async (offer: LoanOffer) => {
+    await client.lender.updateOffer(offer.id, { active: false, suspended: true });
+    toast('Offer suspended');
     offers.reload();
   });
   const [editing, setEditing] = useState<LoanOffer | 'new' | null>(null);
   const [draft, setDraft] = useState<OfferInput | null>(null);
 
-  if (!offers.data) return <Loading />;
+  if (!offers.data) return offers.error ? <Alert tone="red">{offers.error}</Alert> : <Loading />;
   const live = org.data?.accreditationStatus === 'ACCREDITED';
   const activeOffers = offers.data.filter(o => o.active);
 
   return (
     <div>
-      <section className="relative mb-5 overflow-hidden rounded-[24px] bg-gradient-to-r from-[#1b1030] via-[#5c2394] to-[#d91f63] p-5 text-white shadow-lg sm:p-6">
-        <div aria-hidden className="absolute -right-8 -top-10 h-40 w-40 rounded-full bg-fuchsia-300/25 blur-3xl"/>
-        <div className="relative flex flex-wrap items-center justify-between gap-4"><div className="flex items-start gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl border border-white/20 bg-white/15"><Layers3 className="h-6 w-6"/></span><div><span className="rounded-full bg-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">Lender portal · product management</span><h1 className="mt-2 text-2xl font-black text-white">Loan products & offers</h1><p className="mt-1 max-w-xl text-sm text-white/80">Configure pricing, eligibility and funding limits for your Credit Mall products.</p></div></div><Button className="bg-[#fb9320] text-[#1b1030] hover:bg-[#ffac45]" onClick={() => { setDraft(null); setEditing('new'); }}><Plus className="h-4 w-4"/>Create new product</Button></div>
-        <div className="relative mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">{[['Active products',String(activeOffers.length),Layers3],['Personal loans',String(activeOffers.filter(o=>o.productType==='PERSONAL').length),Banknote],['BNPL offers',String(activeOffers.filter(o=>o.productType==='BNPL').length),ShoppingCart],['Accreditation',live?'Accredited':'In progress',BadgeCheck]].map(([label,value,StatIcon]:any)=><div key={label} className="rounded-xl border border-white/15 bg-white/10 p-3"><div className="flex items-center gap-2 text-[10px] font-semibold text-white/70"><StatIcon className="h-4 w-4"/>{label}</div><div className="mt-1 text-lg font-black">{value}</div></div>)}</div>
-      </section>
-      <PageHeader
-        title="Manage loan products"
-        subtitle="Each offer is a product in your stall. Shoppers who meet every criterion see it in their XTRA-Balance."
-        actions={<Button variant="secondary" onClick={() => { setDraft(null); setEditing('new'); }}><Plus className="h-4 w-4" /> Configure product</Button>}
-      />
+      <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-gradient-to-r from-[#1b1030] to-[#7c239d] p-5 text-white">
+        <div><h1 className="text-xl font-bold text-white">Your offers</h1><p className="mt-1 text-sm text-white">{activeOffers.length} active · {offers.data.length} total</p></div>
+        <Button onClick={() => { setDraft(null); setEditing('new'); }}><Plus size={18} /> New offer</Button>
+      </header>
       {!live && <div className="mb-4"><Alert tone="amber">Offers go live for shoppers once your stall is accredited.</Alert></div>}
       {toggle.error && <div className="mb-4"><Alert tone="red">{toggle.error}</Alert></div>}
+      {suspend.error && <div className="mb-4"><Alert tone="red">{suspend.error}</Alert></div>}
       {activationBlocked && <Alert tone="amber" title="Platform fee commitment">
         {commitment.data?.commitmentCents == null ? 'Awaiting your three-month fee forecast.' : `${formatZAR(commitment.data.commitmentCents)} due before offer activation.`} You can save draft offers.
       </Alert>}
       <LenderCapacity path="/lender/capacity" />
-      <OfferAssistant onManual={() => { setDraft(null); setEditing('new'); }} onReview={d => { setDraft(d); setEditing('new'); }} />
-      <h2 className="mb-4 text-lg font-bold">Your offers</h2>
+      <details className="mb-4 rounded-2xl border border-line bg-white p-3"><summary className="cursor-pointer text-sm font-semibold text-purple-800">Create with AI</summary><OfferAssistant onManual={() => { setDraft(null); setEditing('new'); }} onReview={d => { setDraft(d); setEditing('new'); }} /></details>
+
       {offers.data.length === 0 ? (
         <Empty title="No offers yet">Create your first offer: set pricing and who you want to lend to.</Empty>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-line bg-white">
           {offers.data.map((o) => (
             <div key={o.id} className="border-b border-line last:border-0">
-              <RecordLine title={o.name} description={`${o.productType === 'PERSONAL' ? 'Personal loan' : 'BNPL'} · ${o.termMonths} months · ${bpsToPercent(o.monthlyInterestRateBps)} / month`} value={`${formatZAR(o.minAmountCents, { decimals: false })}–${formatZAR(o.maxAmountPerUserCents, { decimals: false })}`} status={o.active ? 'ACTIVE' : 'PAUSED'} actions={<RecordActions label={`Actions for ${o.name}`} actions={[{ label: 'Edit offer', onSelect: () => { setDraft(null); setEditing(o); } }, { label: o.active ? 'Pause offer' : 'Activate offer', disabled: toggle.loading, onSelect: () => toggle.run(o) }]} />} />
-              <details className="px-4 pb-3 text-xs text-muted">
+              <RecordLine title={o.name} description={`${o.productType === 'PERSONAL' ? 'Personal loan' : 'BNPL'} · ${o.termMonths} months · ${bpsToPercent(o.monthlyInterestRateBps)} / month`} value={`${formatZAR(o.minAmountCents, { decimals: false })}–${formatZAR(o.maxAmountPerUserCents, { decimals: false })}`} status={o.suspended ? 'SUSPENDED' : o.active ? 'ACTIVE' : 'PAUSED'} actions={<RecordActions label={`Actions for ${o.name}`} actions={[{ label: 'Edit offer', onSelect: () => { setDraft(null); setEditing(o); } }, { label: o.suspended ? 'Resume offer' : o.active ? 'Pause offer' : 'Activate offer', disabled: toggle.loading || suspend.loading, onSelect: () => toggle.run(o) }, ...(o.suspended ? [] : [{ label: 'Suspend offer', disabled: toggle.loading || suspend.loading, onSelect: () => suspend.run(o) }])]} />} />
+              <details className="px-4 pb-3 text-sm text-ink">
                 <summary className="cursor-pointer font-semibold text-brand-purple">Eligibility & pricing</summary>
                 <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
                   <Kv k="Initiation fee" v={formatZAR(o.initiationFeeCents)} />
@@ -214,7 +214,7 @@ function OfferEditor({ offer, draft, activationBlocked, onClose, onSaved }: { of
           </div>
         )}
         {save.error && <Alert tone="red">{save.error}</Alert>}
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={activationBlocked} checked={!activationBlocked && (f.active ?? true)} onChange={e => setF({ ...f, active: e.target.checked })} /> Make this offer active when saved</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={activationBlocked || f.suspended} checked={!activationBlocked && !f.suspended && (f.active ?? true)} onChange={e => setF({ ...f, active: e.target.checked })} /> Make this offer active when saved</label>
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>

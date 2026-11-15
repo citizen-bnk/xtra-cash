@@ -55,13 +55,14 @@ export function LoanActionCentre({ variant = "default" }: { variant?: "default" 
     unreadRestaurant = restaurant.data?.filter((n) => !n.read_at).length ?? 0,
     unread = unreadLoans + unreadRestaurant;
   async function act(n: Notification) {
-    setActive(n);
+    if (!['VAULT', 'OFFERS'].includes(n.kind)) setActive(n);
     try {
       await client.request("POST", "/loan-operations/notifications/read", {
         key: n.key,
       });
       data.reload();
       if (n.kind === 'VAULT') { window.location.assign('/app/data-vault'); return; }
+      if (n.kind === 'OFFERS') { window.location.assign('/app/bnpl'); return; }
     } catch {
       setNotice(
         "The task may have changed. Refresh notifications before acting.",
