@@ -21,6 +21,10 @@ export default function LenderDetail({ params }: { params: Promise<{ id: string 
     await client.request('POST', `/admin/offers/${offerId}/active`, { active, suspended });
     await lender.reload();
   });
+  const updateFallback = useAction(async (offerId: string, active: boolean) => {
+    await client.request('POST', `/admin/offers/${offerId}/welcome-fallback`, { active });
+    await lender.reload();
+  });
 
   const review = useAction(async () => {
     await client.admin.reviewLender(id, decision!, notes || undefined);
@@ -111,12 +115,13 @@ export default function LenderDetail({ params }: { params: Promise<{ id: string 
         <Card>
           <h2 className="mb-3 font-bold">Offers</h2>
           {updateOffer.error && <Alert tone="red">{updateOffer.error}</Alert>}
+          {updateFallback.error && <Alert tone="red">{updateFallback.error}</Alert>}
           {l.offers.length === 0 && <p className="text-sm text-muted">No offers.</p>}
           <div className="space-y-2">
             {l.offers.map((o) => (
               <div key={o.id} className="flex items-center justify-between rounded-xl bg-surface px-3 py-2 text-sm">
                 <div>
-                  <div className="font-medium">{o.name}</div>
+                  <div className="font-medium">{o.name}{o.welcomeFallback ? ' · Platform fallback' : ''}</div>
                   <div className="text-xs text-muted">{bpsToPercent(o.monthlyInterestRateBps)} p/m · {o.termMonths}m · up to {formatZAR(o.maxAmountPerUserCents, { decimals: false })}</div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
@@ -124,6 +129,11 @@ export default function LenderDetail({ params }: { params: Promise<{ id: string 
                   <RecordActions label={`Actions for ${o.name}`} actions={[
                     { label: o.active ? 'Pause' : 'Activate', disabled: updateOffer.loading, onSelect: () => updateOffer.run(o.id, !o.active) },
                     ...(!o.suspended ? [{ label: 'Suspend', disabled: updateOffer.loading, onSelect: () => updateOffer.run(o.id, false, true) }] : []),
+                    ...(o.welcomeFallback || (o.welcomeOnly && o.active) ? [{
+                      label: o.welcomeFallback ? 'Remove platform fallback' : 'Use as platform fallback',
+                      disabled: updateFallback.loading,
+                      onSelect: () => updateFallback.run(o.id, !o.welcomeFallback),
+                    }] : []),
                   ]} />
                 </div>
               </div>

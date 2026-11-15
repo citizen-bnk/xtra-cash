@@ -225,6 +225,13 @@
       "when": 1794773280000,
       "tag": "0031_offer_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794773340000,
+      "tag": "0032_application_offers",
+      "breakpoints": true
     }
   ]
 }

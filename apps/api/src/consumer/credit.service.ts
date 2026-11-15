@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { addMonths, quoteLoan, type MatchedOffer, type QuoteResponse, type XtraBalance } from '@xtra/shared';
 import { InjectDb } from '../common/db.module';
 import { Db, DbOrTx } from '../db/client';
@@ -31,7 +31,7 @@ export class CreditService {
   constructor(@InjectDb() private db: Db, private settings: SettingsService) {}
 
   /** Loads everything needed for a credit decision. Call inside the authorisation transaction. */
-  async context(userId: string, conn: DbOrTx = this.db, productType: 'BNPL' | 'PERSONAL' = 'BNPL', declared?: { monthlyIncomeCents: number; monthlyExpensesCents: number }): Promise<CreditContext> {
+  async context(userId: string, conn: DbOrTx = this.db, productType: 'BNPL' | 'PERSONAL' = 'BNPL', declared?: { monthlyIncomeCents: number; monthlyExpensesCents: number; id?: string; userId?: string }): Promise<CreditContext> {
     const user = await conn.query.users.findFirst({ where: eq(users.id, userId) });
     if (!user) throw new NotFoundException('User not found');
     const kyc = await conn.query.kycProfiles.findFirst({ where: eq(kycProfiles.userId, userId) });
@@ -82,14 +82,20 @@ export class CreditService {
       })
       .from(loanOffers)
       .innerJoin(lenderOrgs, eq(loanOffers.lenderId, lenderOrgs.id))
-      .where(and(eq(loanOffers.active, true), eq(loanOffers.productType, productType), eq(lenderOrgs.accreditationStatus, 'ACCREDITED'), sql`${lenderOrgs.ownerUserId} <> ${userId}`));
+      .where(and(eq(loanOffers.active, true), eq(loanOffers.productType, productType),
+        declared?.id && declared.userId === userId
+          ? or(isNull(loanOffers.applicationId), eq(loanOffers.applicationId, declared.id))
+          : isNull(loanOffers.applicationId),
+        eq(lenderOrgs.accreditationStatus, 'ACCREDITED'), sql`${lenderOrgs.ownerUserId} <> ${userId}`));
 
     const priorLoan = await conn.select({ id: loans.id }).from(loans).where(eq(loans.userId, userId)).limit(1);
-    const eligible = rows
+    const matches = rows
       .filter(({ offer }) => !offer.welcomeOnly || (priorLoan.length === 0 && pendingPersonal.length === 0))
       .map<CandidateOffer>(({ offer, lenderName, lenderAvailable }) => ({
         offerId: offer.id,
         offerName: offer.name,
+        welcomeOnly: offer.welcomeOnly,
+        welcomeFallback: offer.welcomeFallback,
         lenderId: offer.lenderId,
         lenderName,
         monthlyInterestRateBps: offer.monthlyInterestRateBps,
@@ -108,6 +114,8 @@ export class CreditService {
         userOpenPrincipalCents: openByOffer.get(offer.id) ?? 0,
       }))
       .filter((o) => ineligibilityReason(profile, o) === null);
+    const hasWelcome = matches.some(offer => offer.welcomeOnly && !offer.welcomeFallback && offerCapacity(offer, affordable) > 0);
+    const eligible = matches.filter(offer => !offer.welcomeFallback || !hasWelcome);
 
     let reasonIfNone: string | null = null;
     if (!rows.length) reasonIfNone = 'No lenders are offering credit right now. Check back soon.';

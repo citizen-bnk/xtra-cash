@@ -91,15 +91,15 @@ export function AppShell({
     <div className="flex h-full flex-col bg-gradient-to-b from-[#1b1030] via-[#2b1742] to-[#1b1030] px-3 py-4">
       <div className="mb-6 px-2">
         <Logo light />
-        <div className="mt-1 text-xs font-medium uppercase tracking-wider text-white/50">{section}</div>
+        <div className="mt-1 text-xs font-medium uppercase tracking-wider text-white/90">{section}</div>
       </div>
       {links}
       <div className="mt-auto space-y-3 px-2 pt-6">
         {footer}
         {accountMenu.length === 0 && <div className="border-t border-white/10 pt-3">
           <div className="truncate text-sm font-medium text-white">{userName}</div>
-          {userEmail && <div className="truncate text-xs text-white/50">{userEmail}</div>}
-          <button onClick={onLogout} className="mt-2 inline-flex items-center gap-2 text-xs font-medium text-white/60 hover:text-white">
+          {userEmail && <div className="truncate text-xs text-white/90">{userEmail}</div>}
+          <button onClick={onLogout} className="mt-2 inline-flex items-center gap-2 text-xs font-medium text-white/90 hover:text-white">
             <LogOut className="h-3.5 w-3.5" /> Sign out
           </button>
         </div>}
@@ -110,11 +110,11 @@ export function AppShell({
   return (
     <div className="xc-app-theme min-h-screen">
       <aside className="fixed inset-y-0 left-0 hidden w-60 lg:block">{side}</aside>
-      <header className="safe-pt sticky top-0 z-30 bg-gradient-to-r from-[#1b1030] via-[#5c2394] to-[#a617d3] lg:hidden">
+      <header className="xc-brand-banner safe-pt sticky top-0 z-30 lg:hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-2.5">
           <div className="min-w-0">
             <Logo light size={26} />
-            <div className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wider text-white/50">{section}</div>
+            <div className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wider text-white/90">{section}</div>
           </div>
           <button
             onClick={() => accountMenu.length ? setAccountOpen(value => !value) : setOpen(true)}

@@ -3,5 +3,5 @@ import { LenderMarketingController, MemberMarketingController, PublicCampaignCon
 import { MarketingService } from './marketing.service';
 import { PushService } from './push.service';
 import { MarketingJobsController } from './marketing-jobs.controller';
-@Module({ controllers: [LenderMarketingController, MemberMarketingController, PublicCampaignController, MarketingJobsController], providers: [MarketingService, PushService] })
+@Module({ controllers: [LenderMarketingController, MemberMarketingController, PublicCampaignController, MarketingJobsController], providers: [MarketingService, PushService], exports: [MarketingService] })
 export class MarketingModule {}

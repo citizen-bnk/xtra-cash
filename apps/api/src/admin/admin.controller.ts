@@ -165,6 +165,11 @@ export class AdminController {
     return this.admin.setOfferActive(a, id, dto.active, dto.suspended);
   }
 
+  @HttpCode(200) @Post('offers/:id/welcome-fallback')
+  welcomeFallback(@CurrentUser() actor: AuthUser, @Param('id') id: string, @Body() dto: ActiveDto) {
+    return this.admin.setWelcomeFallback(actor, id, dto.active);
+  }
+
   // ----- lending book
   @Get('loans') loansPage(@Query() q: any) {
     return this.admin.loansPage(q);

@@ -11,7 +11,7 @@ export default function BnplPage() {
   const offers = balance.data.offers.filter(offer => offer.availableCents > 0);
   return <main className="mx-auto w-full max-w-3xl space-y-4 pb-5">
     <Link href="/app" className="text-sm font-semibold text-purple-800">Back</Link>
-    <header className="rounded-3xl bg-gradient-to-br from-[#1b1030] via-[#5c2394] to-[#d91f63] p-5 text-white">
+    <header className="xc-brand-banner rounded-3xl p-5 text-white">
       <h1 className="text-xl font-bold text-white">Shop now, pay later</h1>
       <p className="mt-4 text-sm">Available purchase credit</p>
       <strong className="text-3xl">{formatZAR(balance.data.creditCents)}</strong>

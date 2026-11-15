@@ -304,6 +304,31 @@ export class AdminService {
     return o;
   }
 
+  async setWelcomeFallback(actor: AuthUser, id: string, enabled: boolean) {
+    return this.db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('xtra-welcome-fallback'))`);
+      const [offer] = await tx.select().from(loanOffers).where(eq(loanOffers.id, id)).for('update');
+      if (!offer) throw new NotFoundException('Offer not found');
+      if (enabled) {
+        const funding = await tx.execute(sql`
+          SELECT 1 FROM lender_capacity c JOIN lender_orgs l ON l.id = c.lender_id
+          WHERE c.lender_id = ${offer.lenderId} AND l.accreditation_status = 'ACCREDITED'
+            AND LEAST(c.bnpl_limit - c.bnpl_committed, c.bnpl_customer_limit, l.available_cents) >= ${offer.maxAmountPerUserCents}
+        `);
+        if (!offer.active || !offer.welcomeOnly || offer.maxAmountPerUserCents > 50000 || !funding.rows.length)
+          throw new BadRequestException('Choose an active Welcome BNPL offer of R500 or less with funds allocated.');
+        const [other] = await tx.select({ id: loanOffers.id }).from(loanOffers).where(eq(loanOffers.welcomeFallback, true));
+        if (other && other.id !== id) throw new BadRequestException('Remove the current platform fallback first.');
+      } else if (!offer.welcomeFallback) {
+        return offer;
+      }
+      const [saved] = await tx.update(loanOffers).set({ welcomeFallback: enabled, ...(enabled ? {} : { active: false }) })
+        .where(eq(loanOffers.id, id)).returning();
+      await this.audit.log(actor, enabled ? 'welcome.fallback_enabled' : 'welcome.fallback_removed', 'offer', id, {}, tx);
+      return saved;
+    });
+  }
+
   async transactions(q: { page?: string; status?: string; userId?: string }) {
     const { page, pageSize, offset } = pageParams(q);
     const where: SQL[] = [];

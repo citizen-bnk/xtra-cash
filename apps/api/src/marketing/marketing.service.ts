@@ -28,6 +28,7 @@ export class MarketingService {
   }
   async create(user: AuthUser, dto: CampaignDto) {
     const org = await this.org(user.id), offer = await this.db.query.loanOffers.findFirst({ where: and(eq(loanOffers.id, dto.offerId), eq(loanOffers.lenderId, org.id)) });
+    if (offer?.applicationId || offer?.welcomeFallback) throw new BadRequestException('This offer is available only in its dedicated journey.');
     if (!offer) throw new NotFoundException('Offer not found');
     if (!offer.locationTarget) throw new BadRequestException('Set a map pin and radius on the offer first');
     const start = new Date(dto.startsAt), end = new Date(dto.endsAt);
@@ -39,7 +40,7 @@ export class MarketingService {
     const org = await this.org(user.id), campaign = await this.db.query.offerCampaigns.findFirst({ where: and(eq(offerCampaigns.id, id), eq(offerCampaigns.lenderId, org.id)) });
     if (!campaign) throw new NotFoundException();
     const offer = await this.db.query.loanOffers.findFirst({ where: eq(loanOffers.id, campaign.offerId) });
-    if (status === 'ACTIVE' && (org.accreditationStatus !== 'ACCREDITED' || !offer?.active || campaign.endsAt <= new Date())) throw new BadRequestException('An accredited lender, active offer and unexpired campaign are required');
+    if (status === 'ACTIVE' && (org.accreditationStatus !== 'ACCREDITED' || !offer?.active || offer.welcomeFallback || offer.applicationId || campaign.endsAt <= new Date())) throw new BadRequestException('An accredited lender, active public offer and unexpired campaign are required');
     await this.db.update(offerCampaigns).set({ status }).where(eq(offerCampaigns.id, id));
     await this.audit.log(user, 'campaign.status', 'campaign', id, { status }); return { ok: true };
   }
@@ -47,7 +48,7 @@ export class MarketingService {
     const campaign = await this.db.query.offerCampaigns.findFirst({ where: eq(offerCampaigns.id, id) });
     if (!campaign || campaign.status !== 'ACTIVE' || campaign.startsAt > new Date() || campaign.endsAt <= new Date()) throw new NotFoundException('This campaign is no longer available');
     const [offer, org] = await Promise.all([this.db.query.loanOffers.findFirst({ where: eq(loanOffers.id, campaign.offerId) }), this.db.query.lenderOrgs.findFirst({ where: eq(lenderOrgs.id, campaign.lenderId) })]);
-    if (!offer?.active || org?.accreditationStatus !== 'ACCREDITED') throw new NotFoundException('This offer is no longer available');
+    if (!offer?.active || offer.welcomeFallback || offer.applicationId || org?.accreditationStatus !== 'ACCREDITED') throw new NotFoundException('This offer is no longer available');
     // Public share links never reveal named lenders or private eligibility data.
     return { id, title: 'A nearby lending offer', message: 'Explore this offer. Identity checks, affordability verification and lender approval are required.', place: campaign.target.label, radiusMeters: campaign.target.radiusMeters, offerId: offer.id, productType: offer.productType, minAmountCents: offer.minAmountCents, maxAmountCents: offer.maxAmountPerUserCents, termMonths: offer.termMonths };
   }
@@ -109,7 +110,7 @@ export class MarketingService {
     if (!updated.length) return { offers: [], needsVerification: false };
     const [profile, verification, account] = await Promise.all([this.db.query.kycProfiles.findFirst({ where: eq(kycProfiles.userId, userId) }), this.db.query.personalVerifications.findFirst({ where: eq(personalVerifications.userId, userId) }), this.db.query.users.findFirst({ where: eq(users.id, userId) })]);
     if (account?.status !== 'ACTIVE' || profile?.status !== 'VERIFIED') return { offers: [], needsVerification: true };
-    const rows = await this.db.select({ campaign: offerCampaigns, offer: loanOffers }).from(offerCampaigns).innerJoin(loanOffers, eq(offerCampaigns.offerId, loanOffers.id)).innerJoin(lenderOrgs, eq(offerCampaigns.lenderId, lenderOrgs.id)).where(and(eq(offerCampaigns.status, 'ACTIVE'), lte(offerCampaigns.startsAt, now), gte(offerCampaigns.endsAt, now), eq(loanOffers.active, true), eq(lenderOrgs.accreditationStatus, 'ACCREDITED'))).limit(500);
+    const rows = await this.db.select({ campaign: offerCampaigns, offer: loanOffers }).from(offerCampaigns).innerJoin(loanOffers, eq(offerCampaigns.offerId, loanOffers.id)).innerJoin(lenderOrgs, eq(offerCampaigns.lenderId, lenderOrgs.id)).where(and(eq(offerCampaigns.status, 'ACTIVE'), lte(offerCampaigns.startsAt, now), gte(offerCampaigns.endsAt, now), eq(loanOffers.active, true), eq(loanOffers.welcomeFallback, false), isNull(loanOffers.applicationId), eq(lenderOrgs.accreditationStatus, 'ACCREDITED'))).limit(500);
     const matches = rows.filter(({ campaign, offer }) => (offer.productType !== 'PERSONAL' || verification?.status === 'VERIFIED') && confidentlyInside(point, campaign.target) && !ineligibilityReason(profile, offer as any, now));
     // Every dispatch is awaited before the serverless request ends; no orphaned background promises.
     for (const row of matches.slice(0, 10)) await this.dispatch(userId, row.campaign.id, row.offer.id, now);
@@ -146,7 +147,7 @@ export class MarketingService {
   async regions(userId: string) {
     const member = await this.db.query.marketingMembers.findFirst({ where: eq(marketingMembers.userId, userId) });
     if (!member?.marketing || !member.locationEnabled) return [];
-    const rows = await this.db.select({ id: offerCampaigns.id, target: offerCampaigns.target }).from(offerCampaigns).innerJoin(loanOffers, eq(loanOffers.id, offerCampaigns.offerId)).innerJoin(lenderOrgs, eq(lenderOrgs.id, offerCampaigns.lenderId)).where(and(eq(offerCampaigns.status, 'ACTIVE'), lte(offerCampaigns.startsAt, new Date()), gte(offerCampaigns.endsAt, new Date()), eq(loanOffers.active, true), eq(lenderOrgs.accreditationStatus, 'ACCREDITED'))).limit(100);
+    const rows = await this.db.select({ id: offerCampaigns.id, target: offerCampaigns.target }).from(offerCampaigns).innerJoin(loanOffers, eq(loanOffers.id, offerCampaigns.offerId)).innerJoin(lenderOrgs, eq(lenderOrgs.id, offerCampaigns.lenderId)).where(and(eq(offerCampaigns.status, 'ACTIVE'), lte(offerCampaigns.startsAt, new Date()), gte(offerCampaigns.endsAt, new Date()), eq(loanOffers.active, true), eq(loanOffers.welcomeFallback, false), isNull(loanOffers.applicationId), eq(lenderOrgs.accreditationStatus, 'ACCREDITED'))).limit(100);
     const point = member.locationEncrypted ? JSON.parse(decryptIdentity(member.locationEncrypted)) : null;
     if (!point || !member.locatedAt || Date.now() - +member.locatedAt > 24 * 3600000) return [];
     return rows.sort((a, b) => distanceMeters(point, a.target) - distanceMeters(point, b.target)).slice(0, 20).map(r => ({ identifier: r.id, ...r.target }));

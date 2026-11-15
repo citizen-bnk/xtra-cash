@@ -11,7 +11,7 @@
   background-position: right top, center;
   background-size: 100% 250px, cover;
 }
-.xc-customer-surface h1 { color: #2a1640; font-family: "Poppins", var(--font-inter), sans-serif; }
+.xc-customer-surface h1 { font-family: "Poppins", var(--font-inter), sans-serif; }
 .xc-customer-surface > div > [class*="mb-6"] h1 { font-size: clamp(1.35rem, 4vw, 1.8rem); }
 .xc-customer-surface [class*="rounded-2xl"][class*="bg-white"] { box-shadow: 0 8px 24px rgba(51, 17, 78, .075); }
 .xc-customer-app > nav[aria-label="App"] { border-color: rgba(92, 35, 148, .16); }

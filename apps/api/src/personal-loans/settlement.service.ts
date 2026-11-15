@@ -38,6 +38,9 @@ import {
 import { Accounts, LedgerService } from "../common/ledger.service";
 import { AuditService } from "../common/audit.service";
 import { SettingsService } from "../common/settings.service";
+import { CreditService } from '../consumer/credit.service';
+import { offerCapacity } from '../consumer/credit-engine';
+import { createApplicationOffer } from './application-offer';
 import { AuthUser } from "../common/auth";
 import { encryptIdentity, decryptIdentity } from "../auth/identity-crypto";
 import { MoneyConnector, MoneyEvent, providerEvent } from "./money-connector";
@@ -69,6 +72,7 @@ export class SettlementService {
     private audit: AuditService,
     private settings: SettingsService,
     private connector: MoneyConnector,
+    private credit: CreditService,
   ) {}
   configuration() {
     return this.connector.readiness();
@@ -283,30 +287,27 @@ export class SettlementService {
         throw new ConflictException("Application already has a decision.");
       const [humanReview]=await tx.select().from(lenderAgentRuns).where(and(eq(lenderAgentRuns.applicationId,id),eq(lenderAgentRuns.step,"HUMAN_REVIEW"),eq(lenderAgentRuns.result,"OPEN")));if(humanReview)throw new BadRequestException("Resolve the requested human review before offering credit.");
       const u = await this.eligibleUser(app.userId, tx);
-      const [offer] = await tx
+      const [template] = await tx
         .select()
         .from(loanOffers)
         .where(eq(loanOffers.id, input.offerId));
       if (
-        !offer ||
-        (!!app.offerId && offer.id !== app.offerId) ||
-        !offer.active ||
-        offer.productType !== "PERSONAL" ||
-        offer.termMonths !== app.termMonths ||
-        app.amountCents < offer.minAmountCents ||
-        app.amountCents > offer.maxAmountPerUserCents
+        !template || !template.active || template.productType !== 'PERSONAL' ||
+        (template.applicationId && template.applicationId !== id) ||
+        (!input.applicationOnly && !!app.offerId && template.id !== app.offerId)
       )
         throw new BadRequestException(
           "Select a current personal-loan product matching this application.",
         );
       const [profile] = await tx.select({ income: kycProfiles.monthlyIncomeCents })
         .from(kycProfiles).where(eq(kycProfiles.userId, app.userId));
-      if (offer.incomeMultiple > 0 && (!profile || profile.income < offer.maxAmountPerUserCents * offer.incomeMultiple))
+      const incomeBasis = input.applicationOnly ? app.amountCents : template.maxAmountPerUserCents;
+      if (template.incomeMultiple > 0 && (!profile || profile.income < incomeBasis * template.incomeMultiple))
         throw new BadRequestException('Verified income does not meet the lender offer requirement.');
       const [lender] = await tx
         .select()
         .from(lenderOrgs)
-        .where(eq(lenderOrgs.id, offer.lenderId));
+        .where(eq(lenderOrgs.id, template.lenderId));
       if (
         !lender ||
         lender.accreditationStatus !== "ACCREDITED" ||
@@ -322,7 +323,16 @@ export class SettlementService {
         throw new BadRequestException(
           "The selected product belongs to another lender.",
         );
-      if (!app.lenderId || !app.offerId)
+      const offer = input.applicationOnly ? await createApplicationOffer(tx, template, app) : template;
+      if (offer.termMonths !== app.termMonths || app.amountCents < offer.minAmountCents || app.amountCents > offer.maxAmountPerUserCents)
+        throw new BadRequestException('The loan amount or term does not match the selected product.');
+      if (input.applicationOnly) {
+        const credit = await this.credit.context(app.userId, tx, 'PERSONAL', app);
+        const match = credit.eligible.find(candidate => candidate.offerId === offer.id);
+        if (!match || app.amountCents > offerCapacity(match, credit.affordableCents))
+          throw new BadRequestException('The application does not meet the product criteria, affordability or available funding.');
+      }
+      if (!app.lenderId || app.offerId !== offer.id)
         await tx.update(applications).set({ lenderId: lender.id, offerId: offer.id, status: "REFERRED" }).where(eq(applications.id, id));
       const settings = await this.settings.get(tx);
       if (
