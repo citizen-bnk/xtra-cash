@@ -10,6 +10,7 @@ import {
   Post,
 } from "@nestjs/common";
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { createHash } from 'node:crypto';
 import { z } from "zod";
 import { CurrentUser, Roles, type AuthUser } from "../common/auth";
 import { InjectDb } from "../common/db.module";
@@ -402,23 +403,51 @@ export class LoanOperationsService {
     });
   }
 
+  private async currentCandidates(app: typeof applications.$inferSelect, conn: DbOrTx = this.db) {
+    const rows = await conn.select({
+      candidate: applicationCandidateOffers, product: loanOffers,
+      lenderName: lenderOrgs.name, ownerUserId: lenderOrgs.ownerUserId,
+    }).from(applicationCandidateOffers)
+      .innerJoin(lenderOrgs, eq(lenderOrgs.id, applicationCandidateOffers.lenderId))
+      .innerJoin(loanOffers, and(eq(loanOffers.id, applicationCandidateOffers.offerId), eq(loanOffers.lenderId, lenderOrgs.id)))
+      .where(and(eq(applicationCandidateOffers.applicationId, app.id), eq(applicationCandidateOffers.status, 'SUBMITTED'),
+        eq(lenderOrgs.accreditationStatus, 'ACCREDITED'), eq(loanOffers.active, true), eq(loanOffers.productType, 'PERSONAL')))
+      .orderBy(asc(applicationCandidateOffers.totalRepayableCents), asc(applicationCandidateOffers.createdAt), asc(applicationCandidateOffers.id));
+    return rows.filter(({ candidate, product }) => {
+      const decision = approveInput.safeParse(candidate.decisionPayload);
+      if (!decision.success || (decision.data.expiresAt && Date.parse(decision.data.expiresAt) <= Date.now())) return false;
+      if (app.termMonths !== product.termMonths || app.amountCents < product.minAmountCents || app.amountCents > product.maxAmountPerUserCents) return false;
+      const quote = quoteLoan(app.amountCents, product);
+      return quote.totalRepayableCents === candidate.totalRepayableCents
+        && quote.monthlyInstallmentCents === candidate.monthlyInstallmentCents;
+    }).slice(0, 3);
+  }
+
   async candidateOffers(a: AuthUser, id: string) {
     const app = await this.db.query.personalLoanApplications.findFirst({ where: and(eq(applications.id, id), eq(applications.userId, a.id)) });
     if (!app) throw new NotFoundException();
-    const rows = await this.db.select({ candidate: applicationCandidateOffers, lenderName: lenderOrgs.name, offerName: loanOffers.name, monthlyInterestRateBps: loanOffers.monthlyInterestRateBps, initiationFeeCents: loanOffers.initiationFeeCents, monthlyServiceFeeCents: loanOffers.monthlyServiceFeeCents }).from(applicationCandidateOffers).innerJoin(lenderOrgs, eq(lenderOrgs.id, applicationCandidateOffers.lenderId)).innerJoin(loanOffers, eq(loanOffers.id, applicationCandidateOffers.offerId)).where(and(eq(applicationCandidateOffers.applicationId, id), eq(applicationCandidateOffers.status, 'SUBMITTED'))).orderBy(asc(applicationCandidateOffers.totalRepayableCents), asc(applicationCandidateOffers.createdAt)).limit(3);
-    return rows.map((r, index) => ({ id: r.candidate.id, rank: index + 1, lenderName: r.lenderName, offerName: r.offerName, monthlyInterestRateBps: r.monthlyInterestRateBps, initiationFeeCents: r.initiationFeeCents, monthlyServiceFeeCents: r.monthlyServiceFeeCents, monthlyInstallmentCents: r.candidate.monthlyInstallmentCents, totalRepayableCents: r.candidate.totalRepayableCents, costOfCreditCents: r.candidate.costOfCreditCents, createdAt: r.candidate.createdAt }));
+    if (!openStates.includes(app.status)) return [];
+    return (await this.currentCandidates(app)).map(({ candidate, product, lenderName }, index) => ({
+      id: candidate.id, rank: index + 1, lenderName, offerName: product.name,
+      monthlyInterestRateBps: product.monthlyInterestRateBps, initiationFeeCents: product.initiationFeeCents,
+      monthlyServiceFeeCents: product.monthlyServiceFeeCents, monthlyInstallmentCents: candidate.monthlyInstallmentCents,
+      totalRepayableCents: candidate.totalRepayableCents, costOfCreditCents: candidate.costOfCreditCents, createdAt: candidate.createdAt,
+    }));
   }
 
   async selectCandidate(a: AuthUser, id: string, candidateId: string) {
     return this.db.transaction(async (tx) => {
       const [app] = await tx.select().from(applications).where(and(eq(applications.id, id), eq(applications.userId, a.id))).for('update');
       if (!app || !openStates.includes(app.status)) throw new ConflictException('This request can no longer select an offer.');
-      const [row] = await tx.select({ candidate: applicationCandidateOffers, ownerUserId: lenderOrgs.ownerUserId }).from(applicationCandidateOffers).innerJoin(lenderOrgs, eq(lenderOrgs.id, applicationCandidateOffers.lenderId)).where(and(eq(applicationCandidateOffers.id, candidateId), eq(applicationCandidateOffers.applicationId, id), eq(applicationCandidateOffers.status, 'SUBMITTED')));
-      if (!row) throw new NotFoundException();
-      const available = await tx.select({ id: applicationCandidateOffers.id }).from(applicationCandidateOffers).where(and(eq(applicationCandidateOffers.applicationId, id), eq(applicationCandidateOffers.status, 'SUBMITTED')));
-      if (available.length < 3) throw new ConflictException('Three lender offers are required before the applicant can compare and select.');
-      const topThree = await tx.select({ id: applicationCandidateOffers.id }).from(applicationCandidateOffers).where(and(eq(applicationCandidateOffers.applicationId, id), eq(applicationCandidateOffers.status, 'SUBMITTED'))).orderBy(asc(applicationCandidateOffers.totalRepayableCents), asc(applicationCandidateOffers.createdAt)).limit(3);
-      if (!topThree.some((offer) => offer.id === candidateId)) throw new ConflictException('Only one of the three best current offers can be selected.');
+      const row = (await this.currentCandidates(app, tx)).find(offer => offer.candidate.id === candidateId);
+      if (!row) throw new ConflictException('This offer is no longer available. Refresh to see current offers.');
+      const [product] = await tx.select().from(loanOffers).where(eq(loanOffers.id, row.product.id)).for('share');
+      if (!product?.active || product.updatedAt.getTime() !== row.product.updatedAt.getTime())
+        throw new ConflictException('This offer changed. Refresh to see current offers.');
+      const credit = await this.credit.context(app.userId, tx, 'PERSONAL', app);
+      const match = credit.eligible.find(offer => offer.offerId === product.id);
+      if (!match || app.amountCents > offerCapacity(match, credit.affordableCents))
+        throw new ConflictException('Eligibility or lender capacity changed. Refresh to see available offers.');
       await tx.update(applications).set({ lenderId: row.candidate.lenderId, offerId: row.candidate.offerId, status: 'REFERRED' }).where(eq(applications.id, id));
       const agreement = await this.settlement.approve({ id: row.ownerUserId, email: null, roles: ['LENDER'] }, id, approveInput.parse(row.candidate.decisionPayload), tx);
       await tx.update(applicationCandidateOffers).set({ status: sql`CASE WHEN ${applicationCandidateOffers.id} = ${candidateId} THEN 'SELECTED' ELSE 'NOT_SELECTED' END`, updatedAt: new Date() }).where(eq(applicationCandidateOffers.applicationId, id));
@@ -561,10 +590,27 @@ export class LoanOperationsService {
       for (const doc of pendingDocs) notifications.unshift({ key: `vault:${doc.id}:processing`, applicationId: 'vault', title: 'Document received · review pending', description: 'This document is safely stored in your profile vault. Automated extraction is waiting for the OCR provider; no profile match or discrepancy has been confirmed yet.', cta: 'Open my data vault', kind: 'VAULT', owner: 'Applicant' });
       for (const review of flaggedReviews) notifications.unshift({ key: `vault-review:${review.id}`, applicationId: review.applicationId, title: review.status === 'REVOKED' ? 'Document acceptance was revoked' : 'Document needs attention', description: review.comment, cta: 'Review document', kind: 'VAULT', owner: 'Applicant' });
     }
-    if (!office(a) && !a.roles.includes('LENDER') && rows.length) {
-      const candidateRows = await this.db.select({ applicationId: applicationCandidateOffers.applicationId }).from(applicationCandidateOffers).where(and(inArray(applicationCandidateOffers.applicationId, rows.map((r) => r.id)), eq(applicationCandidateOffers.status, 'SUBMITTED')));
-      const counts = candidateRows.reduce((map, row) => map.set(row.applicationId, (map.get(row.applicationId) ?? 0) + 1), new Map<string, number>());
-      for (const [applicationId, count] of counts) if (count >= 3) notifications.unshift({ key: `application:${applicationId}:TOP_OFFERS:${count}`, applicationId, title: 'Your top loan offers are ready', description: 'Compare the three lowest-cost current offers. Select one to generate the agreement; no funds move until you accept and sign.', cta: 'Compare top offers', kind: 'APPLICATION', owner: 'Applicant' });
+    const openCustomerApplications = rows.filter(row => row.userId === a.id && openStates.includes(row.status));
+    if (!office(a) && !a.roles.includes('LENDER') && openCustomerApplications.length) {
+      const candidates = await this.db.selectDistinct({ applicationId: applicationCandidateOffers.applicationId })
+        .from(applicationCandidateOffers)
+        .innerJoin(loanOffers, eq(loanOffers.id, applicationCandidateOffers.offerId))
+        .innerJoin(lenderOrgs, eq(lenderOrgs.id, applicationCandidateOffers.lenderId))
+        .where(and(inArray(applicationCandidateOffers.applicationId, openCustomerApplications.map(row => row.id)),
+          eq(applicationCandidateOffers.status, 'SUBMITTED'), eq(loanOffers.active, true), eq(lenderOrgs.accreditationStatus, 'ACCREDITED')));
+      const ids = new Set(candidates.map(row => row.applicationId));
+      for (const app of openCustomerApplications.filter(row => ids.has(row.id))) {
+        const offers = await this.currentCandidates(app);
+        if (!offers.length) continue;
+        const revision = createHash('sha256').update(JSON.stringify(offers.map(({ candidate }) => [candidate.id, candidate.updatedAt]))).digest('hex');
+        notifications.unshift({
+          key: `candidate-offer:${app.id}:${revision}`,
+          applicationId: app.id,
+          title: offers.length === 1 ? 'Your loan offer is ready' : 'Your loan offers are ready',
+          description: 'Review the offer terms and choose an agreement to read.',
+          cta: 'View offers', kind: 'APPLICATION', owner: 'Applicant',
+        });
+      }
     }
     const updates = await this.db.execute<{
       id: string; application_id: string | null; title: string; description: string;
