@@ -43,7 +43,8 @@ import { CreditService } from "../consumer/credit.service";
 import { offerCapacity } from "../consumer/credit-engine";
 import { LenderService } from "../lender/lender.service";
 import { parse } from "../payday/payday.dto";
-import { approveInput } from "./settlement.dto";
+import { approveInput, manualOfferInput } from "./settlement.dto";
+import { SettingsService } from "../common/settings.service";
 import { createApplicationOffer } from './application-offer';
 import { decryptIdentity, encryptIdentity } from "../auth/identity-crypto";
 import { quoteLoan } from "@xtra/shared";
@@ -70,6 +71,7 @@ export class LoanOperationsService {
     private settlement: SettlementService,
     private credit: CreditService,
     private lender: LenderService,
+    private settings: SettingsService,
   ) {}
   private async org(a: AuthUser, conn: DbOrTx = this.db) {
     const [org] = await conn
@@ -323,6 +325,54 @@ export class LoanOperationsService {
         "The applicant consented to lender review. Obtain genuine assessment and repayment evidence through the approved secure process. No credit decision is implied by these declared figures.",
     };
   }
+  async makeOffer(actor: AuthUser, id: string, input: z.infer<typeof manualOfferInput>) {
+    return this.db.transaction(async tx => {
+      const [app] = await tx.select().from(applications).where(eq(applications.id, id)).for('update');
+      if (!app || app.userId === actor.id) throw new NotFoundException();
+      if (!openStates.includes(app.status)) throw new ConflictException('This application is no longer accepting offers.');
+      const lender = input.lenderId && office(actor)
+        ? (await tx.select({ lender: lenderOrgs }).from(lenderOrgs).innerJoin(users, eq(users.id, lenderOrgs.ownerUserId))
+            .where(and(eq(lenderOrgs.id, input.lenderId), eq(lenderOrgs.accreditationStatus, 'ACCREDITED'), eq(users.status, 'ACTIVE'))))[0]?.lender
+        : await this.org(actor, tx);
+      if (!lender?.ncrNumber || lender.ownerUserId === app.userId)
+        throw new BadRequestException('An accredited lender with an NCR reference is required.');
+      if (app.lenderId && app.lenderId !== lender.id) throw new NotFoundException();
+      if (!app.lenderId) await this.visible(id, tx);
+      if (input.amountCents !== app.amountCents || input.termMonths !== app.termMonths)
+        throw new ConflictException('The applicant updated the request. Close this offer and refresh the application.');
+      const settings = await this.settings.get(tx);
+      if (input.monthlyInterestRateBps > settings.maxRateBps)
+        throw new BadRequestException(`Monthly interest cannot exceed ${(settings.maxRateBps / 100).toFixed(2)}%.`);
+      if (input.monthlyServiceFeeCents > settings.maxMonthlyServiceFeeCents)
+        throw new BadRequestException(`Monthly service fee cannot exceed R${(settings.maxMonthlyServiceFeeCents / 100).toFixed(2)}.`);
+      const commitment = await this.lender.feeCommitment(lender.id, tx);
+      if (commitment.required && !commitment.paidAt)
+        throw new BadRequestException('Complete your lender platform fee commitment before sending offers.');
+
+      const [product] = await tx.insert(loanOffers).values({
+        applicationId: id,
+        lenderId: lender.id,
+        name: 'Personal loan',
+        productType: 'PERSONAL',
+        termMonths: app.termMonths,
+        minAmountCents: app.amountCents,
+        maxAmountPerUserCents: app.amountCents,
+        monthlyInterestRateBps: input.monthlyInterestRateBps,
+        initiationFeeCents: input.initiationFeeCents,
+        monthlyServiceFeeCents: input.monthlyServiceFeeCents,
+      }).returning();
+      const [savedPolicy] = await tx.select({ terms: lenderAgentPolicies.policy }).from(lenderAgentPolicies)
+        .where(eq(lenderAgentPolicies.lenderId, lender.id));
+      const { legalReference, agreementTerms } = savedPolicy?.terms ?? {};
+      return this.recordOffer(tx, actor, app, product, {
+        ...(legalReference && agreementTerms ? { legalReference, agreementTerms } : {}),
+        offerId: product.id,
+        expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+        responsibleLendingConfirmed: true,
+      });
+    });
+  }
+
   async offer(a: AuthUser, id: string, input: z.infer<typeof approveInput>) {
     return this.db.transaction(async (tx) => {
       const [app] = await tx
@@ -331,7 +381,7 @@ export class LoanOperationsService {
         .where(eq(applications.id, id))
         .for("update");
       if (!app) throw new NotFoundException();
-      const { competition } = await this.visible(id, tx);
+      await this.visible(id, tx);
       const org = await this.org(a, tx);
       if (app.userId === a.id) throw new NotFoundException();
       const [template] = await tx
@@ -383,34 +433,36 @@ export class LoanOperationsService {
             "Outside the configured lender vicinity.",
           );
       }
-      const quote = quoteLoan(app.amountCents, product);
-      const decisionPayload = { ...input, applicationOnly: undefined, offerId: product.id };
-      const [result] = await tx.insert(applicationCandidateOffers).values({
-        applicationId: id,
-        lenderId: org.id,
-        offerId: product.id,
-        decisionPayload,
-        monthlyInstallmentCents: quote.monthlyInstallmentCents,
-        totalRepayableCents: quote.totalRepayableCents,
-        costOfCreditCents: quote.costOfCreditCents,
-      }).onConflictDoUpdate({
-        target: [applicationCandidateOffers.applicationId, applicationCandidateOffers.lenderId],
-        set: {
-          offerId: product.id, decisionPayload, monthlyInstallmentCents: quote.monthlyInstallmentCents,
-          totalRepayableCents: quote.totalRepayableCents, costOfCreditCents: quote.costOfCreditCents,
-          status: 'SUBMITTED', updatedAt: new Date(),
-        },
-      }).returning();
-      await this.audit.log(
-        a,
-        "personal_loan.candidate_offer_submitted",
-        "personal_loan_application",
-        id,
-        { offerId: product.id, candidateOfferId: result.id },
-        tx,
-      );
-      return result;
+      return this.recordOffer(tx, a, app, product, { ...input, applicationOnly: undefined, offerId: product.id });
     });
+  }
+
+  private async recordOffer(
+    tx: DbOrTx,
+    actor: AuthUser,
+    app: typeof applications.$inferSelect,
+    product: typeof loanOffers.$inferSelect,
+    decisionPayload: z.infer<typeof approveInput>,
+  ) {
+    const quote = quoteLoan(app.amountCents, product);
+    const [previous] = await tx.select().from(applicationCandidateOffers).where(and(
+      eq(applicationCandidateOffers.applicationId, app.id),
+      eq(applicationCandidateOffers.lenderId, product.lenderId),
+    ));
+    // Replacing an offer issues a new ID so an open borrower screen cannot select old terms.
+    if (previous) await tx.delete(applicationCandidateOffers).where(eq(applicationCandidateOffers.id, previous.id));
+    const [result] = await tx.insert(applicationCandidateOffers).values({
+      applicationId: app.id,
+      lenderId: product.lenderId,
+      offerId: product.id,
+      decisionPayload,
+      monthlyInstallmentCents: quote.monthlyInstallmentCents,
+      totalRepayableCents: quote.totalRepayableCents,
+      costOfCreditCents: quote.costOfCreditCents,
+    }).returning();
+    await this.audit.log(actor, 'personal_loan.candidate_offer_submitted', 'personal_loan_application', app.id,
+      { lenderId: product.lenderId, offerId: product.id, candidateOfferId: result.id, priorCandidateOfferId: previous?.id }, tx);
+    return result;
   }
 
   private async currentCandidates(app: typeof applications.$inferSelect, conn: DbOrTx = this.db) {
@@ -424,6 +476,7 @@ export class LoanOperationsService {
         eq(lenderOrgs.accreditationStatus, 'ACCREDITED'), eq(loanOffers.active, true), eq(loanOffers.productType, 'PERSONAL')))
       .orderBy(asc(applicationCandidateOffers.totalRepayableCents), asc(applicationCandidateOffers.createdAt), asc(applicationCandidateOffers.id));
     return rows.filter(({ candidate, product }) => {
+      if (product.suspended || (app.lenderId && app.lenderId !== product.lenderId)) return false;
       const decision = approveInput.safeParse(candidate.decisionPayload);
       if (!decision.success || (decision.data.expiresAt && Date.parse(decision.data.expiresAt) <= Date.now())) return false;
       if (app.termMonths !== product.termMonths || app.amountCents < product.minAmountCents || app.amountCents > product.maxAmountPerUserCents) return false;
@@ -455,6 +508,7 @@ export class LoanOperationsService {
       if (!product?.active || product.updatedAt.getTime() !== row.product.updatedAt.getTime())
         throw new ConflictException('This offer changed. Refresh to see current offers.');
       const credit = await this.credit.context(app.userId, tx, 'PERSONAL', app);
+      if (!credit.profile) throw new ConflictException(credit.reasonIfNone ?? 'Complete profile verification before continuing.');
       const match = credit.eligible.find(offer => offer.offerId === product.id);
       if (!match || app.amountCents > offerCapacity(match, credit.affordableCents))
         throw new ConflictException('Eligibility or lender capacity changed. Refresh to see available offers.');
@@ -538,7 +592,7 @@ export class LoanOperationsService {
         cta = "Confirm receipt";
         owner = "Finance admin";
       } else if (a.roles.includes("LENDER") && openStates.includes(app.status)) {
-        title = "Complete the lending assessment";
+        title = "New loan request";
         description =
           "Review this customer request and submit an offer if it fits your lending criteria. XTRA-CASH ranks the customer’s three best current offers.";
         cta = "Review and make offer";
@@ -600,8 +654,11 @@ export class LoanOperationsService {
       for (const doc of pendingDocs) notifications.unshift({ key: `vault:${doc.id}:processing`, applicationId: 'vault', title: 'Document received · review pending', description: 'This document is safely stored in your profile vault. Automated extraction is waiting for the OCR provider; no profile match or discrepancy has been confirmed yet.', cta: 'Open my data vault', kind: 'VAULT', owner: 'Applicant' });
       for (const review of flaggedReviews) notifications.unshift({ key: `vault-review:${review.id}`, applicationId: review.applicationId, title: review.status === 'REVOKED' ? 'Document acceptance was revoked' : 'Document needs attention', description: review.comment, cta: 'Review document', kind: 'VAULT', owner: 'Applicant' });
     }
-    const openCustomerApplications = rows.filter(row => row.userId === a.id && openStates.includes(row.status));
-    if (!office(a) && !a.roles.includes('LENDER') && openCustomerApplications.length) {
+    const openCustomerApplications = a.roles.includes('CONSUMER') && (office(a) || a.roles.includes('LENDER'))
+      ? await this.db.select().from(applications).where(and(eq(applications.userId, a.id), inArray(applications.status, openStates)))
+          .orderBy(desc(applications.createdAt)).limit(100)
+      : rows.filter(row => row.userId === a.id && openStates.includes(row.status));
+    if (openCustomerApplications.length) {
       const candidates = await this.db.selectDistinct({ applicationId: applicationCandidateOffers.applicationId })
         .from(applicationCandidateOffers)
         .innerJoin(loanOffers, eq(loanOffers.id, applicationCandidateOffers.offerId))
@@ -841,6 +898,11 @@ export class LoanOperationsController {
   ) {
     return this.service.detail(a, id);
   }
+  @Roles("LENDER", "ADMIN", "SUPER_ADMIN") @Post("applications/:id/offer")
+  makeOffer(@CurrentUser() actor: AuthUser, @Param("id") id: string, @Body() body: unknown) {
+    return this.service.makeOffer(actor, id, parse(manualOfferInput, body));
+  }
+
   @Roles("LENDER") @Post("competitions/:id/offer") offer(
     @CurrentUser() a: AuthUser,
     @Param("id") id: string,

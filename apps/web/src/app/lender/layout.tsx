@@ -5,7 +5,7 @@ import { PortalShell } from '@/components/PortalShell';
 import { LenderPersonalAccess } from '@/components/LenderPersonalAccess';
 
 const NAV = [
-  { href: '/lender', label: 'Overview', icon: LayoutDashboard, exact: true },
+  { href: '/lender', label: 'Investments', icon: LayoutDashboard, exact: true },
   { href: '/lender/accreditation', label: 'Accreditation', short: 'Accredit', icon: BadgeCheck },
   { href: '/lender/funds', label: 'Funds', icon: Banknote },
   { href: '/lender/offers', label: 'Offers & criteria', short: 'Offers', icon: Tags },
