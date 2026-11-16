@@ -58,7 +58,7 @@ const schema=require('../dist/db/schema'),{AppModule}=require('../dist/app.modul
   await db.update(schema.personalLoanApplications).set(profile).where(eq(schema.personalLoanApplications.id, application.id));
   await db.insert(schema.kycProfiles).values({
    userId: borrowerId, idNumber: 'isolated-id', dateOfBirth: new Date('1993-01-01T00:00:00Z'),
-   province: 'Gauteng', employmentStatus: 'EMPLOYED', consentAt: new Date(), status: 'VERIFIED', ...profile,
+   province: 'Gauteng', employmentStatus: 'EMPLOYED_FULL_TIME', consentAt: new Date(), status: 'VERIFIED', ...profile,
   });
   await db.insert(schema.personalVerifications).values({
    userId: borrowerId, identityType: 'ID', identityNumber: 'isolated-id', mobile: '+27820000000',
