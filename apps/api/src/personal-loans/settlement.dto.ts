@@ -1,5 +1,14 @@
 import { z } from "zod";
 const ref = z.string().trim().min(1).max(500);
+export const manualOfferInput = z.object({
+  lenderId: z.string().min(1).max(100).optional(),
+  amountCents: z.number().int().min(50000).max(10000000),
+  termMonths: z.number().int().min(1).max(24),
+  monthlyInterestRateBps: z.number().int().min(0).max(10000),
+  initiationFeeCents: z.number().int().min(0).max(200000),
+  monthlyServiceFeeCents: z.number().int().min(0).max(100000),
+}).strict();
+
 export const approveInput = z
   .object({
     offerId: z.string().min(1).max(100),

@@ -12,7 +12,8 @@ import {
   type MoneyConfiguration,
 } from "@xtra/shared";
 import { useApi, useAuth } from "./api";
-import { DecisionAiWorkspace, ManualDecisionForm } from "./lender-ai";
+import { DecisionAiWorkspace } from "./lender-ai";
+import { MakeLenderOffer } from "./make-lender-offer";
 import { LenderReviewWorkspace } from "./lender-review";
 import {
   Alert,
@@ -38,17 +39,17 @@ const reviewStates = [
 export function PersonalSettlementView({
   applicationId,
   reviewer = false,
+  officeView = false,
 }: {
   applicationId: string;
   reviewer?: boolean;
+  officeView?: boolean;
 }) {
   const { client, me } = useAuth();
   const [intervening, setIntervening] = useState(false);
   const [paymentNote, setPaymentNote] = useState('');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
-  const [preparationMode, setPreparationMode] = useState<"AI" | "MANUAL">(
-    "AI",
-  );
+  const [humanReviewOpen, setHumanReviewOpen] = useState(false), [offerSent, setOfferSent] = useState(false);
   const [decisionOpen, setDecisionOpen] = useState(false), [quickAction, setQuickAction] = useState<null | 'INFO' | 'HOLD' | 'DECLINE'>(null), [decisionNote, setDecisionNote] = useState('');
   const data = useApi(
     (c) =>
@@ -111,7 +112,7 @@ export function PersonalSettlementView({
     return <Alert tone="red">{data.error || "Application unavailable"}</Alert>;
   const d = data.data,
     ag = d.agreement,
-    isOffice = me?.roles.some((r) => r === "ADMIN" || r === "SUPER_ADMIN");
+    isOffice = officeView && Boolean(me?.roles.some(r => r === "ADMIN" || r === "SUPER_ADMIN"));
   const canReview = reviewer && (!isOffice || intervening) && (reviewStates.includes(d.application.status) || d.humanReviewPending);
   if (d.sharedReadOnly)
     return (
@@ -161,22 +162,22 @@ export function PersonalSettlementView({
   return (
     <div className="space-y-5">
       <PageHeader
-        title={isOffice ? "Loan progress and intervention" : reviewer ? "Review request and make an offer" : "Your loan application"}
+        title={isOffice ? "Loan progress and intervention" : reviewer ? "Loan request" : "Your loan application"}
         subtitle={`${formatZAR(d.application.amountCents)} · ${d.application.termMonths} months · ${d.application.purpose}`}
-        actions={reviewer ? <RecordActions actions={[
+        actions={reviewer ? <div className="flex flex-wrap items-center gap-2">{canReview && reviewStates.includes(d.application.status) && <Button size="sm" onClick={() => { setOfferSent(false); setDecisionOpen(true); }}>Make an offer</Button>}<RecordActions actions={[
           { label: 'Refresh application', onSelect: data.reload },
           ...(isOffice ? [{ label: intervening ? 'Exit lender controls' : 'Open lender controls', onSelect: () => setIntervening(!intervening) }] : []),
           ...(isOffice && reviewStates.includes(d.application.status) ? [{ label: 'Amend application', onSelect: () => { setEditAmount((d.application.amountCents / 100).toFixed(2)); setEditTerm(String(d.application.termMonths)); setEditPurpose(d.application.purpose); setEditIncome((d.application.monthlyIncomeCents / 100).toFixed(2)); setEditExpenses((d.application.monthlyExpensesCents / 100).toFixed(2)); setEditOpen(true); } }] : []),
+          ...(d.humanReviewPending && canReview ? [{ label: 'Resolve human review', onSelect: () => setHumanReviewOpen(true) }] : []),
           ...(canReview ? [
-            { label: 'Approve & make an offer · AI assist', onSelect: () => { setPreparationMode('AI'); setDecisionOpen(true); } },
-            { label: 'Guided decision form', onSelect: () => { setPreparationMode('MANUAL'); setDecisionOpen(true); } },
             { label: 'Request more information', onSelect: () => { setQuickAction('INFO'); setDecisionNote(''); } },
             { label: 'Keep under review', onSelect: () => { setQuickAction('HOLD'); setDecisionNote(''); } },
             { label: 'Decline request', onSelect: () => { setQuickAction('DECLINE'); setDecisionNote(''); } },
           ] : []),
-        ]} label="Application actions" /> : <Button variant="secondary" size="sm" onClick={data.reload}>Refresh</Button>}
+        ]} label="Application actions" /></div> : <Button variant="secondary" size="sm" onClick={data.reload}>Refresh</Button>}
       />
       <StatusBadge status={d.application.status} />
+      {offerSent && <Alert tone="green">Offer sent. The applicant can review it from their loan application.</Alert>}
       <Card className={reviewer ? "space-y-2 p-3" : "space-y-3"}>
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-bold">Application details</h2>{reviewStates.includes(d.application.status) && !reviewer && <Button variant="secondary" onClick={() => { setEditAmount((d.application.amountCents / 100).toFixed(2)); setEditTerm(String(d.application.termMonths)); setEditPurpose(d.application.purpose); setEditIncome((d.application.monthlyIncomeCents / 100).toFixed(2)); setEditExpenses((d.application.monthlyExpensesCents / 100).toFixed(2)); setEditOpen(true); }}>Edit application</Button>}</div>
         {reviewer ? <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm"><strong>{formatZAR(d.application.amountCents)}</strong><span>{d.application.termMonths} months</span><span className="min-w-0 truncate text-muted">{d.application.purpose}</span><span className="ml-auto text-xs text-muted">{formatZAR(d.application.monthlyIncomeCents - d.application.monthlyExpensesCents)} disposable / month</span></div> : <dl className="grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-muted">Requested amount</dt><dd className="font-semibold">{formatZAR(d.application.amountCents)}</dd></div><div><dt className="text-muted">Repayment term</dt><dd className="font-semibold">{d.application.termMonths} months</dd></div><div><dt className="text-muted">Purpose</dt><dd className="font-semibold">{d.application.purpose}</dd></div><div><dt className="text-muted">Submitted</dt><dd className="font-semibold">{new Date(d.application.createdAt).toLocaleString('en-ZA')}</dd></div><div><dt className="text-muted">Monthly income used</dt><dd className="font-semibold">{formatZAR(d.application.monthlyIncomeCents)}</dd></div><div><dt className="text-muted">Monthly expenses used</dt><dd className="font-semibold">{formatZAR(d.application.monthlyExpensesCents)}</dd></div><div><dt className="text-muted">Application reference</dt><dd className="break-all font-mono text-xs">{d.application.id}</dd></div></dl>}
@@ -206,8 +207,15 @@ export function PersonalSettlementView({
       {!reviewer && !ag && reviewStates.includes(d.application.status) && <CandidateOffers applicationId={applicationId} onSelected={data.reload} />}
       {!reviewer && !ag && reviewStates.includes(d.application.status) && <RequestGuarantee applicationId={applicationId} />}
       {isOffice && intervening && !reviewer && reviewStates.includes(d.application.status) && <Card className="space-y-3"><Field label="Intervention message"><Textarea value={message} maxLength={500} onChange={e => setMessage(e.target.value)}/></Field><Button loading={busy} disabled={message.trim().length < 3} onClick={() => act('information', {message})}>Request clarification</Button></Card>}
-      <Modal open={decisionOpen} title={preparationMode === 'AI' ? 'Prepare lender offer' : 'Lender decision'} onClose={() => setDecisionOpen(false)}>
-        {preparationMode === 'AI' ? <DecisionAiWorkspace applicationId={applicationId} onAdvanced={() => { setDecisionOpen(false); data.reload(); }} /> : <ManualDecisionForm request={{ amountCents: d.application.amountCents, termMonths: d.application.termMonths, offerId: d.application.offerId }} applicationId={applicationId} onAdvanced={() => { setDecisionOpen(false); data.reload(); }} />}
+      <Modal open={decisionOpen} title="Make an offer" onClose={() => setDecisionOpen(false)}>
+        {decisionOpen && <MakeLenderOffer application={d.application} office={isOffice} onSent={() => {
+          setDecisionOpen(false);
+          setOfferSent(true);
+          void data.reload();
+        }} />}
+      </Modal>
+      <Modal open={humanReviewOpen} title="Resolve human review" onClose={() => setHumanReviewOpen(false)}>
+        {humanReviewOpen && <DecisionAiWorkspace applicationId={applicationId} onAdvanced={() => { setHumanReviewOpen(false); void data.reload(); }} />}
       </Modal>
       <Modal open={!!quickAction} title={quickAction === 'INFO' ? 'Request more information' : quickAction === 'HOLD' ? 'Keep under review' : 'Decline request'} onClose={() => setQuickAction(null)}>
         <div className="space-y-4"><p className="text-sm text-muted">Add a clear note. The applicant and lender will see the recorded update in the application timeline.</p>{quickAction === 'HOLD' && <Alert tone="blue">This records the application as under review with your note. A separate paused status is not configured.</Alert>}<Field label={quickAction === 'INFO' ? 'What should the applicant provide?' : quickAction === 'HOLD' ? 'Review note' : 'Reason for declining'}><Textarea value={decisionNote} maxLength={500} onChange={e => setDecisionNote(e.target.value)} /></Field><div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setQuickAction(null)}>Cancel</Button><Button disabled={decisionNote.trim().length < 3} loading={busy} onClick={async () => { const action = quickAction; if (!action) return; const ok = action === 'INFO' ? await act('information', { message: decisionNote.trim() }) : await act('review', { action: action === 'DECLINE' ? 'DECLINE' : 'REVIEW', notes: decisionNote.trim() }); if (ok) { setQuickAction(null); setDecisionNote(''); setDecisionOpen(false); } }}>{quickAction === 'INFO' ? 'Send request' : quickAction === 'HOLD' ? 'Keep under review' : 'Confirm decline'}</Button></div></div>

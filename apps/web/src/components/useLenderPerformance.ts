@@ -3,7 +3,10 @@ import { useEffect, useState } from 'react';
 import type { LenderPerformance } from '@xtra/shared';
 import { useClient } from '@xtra/ui';
 
-/** Mounted only by the dashboard. Hidden tabs and navigation cancel the requests. */
+const accrualFormat = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 6, maximumFractionDigits: 6 });
+export const formatAccruedReturn = (micros: number) => accrualFormat.format(micros / 1000000);
+
+/** Hidden tabs and navigation cancel the live portfolio requests. */
 export function useLenderPerformance(interval: number) {
   const client = useClient();
   const [data, setData] = useState<LenderPerformance | null>(null);

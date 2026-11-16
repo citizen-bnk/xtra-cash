@@ -16,7 +16,7 @@ function progress(status: string) {
 export default function LenderApplications() {
   const applications = useApi(c => c.lender.personalApplications());
   return <div className="space-y-4">
-    <PageHeader title="Active loan requests" subtitle="Open a request to review its evidence and make an offer." actions={<Link className="text-sm font-semibold underline" href="/lender/ai">Lender AI settings</Link>} />
+    <PageHeader title="Active loan requests" subtitle="Open a request to view the details and send an offer." actions={<Link className="text-sm font-semibold underline" href="/lender/ai">Lender AI settings</Link>} />
     <Alert tone="blue">All active accredited lenders receive new requests. The applicant compares offers and chooses one. No funds move until the agreement is accepted and funding controls complete.</Alert>
     {applications.error && <Alert tone="red">Could not load loan requests: {applications.error}</Alert>}
     {applications.loading ? <Loading /> : !applications.data?.length ? <div className="rounded-2xl border border-dashed border-line bg-white px-4 py-10 text-center text-sm text-muted">No open loan requests</div> : <div className="overflow-hidden rounded-2xl border border-line bg-white">

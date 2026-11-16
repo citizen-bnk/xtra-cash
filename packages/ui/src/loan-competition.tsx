@@ -4,7 +4,7 @@ import { ArrowRight, BadgeCheck, CheckCircle2, Clock3, FileCheck2, HandCoins, Wa
 import { formatZAR, type LoanOffer } from "@xtra/shared";
 import { useApi, useAuth } from "./api";
 import { Alert, Button, Card, Field, Input, Select } from "./components";
-import { ManualDecisionForm } from "./lender-ai";
+
 export function CompetitionRelease({
   applicationId,
   reviewer,

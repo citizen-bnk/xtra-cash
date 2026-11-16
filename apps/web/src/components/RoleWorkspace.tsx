@@ -5,7 +5,7 @@ import { ArrowUpRight } from 'lucide-react';
 import { formatZAR, type Role } from '@xtra/shared';
 import { useApi } from '@xtra/ui';
 import { ADMIN_URL } from '@/lib/config';
-import { useLenderPerformance } from './useLenderPerformance';
+import { formatAccruedReturn, useLenderPerformance } from './useLenderPerformance';
 
 export function WorkspaceLinks({ roles }: { roles: Role[] }) {
   const workspaces = [
@@ -22,9 +22,12 @@ export function WorkspaceLinks({ roles }: { roles: Role[] }) {
   </nav>;
 }
 
-function Metrics({ title, values, message }: { title: string; values: [string, string | number][]; message?: string }) {
+function Metrics({ title, values, message, href }: { title: string; values: [string, string | number][]; message?: string; href?: string }) {
   return <section aria-label={title} className="mt-3 rounded-[24px] border border-white/80 bg-[#fff7ff] p-4 text-[#1b1030] shadow-lg">
-    <h2 className="font-black">{title}</h2>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h2 className="font-black">{title}</h2>
+      {href && <Link href={href} className="inline-flex min-h-9 items-center gap-1 text-sm font-bold text-[#5c2394]">View investments <ArrowUpRight className="h-4 w-4" aria-hidden /></Link>}
+    </div>
     {values.length > 0 && <dl className="mt-2 grid grid-cols-2 gap-2">
       {values.map(([label, value]) => <div key={label} className="min-w-0 rounded-xl bg-[#f4e5ff] p-2.5">
         <dt className="text-xs font-semibold text-[#592e74]">{label}</dt>
@@ -37,12 +40,12 @@ function Metrics({ title, values, message }: { title: string; values: [string, s
 
 function LenderHome() {
   const { data, error } = useLenderPerformance(5000);
-  return <Metrics title="Lender portfolio" values={data ? [
+  return <Metrics title="My investments" href="/lender" values={data ? [
     ['Outstanding principal', formatZAR(data.outstandingCents)],
     ['Repaid to date', formatZAR(data.totalRepaidCents)],
     ['Realised return', formatZAR(data.totals.realizedReturnCents)],
-    ['Accrued return (estimated)', formatZAR(Math.round(data.totals.estimatedAccruedMicros / 10000))],
-  ] : []} message={error ? 'Portfolio refresh unavailable. Figures show the last successful update.' : data ? 'Updates every 5 seconds while open.' : 'Loading your portfolio…'} />;
+    ['Accrued return (estimated)', formatAccruedReturn(data.totals.estimatedAccruedMicros)],
+  ] : []} message={error ? 'Portfolio refresh unavailable. Figures show the last successful update.' : data ? 'Updated ' + new Date(data.asOf).toLocaleTimeString('en-ZA') + ' · Refreshes every 5 seconds while open.' : 'Loading your portfolio…'} />;
 }
 
 function AdminHome() {
