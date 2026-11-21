@@ -9,10 +9,10 @@ const schema=require('../dist/db/schema'),{AppModule}=require('../dist/app.modul
  const pg=new PGlite(),db=drizzle(pg,{schema});for (const migration of readMigrationFiles({ migrationsFolder: path.join(__dirname, '../drizzle') })) {
    for (const statement of migration.sql) if (statement.trim()) await pg.exec(statement);
  }
- const module=await Test.createTestingModule({imports:[AppModule]}).overrideProvider('DB_BUNDLE').useValue({db,pool:{end:()=>pg.close()}}).compile();
+ const module=await Test.createTestingModule({imports:[AppModule]}).overrideProvider('DB_BUNDLE').useValue({db,pool:{query:(...args)=>pg.query(...args),end:()=>pg.close()}}).compile();
  const app=module.createNestApplication({logger:false});configureApp(app);await app.listen(0,'127.0.0.1');
  try{
-  const users=await db.insert(schema.users).values(['LENDER','LENDER','CONSUMER'].map((role,i)=>({email:`perf${i}@example.test`,firstName:'Test',lastName:'Account',roles:[role],referralCode:`PERF${i}`}))).returning();
+  const users=await db.insert(schema.users).values(['LENDER','LENDER','CONSUMER','ADMIN'].map((role,i)=>({email:`perf${i}@example.test`,firstName:'Test',lastName:'Account',roles:[role],referralCode:`PERF${i}`}))).returning();
   const orgs=await db.insert(schema.lenderOrgs).values(users.slice(0,2).map((u,i)=>({ownerUserId:u.id,name:`Test lender ${i}`,contactEmail:u.email,contactPhone:'+27820000000',availableCents:100000,accreditationStatus:'ACCREDITED',ncrNumber:'NCRCP-TEST-'+i}))).returning();
   // These fixtures represent existing accredited lenders from before fee commitments were introduced.
   await pg.query('UPDATE lender_orgs SET fee_commitment_required=false WHERE id=ANY($1::text[])', [orgs.map(org => org.id)]);
@@ -33,6 +33,11 @@ const schema=require('../dist/db/schema'),{AppModule}=require('../dist/app.modul
   }).returning();
   const { loanCompetitions } = require('../dist/personal-loans/lender-ai.schema');
   await db.insert(loanCompetitions).values({ applicationId: application.id, releasedBy: users[2].id, authorityReference: 'APPLICANT_SUBMISSION' });
+  const lenderNotice = (await http().get('/loan-operations/notifications').set(headers[0]).expect(200)).body.notifications
+   .find(item => item.kind === 'ACTIVITY' && item.title === 'New loan request');
+  assert.ok(lenderNotice.url.endsWith('/lender/applications/' + application.id));
+  await http().post('/loan-operations/notifications/read').set(headers[0]).send({key:lenderNotice.key}).expect(201);
+  assert.ok((await http().get('/loan-operations/notifications').set(headers[0]).expect(200)).body.notifications.find(item => item.key === lenderNotice.key).read);
   const sendOffer = '/loan-operations/applications/' + application.id + '/offer';
   const offerList = '/loan-operations/competitions/' + application.id + '/offers';
   const pricing = { amountCents: 100000, termMonths: 3, monthlyInterestRateBps: 0, initiationFeeCents: 0, monthlyServiceFeeCents: 0 };
@@ -77,6 +82,28 @@ const schema=require('../dist/db/schema'),{AppModule}=require('../dist/app.modul
   await http().get('/lender/loans?product=INVALID').set(headers[0]).expect(400);
   assert.deepEqual(await db.query.loans.findMany(),before);
   console.log('PASS: lender performance authentication, role enforcement, tenant isolation, four product groups, actual net receipts, read-only snapshot, empty book and filtered loan links.');
+  process.env.PERSONAL_AGREEMENTS_ENABLED = 'true';
+  process.env.WALLET_DEPOSIT_BANK_DETAILS = 'Isolated settlement account';
+  const password = 'Fixture-only-password-123';
+  const signature = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAABACAAAAADQNvZiAAAA7ElEQVR4nO3ZkQLCAABF0cfjOI7jOI7HcRzHcRzHcTwej8d9Qp9xoMdHrt9k2Gx3+8PxNJ4v19v98Xy9P9O8rN8/gegADdEBGqIDNEQHaIgO0BAdoCE6QEN0gIboAA3RARqiAzREB2iIDtAQHaAhOkBDdIAGHqAhOkBDdICG6AAN0QEaogM0RAdw4AEYogM0dIzoAA0dIzpAQ8eIDtDQMaIDNHSM6AANHSM6QEPHiA7Q0DGiAzTwAA0dIzpAQ8eIDtDQMaIDOPAADB0jOkBDx4gO0NAxogM0dIzoAA0dIzpAQ8eIDtDQMaIDNPwA0H3+YhQmS8UAAAAASUVORK5CYII=';
+  await db.update(schema.users).set({passwordHash:await require('bcryptjs').hash(password,4)}).where(eq(schema.users.id,borrowerId));
+  const applicationUrl = '/personal-loans/applications/' + application.id;
+  const agreement = (await http().get(applicationUrl).set(headers[2]).expect(200)).body.agreement;
+  assert.equal((await http().get('/me/signature').set(headers[0]).expect(200)).body.signature,null);
+  await http().post(applicationUrl + '/accept').set(headers[2]).send({digest:agreement.digest,acknowledged:true,password,signature}).expect(201);
+  assert.equal((await http().get('/me/signature').set(headers[2]).expect(200)).body.signature,signature);
+  const accepted = (await http().get('/loan-operations/notifications').set(headers[0]).expect(200)).body.notifications;
+  assert.ok(accepted.some(item => item.title === 'Applicant signed your loan agreement'));
+  await http().post(applicationUrl + '/external-payment').set(headers[3]).send({confirmed:true,note:'Confirmed test bank receipt'}).expect(201);
+  const deposits = '/me/wallet/deposits';
+  const deposit = (await http().post(deposits).set(headers[2]).send({amountCents:5000,clientKey:'test-deposit-key'}).expect(201)).body;
+  const confirmationUrl = '/money/wallet/deposits/' + deposit.id + '/decision';
+  const confirmation={action:'CONFIRM',note:'Reconciled bank statement',bankReference:'isolated-bank-receipt'};
+  await http().post(confirmationUrl).set(headers[3]).send(confirmation).expect(201);
+  await http().post(confirmationUrl).set(headers[3]).send(confirmation).expect(201);
+  assert.equal((await http().get(deposits).set(headers[2]).expect(200)).body.walletCents,105000);
+  assert.ok((await pg.query("select count(*)::int as n from notification_deliveries where channel='EMAIL'")).rows[0].n >= 8);
+  console.log('PASS: submission and signing alerts, saved signature, confirmed lender funding, and wallet top-up without double credit.');
  }finally{await app.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
 

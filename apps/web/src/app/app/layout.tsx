@@ -12,7 +12,7 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
   const immersiveAssistant = pathname === '/app/assistant';
 
   return (
-    <RequireRole roles={['CONSUMER', 'AFFILIATE', 'LENDER', 'ADMIN', 'SUPER_ADMIN']} signedOutRoute="/onboarding">
+    <RequireRole roles={['CONSUMER', 'AFFILIATE', 'LENDER', 'ADMIN', 'SUPER_ADMIN']} signedOutRoute={pathname.startsWith("/app/applications/") || pathname === "/app/pay" ? "/login" : "/onboarding"}>
       <MarketingLocationObserver />
       <div className={`xc-app-theme xc-customer-app min-h-[100dvh] ${immersiveAssistant ? '' : 'pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))]'} ${immersiveHome || immersiveAssistant ? '' : 'bg-[#f5f0fa]'}`}>
         {!immersiveHome && !immersiveProfile && !immersiveAssistant && <CustomerHeader />}

@@ -14,6 +14,7 @@ import {
 } from "./personal-settlement";
 type Notification = {
   key: string;
+  url?: string;
   applicationId: string;
   title: string;
   description: string;
@@ -34,13 +35,34 @@ export function LoanActionCentre({ variant = "default" }: { variant?: "default" 
       [me?.id],
     );
   const restaurant = useApi((c) => me?.roles.includes('CONSUMER') ? c.request<RestaurantNotification[]>('GET', '/me/restaurant-notifications') : Promise.resolve([]), [me?.id]);
+  const [pushMessage, setPushMessage] = useState("");
+  async function enablePush() {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window))
+        throw new Error('This browser does not support device alerts.');
+      if (await Notification.requestPermission() !== 'granted') throw new Error('Allow notifications in your browser settings.');
+      const config = await client.request<{vapidPublicKey: string | null}>('GET','/notifications/configuration');
+      if (!config.vapidPublicKey) throw new Error('Device alerts are awaiting activation.');
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      const raw = atob(config.vapidPublicKey.replace(/-/g,'+').replace(/_/g,'/'));
+      const subscription = await registration.pushManager.getSubscription() ?? await registration.pushManager.subscribe({
+        userVisibleOnly:true, applicationServerKey:Uint8Array.from(raw,c => c.charCodeAt(0)),
+      });
+      const {endpoint,keys} = subscription.toJSON();
+      await client.request('POST','/notifications/devices',{endpoint,keys});
+      setPushMessage('Device alerts enabled.');
+    } catch (error) {
+      setPushMessage(error instanceof Error ? error.message : 'Could not enable device alerts.');
+    }
+  }
   const [bellOpen, setBellOpen] = useState(false),
     [active, setActive] = useState<Notification | null>(null),
     [notice, setNotice] = useState("");
   useEffect(() => {
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") { data.reload(); restaurant.reload(); }
-    }, 30000);
+    }, 10000);
     const refresh = () => { data.reload(); restaurant.reload(); };
     window.addEventListener("focus", refresh);
     return () => {
@@ -55,6 +77,11 @@ export function LoanActionCentre({ variant = "default" }: { variant?: "default" 
     unreadRestaurant = restaurant.data?.filter((n) => !n.read_at).length ?? 0,
     unread = unreadLoans + unreadRestaurant;
   async function act(n: Notification) {
+    if (n.url) {
+      await client.request('POST', '/loan-operations/notifications/read', { key: n.key }).catch(() => undefined);
+      window.location.assign(n.url);
+      return;
+    }
     if (!['VAULT', 'OFFERS', 'GUARANTEE'].includes(n.kind)) setActive(n);
     try {
       await client.request("POST", "/loan-operations/notifications/read", {
@@ -114,6 +141,8 @@ export function LoanActionCentre({ variant = "default" }: { variant?: "default" 
           restaurant.reload();
         }}
       >
+        <Button variant="secondary" size="sm" onClick={() => void enablePush()}>Enable device alerts</Button>
+        {pushMessage && <p role="status" className="my-2 text-sm">{pushMessage}</p>}
         {data.error && <Alert tone="red">{data.error}</Alert>}
         {restaurant.error && me?.roles.includes('CONSUMER') && <Alert tone="amber">Restaurant notifications are temporarily unavailable.</Alert>}
         {notice && <Alert tone="amber">{notice}</Alert>}

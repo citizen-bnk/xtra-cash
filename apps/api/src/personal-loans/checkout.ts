@@ -88,13 +88,13 @@ export class PersonalCheckoutController {
     const result = z.object({ verified:z.literal(true), userId:z.literal(actor.id), applicationId:z.literal(id), mandateReference:z.string().min(1).max(300) }).parse(
       await this.connector.call('/v1/repayment-methods/verify',{ sessionReference:session.repayment_session,userId:actor.id,applicationId:id }),
     );
+    await this.settlement.accept(actor,id,{digest:input.digest,password:input.password,acknowledged:true,signature:input.signature});
     await this.db.transaction(async tx => {
       await tx.execute(sql`UPDATE personal_checkout SET mandate_reference=${result.mandateReference},
-        agreement_digest=${input.digest},signature_png=${input.signature},signed_at=now()
+        agreement_digest=${input.digest},signed_at=now()
         WHERE application_id=${id} AND user_id=${actor.id}`);
       await this.audit.log(actor,'personal_checkout.signature_recorded','personal_loan_application',id,{digest:input.digest},tx);
     });
-    await this.settlement.accept(actor,id,{digest:input.digest,password:input.password,acknowledged:true});
     await this.db.execute(sql`UPDATE personal_agreements SET mandate_reference=${result.mandateReference}
       WHERE application_id=${id} AND user_id=${actor.id} AND digest=${input.digest} AND status='ACCEPTED'`);
     const funding = await this.settlement.fund(actor,id,true);

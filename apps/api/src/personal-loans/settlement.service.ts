@@ -40,6 +40,7 @@ import { AuditService } from "../common/audit.service";
 import { SettingsService } from "../common/settings.service";
 import { CreditService } from '../consumer/credit.service';
 import { offerCapacity } from '../consumer/credit-engine';
+import { saveAgreementSignature } from './account-wallet';
 import { createApplicationOffer } from './application-offer';
 import { AuthUser } from "../common/auth";
 import { encryptIdentity, decryptIdentity } from "../auth/identity-crypto";
@@ -448,6 +449,7 @@ export class SettlementService {
       )
         throw new ConflictException("Offer expired or no longer available.");
       await this.eligibleUser(a.id, tx);
+      await saveAgreementSignature(tx,ag.id,a.id,ag.digest,input.signature);
       await tx
         .update(agreements)
         .set({ status: "ACCEPTED", acceptedBy: a.id, acceptedAt: new Date() })
@@ -564,7 +566,9 @@ export class SettlementService {
         const proof = await tx.execute(sql`SELECT c.application_id FROM personal_checkout c
           JOIN personal_agreements g ON g.application_id=c.application_id AND g.digest=c.agreement_digest AND g.mandate_reference=c.mandate_reference
           WHERE c.application_id=${id} AND c.user_id=${a.id} AND g.user_id=${a.id} AND g.accepted_by=${a.id}
-          AND g.status='ACCEPTED' AND c.signature_png IS NOT NULL AND c.signed_at IS NOT NULL`);
+          AND g.status='ACCEPTED' AND c.signed_at IS NOT NULL
+          AND (c.signature_png IS NOT NULL OR EXISTS (SELECT 1 FROM agreement_signatures s
+            WHERE s.agreement_id=g.id AND s.user_id=c.user_id AND s.digest=g.digest))`);
         if (!proof.rows.length) throw new ForbiddenException('Complete your agreement and repayment setup first.');
       } else if (app.userId === a.id || !isAdmin(a)) throw new ForbiddenException();
       const [ag] = await tx

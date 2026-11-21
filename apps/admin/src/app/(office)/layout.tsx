@@ -29,7 +29,7 @@ export default function OfficeLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const staff = !!me && me.roles.some((r) => r === 'ADMIN' || r === 'SUPER_ADMIN');
   useEffect(() => {
-    if (!loading && !staff) router.replace('/login');
+    if (!loading && !staff) router.replace('/login?next=' + encodeURIComponent(pathname));
   }, [loading, staff, router]);
   const stats = useApi((c) => (staff ? c.admin.stats() : Promise.resolve(undefined)), [staff, pathname]);
 

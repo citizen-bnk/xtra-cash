@@ -17,7 +17,8 @@ export default function AdminLogin() {
       await client.auth.login(identifier.trim(), password);
       const me = await refreshMe();
       if (!me?.roles.some(r => r === 'ADMIN' || r === 'SUPER_ADMIN')) { await client.auth.logout(); setError('This account does not have back-office access.'); return; }
-      router.replace('/');
+      const next = new URLSearchParams(window.location.search).get('next');
+      router.replace(next && /^\/(applications|money)(\/|$)/.test(next) && !next.includes('\\') ? next : '/');
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not sign in.'); }
     finally { setBusy(false); }
   }

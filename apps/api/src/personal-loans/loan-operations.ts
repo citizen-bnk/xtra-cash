@@ -47,6 +47,7 @@ import { approveInput, manualOfferInput } from "./settlement.dto";
 import { SettingsService } from "../common/settings.service";
 import { createApplicationOffer } from './application-offer';
 import { decryptIdentity, encryptIdentity } from "../auth/identity-crypto";
+import { ActivityNotifications } from './activity-notifications';
 import { quoteLoan } from "@xtra/shared";
 const openStates: (typeof applications.$inferSelect.status)[] = [
   "SUBMITTED",
@@ -72,6 +73,7 @@ export class LoanOperationsService {
     private credit: CreditService,
     private lender: LenderService,
     private settings: SettingsService,
+    private activity: ActivityNotifications,
   ) {}
   private async org(a: AuthUser, conn: DbOrTx = this.db) {
     const [org] = await conn
@@ -713,15 +715,16 @@ export class LoanOperationsService {
       cta: 'View guarantees', kind: 'GUARANTEE', owner: guarantee.signer ? 'Guarantor' : 'Applicant',
     });
     return {
-      notifications: notifications.slice(0, 100).map((n) => ({
+      notifications: [...await this.activity.inbox(a.id), ...notifications].slice(0, 150).map((n) => ({
         ...n,
-        read: receipts.some((r) => r.notificationKey === n.key),
+        read: ('read' in n && !!n.read) || receipts.some((r) => r.notificationKey === n.key),
       })),
       delivery: "IN_APP",
       externalDeliveryConfigured: false,
     };
   }
   async read(a: AuthUser, key: string) {
+    if (key.startsWith('activity:')) return this.activity.read(a.id,key);
     const current = await this.notifications(a);
     if (!current.notifications.some((n) => n.key === key))
       throw new NotFoundException();
