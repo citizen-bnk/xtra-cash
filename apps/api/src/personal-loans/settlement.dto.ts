@@ -26,6 +26,7 @@ export const acceptInput = z
   .object({
     digest: z.string().length(64),
     acknowledged: z.literal(true),
+    signature: z.string().max(180000),
     password: z.string().min(1).max(128),
   })
   .strict();

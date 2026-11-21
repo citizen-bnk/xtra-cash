@@ -12,3 +12,5 @@ export * from './loan-competition';
 export * from './lender-review';
 export * from './lender-capacity';
 export * from './personal-guarantees';
+
+export * from './wallet-deposits';

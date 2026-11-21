@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import { SignatureInput } from './signature-input';
 import { BadgeCheck } from "lucide-react";
 import { CandidateOffers, LoanJourney } from "./loan-competition";
 import { RequestGuarantee } from './personal-guarantees';
@@ -59,6 +60,7 @@ export function PersonalSettlementView({
       ),
     [applicationId],
   );
+  const [signature, setSignature] = useState({ digest: '', image: '' });
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [password, setPassword] = useState(""),
@@ -190,10 +192,10 @@ export function PersonalSettlementView({
       {d.externalPayment && !reviewer && <Card className="overflow-hidden border-emerald-200 p-0"><div className="bg-gradient-to-r from-[#16794b] to-[#2a9d8f] px-4 py-4 text-white"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-white/15"><BadgeCheck className="h-6 w-6" /></span><div><p className="text-[10px] font-bold uppercase tracking-[.15em] text-white/75">Funds disbursed</p><h2 className="font-bold text-white">Money is in your wallet</h2></div></div><p className="mt-3 text-2xl font-black">{formatZAR(d.externalPayment.amountCents)}</p></div><div className="space-y-3 p-4"><p className="text-sm">Credited {new Date(d.externalPayment.confirmedAt).toLocaleString('en-ZA')}. {d.externalPayment.note}</p><p className="text-xs text-muted">Deposit reference: <span className="font-mono font-semibold">{d.externalPayment.depositReference}</span>. Bank transfers will be available when wallet withdrawals are enabled.</p>{!isOffice && <div className="grid grid-cols-2 gap-2"><a href="/app/card" className="inline-flex min-h-10 items-center justify-center rounded-xl border border-brand-purple/30 px-3 text-center text-xs font-bold text-brand-purple">View my card</a><a href="/app/loans" className="inline-flex min-h-10 items-center justify-center rounded-xl bg-gradient-to-r from-[#8c00cf] to-[#d91f63] px-3 text-center text-xs font-bold text-white">Repayment plan</a></div>}</div></Card>}
       {isOffice && !reviewer && <div className="flex items-center justify-between gap-3 rounded-xl border p-3"><p className="text-sm text-muted">Staff oversight · Customer and lender manage this loan.</p><Button variant="secondary" onClick={() => setIntervening(!intervening)}>{intervening ? 'Close intervention' : 'Intervene'}</Button></div>}
       {isOffice && d.application.status === "ACCEPTED" && (
-        <Alert tone="blue">The applicant accepted the agreement. Once the lender has paid the customer, record the external payment confirmation below.</Alert>
+        <Alert tone="blue">The applicant accepted the agreement. Confirm the lender’s settlement deposit below.</Alert>
       )}
       {(error || data.error) && <Alert tone="red">{error || data.error}</Alert>}
-      {!d.configuration.enabled && !d.externalPayment && (
+      {reviewer && ['ACCEPTED','FUNDING_PENDING'].includes(d.application.status) && !d.configuration.enabled && !d.externalPayment && (
         <Alert tone="amber">
           The lender pays the loan amount into the XTRA-CASH settlement account using the deposit reference. After an administrator confirms receipt, the full loan amount is credited to the applicant’s XTRA-CASH wallet.
         </Alert>
@@ -252,32 +254,25 @@ export function PersonalSettlementView({
         )}
       {ag && (
         <Card className="space-y-4">
-          <div className="flex flex-wrap justify-between gap-2">
-            <h2 className="text-xl font-bold">
-              Your quotation and credit agreement
-            </h2>
-            <Button variant="secondary" onClick={download}>
-              Save a copy
-            </Button>
-          </div>
-          <p className="text-sm">
-            Offer expires {new Date(ag.expiresAt).toLocaleString("en-ZA")}.{" "}
-            {ag.acceptedAt
-              ? `Accepted ${new Date(ag.acceptedAt).toLocaleString("en-ZA")}.`
-              : ""}
-          </p>
-          <pre className="max-h-[36rem] overflow-y-auto whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-4 font-sans text-sm">
-            {ag.content}
-          </pre>
-          <p className="break-all text-xs text-muted">
-            Document fingerprint: {ag.digest}
-          </p>
+          <h2 className="text-xl font-bold">Loan terms</h2>
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div><dt className="text-muted">Loan amount</dt><dd className="font-bold">{formatZAR(ag.terms.principalCents)}</dd></div>
+            <div><dt className="text-muted">Term</dt><dd className="font-bold">{ag.terms.termMonths} months</dd></div>
+            <div><dt className="text-muted">First instalment</dt><dd className="font-bold">{formatZAR(ag.terms.monthlyInstallmentCents)}</dd></div>
+            <div><dt className="text-muted">Total repayment</dt><dd className="font-bold">{formatZAR(ag.terms.totalRepayableCents)}</dd></div>
+          </dl>
+          <details className="text-sm"><summary className="cursor-pointer font-semibold text-brand-purple">Read terms and conditions</summary>
+            <p className="mt-2 whitespace-pre-wrap break-words">{ag.content}</p>
+            <Button variant="secondary" size="sm" onClick={download}>Save a copy</Button>
+          </details>
+          {ag.acceptedAt ? <p className="text-sm text-muted">Signed {new Date(ag.acceptedAt).toLocaleDateString('en-ZA')}</p> :
+            <p className="text-xs text-muted">Offer expires {new Date(ag.expiresAt).toLocaleDateString('en-ZA')}</p>}
+          {reviewer && !isOffice && d.application.status === 'ACCEPTED' && <p className="rounded-xl bg-brand-soft p-3 text-sm">Pay the principal to the XTRA-CASH settlement account using reference <strong>{d.depositReference}</strong>.</p>}
           {!reviewer && d.application.status === "OFFERED" && (
             <div className="space-y-3">
               {!d.configuration.agreementsEnabled && (
                 <Alert tone="amber">
-                  Agreement acceptance will become available after lender and
-                  legal activation.
+                  Signing is awaiting activation.
                 </Alert>
               )}
               <label className="flex gap-2">
@@ -286,9 +281,9 @@ export function PersonalSettlementView({
                   checked={ack}
                   onChange={(e) => setAck(e.target.checked)}
                 />
-                I have read this quotation and agreement and accept these
-                specific terms.
+                I agree to these loan terms and conditions.
               </label>
+              <SignatureInput key={ag.digest} onChange={image => setSignature({ digest: ag.digest, image })} />
               <Field label="Confirm your account password">
                 <Input
                   type="password"
@@ -301,7 +296,7 @@ export function PersonalSettlementView({
                 loading={busy}
                 disabled={
                   !ack ||
-                  !password ||
+                  !password || !signature.image || signature.digest !== ag.digest || d.humanReviewPending ||
                   !d.configuration.agreementsEnabled ||
                   new Date(ag.expiresAt).getTime() <= Date.now()
                 }
@@ -310,10 +305,11 @@ export function PersonalSettlementView({
                     digest: ag.digest,
                     acknowledged: true,
                     password,
+                    signature: signature.image,
                   })
                 }
               >
-                Accept agreement
+                Sign and accept
               </Button>
             </div>
           )}

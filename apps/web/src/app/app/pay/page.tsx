@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { ArrowRight, Banknote, CreditCard, ReceiptText, ScanLine, Wallet } from 'lucide-react';
 import { formatZAR } from '@xtra/shared';
-import { Alert, Loading, Modal, useApi } from '@xtra/ui';
+import { Alert, Loading, Modal, WalletTopUp, useApi } from '@xtra/ui';
 
 const action = 'flex min-h-20 items-center gap-3 rounded-2xl border border-[#e8d9f3] bg-white p-4 text-left shadow-sm';
 
@@ -29,6 +29,6 @@ export default function PayPage() {
       <Link href="/app/card" className={action}><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#f3e7f8] text-[#8c00cf]"><CreditCard className="h-6 w-6" /></span><span className="min-w-0 flex-1"><strong className="block text-sm">My card</strong><span className="block text-xs text-muted">View card and payment status</span></span><ArrowRight className="h-5 w-5 text-[#8c00cf]" /></Link>
       <Link href="/app/receipts" className={action}><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#f3e7f8] text-[#8c00cf]"><ReceiptText className="h-6 w-6" /></span><span className="min-w-0 flex-1"><strong className="block text-sm">My receipts</strong><span className="block text-xs text-muted">Your restaurant shares and saved purchases</span></span><ArrowRight className="h-5 w-5 text-[#8c00cf]" /></Link>
     </nav>
-    <Modal open={topUpOpen} onClose={() => setTopUpOpen(false)} title="Top up funds"><p className="text-sm leading-relaxed">Wallet top-ups are awaiting a verified money-in connection. Restaurant checkout itself uses your XTRA-CASH wallet; it does not charge a card or bank account directly. You can request a loan and, if approved and funded, use the wallet balance.</p><Link href="/app/loans" className="mt-5 flex min-h-11 items-center justify-center rounded-xl bg-[#5c2394] px-4 font-bold text-white">Get a loan</Link></Modal>
+    <Modal open={topUpOpen} onClose={() => { setTopUpOpen(false); void balance.reload(); }} title="Top up funds">{topUpOpen && <WalletTopUp />}</Modal>
   </section>;
 }

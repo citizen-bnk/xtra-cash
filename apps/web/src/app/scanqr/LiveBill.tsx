@@ -2,7 +2,7 @@
 
 import PersonalLoanCheckout from './PersonalLoanCheckout';
 import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@xtra/ui';
+import { WalletTopUp, useAuth } from '@xtra/ui';
 import { ArrowLeft, CircleCheck, Clock3, LockKeyhole, Share2, Wallet } from 'lucide-react';
 
 type LiveItem = { id: string; label: string; amount_cents: number; tax_cents: number; bill_tip_cents: number; status: 'UNCLAIMED' | 'CLAIMED' | 'PAYMENT_PENDING' | 'PAID'; claimed_by: string | null; claimed_name: string | null };
@@ -107,7 +107,7 @@ export default function LiveBill({ token, onBack }: { token: string; onBack: () 
         </section>}
         {funding === 'wallet' && <section className="sq-card sq-schedule">
           <div className="sq-row"><strong>Top up wallet</strong><button className="sq-text-button" onClick={() => setFunding(null)}>Back to bill</button></div>
-          <p className="sq-note">Wallet top-ups await a connected payment service. You can use a personal loan here or return to your bill.</p>
+          <WalletTopUp />
           <div className="sq-text-row">
             <button type="button" className="sq-secondary" disabled={busy || !online} onClick={() => void refresh().catch(cause => setError(cause instanceof Error ? cause.message : 'Could not check your wallet.'))}>Check wallet balance</button>
             <button type="button" className="sq-secondary" onClick={() => setFunding('loan')}>Use a personal loan</button>

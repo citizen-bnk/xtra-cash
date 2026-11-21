@@ -1,3 +1,5 @@
+import { AccountWalletController, WalletDepositAdminController, AccountWalletService } from './account-wallet';
+import { ActivityNotificationModule } from './activity-notifications';
 import { PersonalCheckoutController } from "./checkout";
 import { Module } from "@nestjs/common";
 import { LenderAccessService, LenderAccessController } from './lender-access';
@@ -35,8 +37,9 @@ import { CustomerAssistantController } from './customer-assistant';
 import { MarketingModule } from '../marketing/marketing.module';
 import { PersonalGuaranteesController } from './guarantees';
 @Module({
-  imports: [ConsumerModule, LenderModule, MarketingModule],
+  imports: [ConsumerModule, LenderModule, MarketingModule, ActivityNotificationModule],
   controllers: [
+    AccountWalletController, WalletDepositAdminController,
     PersonalCheckoutController,
     PersonalGuaranteesController,
     LoanOperationsController,
@@ -55,6 +58,7 @@ import { PersonalGuaranteesController } from './guarantees';
     CustomerAssistantController,
   ],
   providers: [
+    AccountWalletService,
     LoanOperationsService,
     RoutingService,
     LenderAccessService,

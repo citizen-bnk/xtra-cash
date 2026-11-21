@@ -64,7 +64,7 @@ export default function ConsumerHome() {
       <section className="mx-auto flex w-full max-w-[520px] items-center gap-3 px-4 py-3" aria-label="Account overview">
         <div className="grid h-[58px] w-[58px] shrink-0 place-items-center rounded-full border-[3px] border-white bg-gradient-to-br from-orange-300 via-pink-400 to-purple-700 text-lg font-black text-white shadow-[0_0_18px_rgba(255,95,222,.65)]">{initials}</div>
         <div className="min-w-0 flex-1"><h1 className="truncate text-xl font-black leading-tight">Hi {name} <span aria-hidden>👋</span></h1></div>
-        {hasCustomerAccess && <Link href="/app/loans" className="min-w-[112px] rounded-2xl border border-white/70 bg-white/90 px-3 py-2 text-left text-ink shadow-lg shadow-purple-950/25"><span className="block text-[11px] font-medium">Available Credit</span><strong className="mt-0.5 block truncate text-lg font-black leading-tight">{b ? formatZAR(b.creditCents) : 'Check limit'}</strong></Link>}
+        {hasCustomerAccess && <Link href="/app/loans" className="min-w-[112px] rounded-2xl border border-white/70 bg-white/90 px-3 py-2 text-left text-ink shadow-lg shadow-purple-950/25"><span className="block text-[11px] font-medium">Available to spend</span><strong className="mt-0.5 block truncate text-lg font-black leading-tight">{b ? formatZAR(b.xtraBalanceCents) : 'Check limit'}</strong></Link>}
       </section>
     </div>
     <div className="relative mx-auto min-h-[100dvh] w-full max-w-[520px] px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom,0px))] pt-2">
