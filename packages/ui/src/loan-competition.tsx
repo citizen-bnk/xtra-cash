@@ -2,8 +2,9 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, BadgeCheck, CheckCircle2, Clock3, FileCheck2, HandCoins, WalletCards } from "lucide-react";
 import { formatZAR, type LoanOffer } from "@xtra/shared";
+import { RecordActions } from "./record-actions";
 import { useApi, useAuth } from "./api";
-import { Alert, Button, Card, Field, Input, Select } from "./components";
+import { Alert, Button, Card, Field, Input, Select, Modal } from "./components";
 
 export function CompetitionRelease({
   applicationId,
@@ -194,11 +195,13 @@ export function CompetitionRelease({
     </Card>
   );
 }
-type CandidateOffer = { id: string; rank: number; lenderName: string; offerName: string; monthlyInterestRateBps: number; initiationFeeCents: number; monthlyServiceFeeCents: number; monthlyInstallmentCents: number; totalRepayableCents: number; costOfCreditCents: number };
+type CandidateOffer = { selectionIssue: string | null; amountCents: number; termMonths: number; id: string; rank: number; lenderName: string; offerName: string; monthlyInterestRateBps: number; initiationFeeCents: number; monthlyServiceFeeCents: number; monthlyInstallmentCents: number; totalRepayableCents: number; costOfCreditCents: number };
 export function CandidateOffers({ applicationId, onSelected, autoRefresh = false }: { applicationId: string; onSelected: () => void; autoRefresh?: boolean }) {
   const { client } = useAuth();
   const offers = useApi((c) => c.request<CandidateOffer[]>('GET', `/loan-operations/competitions/${applicationId}/offers`), [applicationId]);
   const [busy, setBusy] = useState(''), [error, setError] = useState('');
+  const [reviewId, setReviewId] = useState<string | null>(null);
+  const reviewing = offers.data?.find(offer => offer.id === reviewId);
   useEffect(() => {
     if (!autoRefresh) return;
     const timer = window.setInterval(() => {
@@ -206,37 +209,45 @@ export function CandidateOffers({ applicationId, onSelected, autoRefresh = false
     }, 15000);
     return () => window.clearInterval(timer);
   }, [autoRefresh, offers.reload]);
+  if (offers.loading && !offers.data) return <p className="text-sm text-muted">Loading offers...</p>;
   if (!offers.data?.length && !offers.error) return <Alert tone="blue">Your request is with active accredited lenders. You will be notified when an offer is ready.</Alert>;
   async function select(id: string) {
     setBusy(id); setError('');
     try { await client.request('POST', `/loan-operations/competitions/${applicationId}/offers/${id}/select`, {}); onSelected(); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Could not select this offer'); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Could not select this offer'); void offers.reload(); }
     finally { setBusy(''); }
   }
   return (
     <section className="space-y-3" aria-label="Lender offers">
       <h2 className="text-lg font-bold">Choose your offer</h2>
       {(error || offers.error) && <Alert tone="red">{error || offers.error}</Alert>}
+      <Button variant="secondary" size="sm" loading={offers.loading} onClick={() => void offers.reload()}>Refresh offers</Button>
       {offers.data?.map(offer => (
-        <Card key={offer.id} className="space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h3 className="break-words font-bold text-ink">{offer.offerName}</h3>
-              <p className="text-sm text-ink">{offer.lenderName}</p>
-            </div>
-            {offer.rank === 1 && offers.data!.length > 1 && <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-semibold text-purple-900">Lowest total cost</span>}
-          </div>
-          <dl className="grid grid-cols-2 gap-3 text-sm text-ink">
-            <div><dt>Monthly instalment</dt><dd className="font-bold">{formatZAR(offer.monthlyInstallmentCents)}</dd></div>
-            <div><dt>Total repayment</dt><dd className="font-bold">{formatZAR(offer.totalRepayableCents)}</dd></div>
-          </dl>
-          <details className="text-sm text-ink">
-            <summary className="cursor-pointer font-semibold text-purple-800">Interest and fees</summary>
-            <p className="mt-2">{(offer.monthlyInterestRateBps / 100).toFixed(2)}% monthly interest · {formatZAR(offer.initiationFeeCents)} initiation fee · {formatZAR(offer.monthlyServiceFeeCents)} monthly service fee</p>
-          </details>
-          <Button className="w-full sm:w-auto" loading={busy === offer.id} disabled={!!busy} onClick={() => select(offer.id)}>Review agreement <ArrowRight size={16} /></Button>
-        </Card>
+        <div key={offer.id} className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2">
+          <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setReviewId(offer.id)}>
+            <span className="block truncate text-sm font-bold">{offer.lenderName} · {formatZAR(offer.monthlyInstallmentCents)} / month</span>
+            <span className="block truncate text-xs text-muted">{offer.termMonths} months · {formatZAR(offer.totalRepayableCents)} total{offer.selectionIssue ? ' · Action needed' : offer.rank === 1 ? ' · Lowest total cost' : ''}</span>
+          </button>
+          <RecordActions label={`Actions for ${offer.lenderName} offer`} actions={[{ label: 'Review offer', onSelect: () => setReviewId(offer.id) }]} />
+        </div>
       ))}
+      <Modal open={reviewId !== null} title="Review offer" onClose={() => setReviewId(null)}>
+        {reviewing ? <div className="space-y-4">
+          <h3 className="font-bold">{reviewing.lenderName} · {reviewing.offerName}</h3>
+          <p className="text-sm">{formatZAR(reviewing.amountCents)} over {reviewing.termMonths} months</p>
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div><dt>Monthly instalment</dt><dd className="font-bold">{formatZAR(reviewing.monthlyInstallmentCents)}</dd></div>
+            <div><dt>Total repayment</dt><dd className="font-bold">{formatZAR(reviewing.totalRepayableCents)}</dd></div>
+            <div><dt>Cost of credit</dt><dd>{formatZAR(reviewing.costOfCreditCents)}</dd></div>
+            <div><dt>Monthly interest</dt><dd>{(reviewing.monthlyInterestRateBps / 100).toFixed(2)}%</dd></div>
+            <div><dt>Initiation fee</dt><dd>{formatZAR(reviewing.initiationFeeCents)}</dd></div>
+            <div><dt>Monthly service fee</dt><dd>{formatZAR(reviewing.monthlyServiceFeeCents)}</dd></div>
+          </dl>
+          {reviewing.selectionIssue && <Alert tone="amber">{reviewing.selectionIssue}</Alert>}
+          {error && <Alert tone="red">{error}</Alert>}
+          <Button loading={busy === reviewing.id} disabled={!!busy || !!reviewing.selectionIssue} onClick={() => void select(reviewing.id)}>Review agreement <ArrowRight size={16} /></Button>
+        </div> : <Alert tone="amber">This offer is no longer available. Close this window to review current offers.</Alert>}
+      </Modal>
     </section>
   );
 }

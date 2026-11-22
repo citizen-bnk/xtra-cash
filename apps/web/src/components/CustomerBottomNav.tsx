@@ -1,25 +1,61 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Banknote, Ellipsis, House, ScanLine, X } from 'lucide-react';
+import { ArrowLeftRight, Banknote, Building2, ChevronRight, CreditCard, Ellipsis, Gift, House, LogOut, ReceiptText, ScanLine, ShieldCheck, ShoppingBag, UserRound, Wallet, X } from 'lucide-react';
+import { ADMIN_URL } from '@/lib/config';
 import { Logo, useAuth } from '@xtra/ui';
 
 export const moreLinks = [
-  { label: 'My wallet', href: '/app/wallet' },
-  { label: 'My card', href: '/app/card' },
-  { label: 'My guarantees', href: '/app/guarantees' },
-  { label: 'Transactions', href: '/app/activity' },
-  { label: 'Pay bills', href: '/app/bills' },
-  { label: 'Shop now, pay later', href: '/app/bnpl' },
-  { label: 'Vouchers', href: '/app/vouchers' },
-  { label: 'My profile', href: '/app/profile' },
+  { label: 'My wallet', icon: Wallet, href: '/app/wallet' },
+  { label: 'My card', icon: CreditCard, href: '/app/card' },
+  { label: 'My guarantees', icon: ShieldCheck, href: '/app/guarantees' },
+  { label: 'Transactions', icon: ArrowLeftRight, href: '/app/activity' },
+  { label: 'Pay bills', icon: ReceiptText, href: '/app/bills' },
+  { label: 'Shop now, pay later', icon: ShoppingBag, href: '/app/bnpl' },
+  { label: 'Vouchers', icon: Gift, href: '/app/vouchers' },
+  { label: 'My profile', icon: UserRound, href: '/app/profile' },
 ];
 
 export function CustomerMoreMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { me } = useAuth();
+  const { me, logout } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [signingOut, setSigningOut] = useState(false);
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await logout();
+      onClose();
+      router.replace('/login');
+    } finally {
+      setSigningOut(false);
+    }
+  }
   if (!open) return null;
-  return <div className="fixed inset-0 z-50 bg-[#1b1030]/55" onClick={onClose}><section role="dialog" aria-modal="true" aria-label="More services" onClick={event => event.stopPropagation()} className="safe-pb absolute inset-x-0 bottom-0 mx-auto max-w-[520px] rounded-t-[28px] bg-white p-5 text-[#1b1030] shadow-2xl"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-black">More services</h2><button type="button" aria-label="Close menu" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-[#f3e7f8]"><X className="h-5 w-5" /></button></div><div className="grid max-h-[60dvh] grid-cols-2 gap-2 overflow-y-auto">{moreLinks.map(link => <Link key={link.href} href={link.href} onClick={onClose} className="rounded-xl border border-purple-100 bg-[#faf6fd] p-3 text-sm font-bold text-[#5c2394]">{link.label}</Link>)}{me?.roles.some(role => role === 'ADMIN' || role === 'SUPER_ADMIN') && <Link href="https://xtra-cash-admin.vercel.app" onClick={onClose} className="rounded-xl border border-purple-100 bg-[#faf6fd] p-3 text-sm font-bold text-[#5c2394]">Open Back Office</Link>}</div></section></div>;
+  return <div className="fixed inset-0 z-50 bg-[#1b1030]/55" onClick={onClose}>
+    <section role="dialog" aria-modal="true" aria-label="More services" onClick={event => event.stopPropagation()} className="safe-pb absolute inset-x-0 bottom-0 mx-auto max-w-[520px] rounded-t-[28px] bg-white p-5 text-[#1b1030] shadow-2xl">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-black">More services</h2>
+        <button type="button" aria-label="Close menu" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-[#f3e7f8]"><X className="h-5 w-5" /></button>
+      </div>
+      <nav aria-label="More services" className="grid max-h-[min(60dvh,28rem)] gap-2.5 overflow-y-auto overscroll-contain px-1 py-1">
+        {[...moreLinks, ...(me?.roles.some(role => role === 'ADMIN' || role === 'SUPER_ADMIN')
+          ? [{ label: 'Open back office', href: ADMIN_URL, icon: Building2 }] : [])].map(({ label, href, icon: Icon }) => {
+          const current = pathname === href;
+          return <Link key={href} href={href} onClick={onClose} aria-current={current ? 'page' : undefined}
+            className={`flex min-h-14 items-center gap-3 rounded-2xl border px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-700 ${current ? 'border-purple-300 bg-purple-100' : 'border-purple-100 bg-[#fcf8ff] hover:bg-purple-50'}`}>
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#efe2fb] text-[#65249a]"><Icon size={19} aria-hidden /></span>
+            <span className="min-w-0 flex-1 text-sm font-bold text-[#371852]">{label}</span>
+            <ChevronRight size={16} className="shrink-0 text-[#793bb1]" aria-hidden />
+          </Link>;
+        })}
+      </nav>
+      {me && <button type="button" disabled={signingOut} onClick={() => void signOut()} className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 text-sm font-bold text-rose-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-700">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-rose-100"><LogOut size={19} aria-hidden /></span> {signingOut ? 'Signing out…' : 'Sign out'}
+      </button>}
+    </section>
+  </div>;
 }
 
 export function CustomerBottomNav() {

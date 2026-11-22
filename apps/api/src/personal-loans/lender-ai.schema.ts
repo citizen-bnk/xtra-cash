@@ -55,7 +55,7 @@ export const applicationCandidateOffers=pgTable('application_candidate_offers',{
  status:text('status').notNull().default('SUBMITTED'),
  createdAt:time('created_at').notNull().defaultNow(),
  updatedAt:time('updated_at').notNull().defaultNow(),
-},t=>[uniqueIndex('candidate_offer_application_lender').on(t.applicationId,t.lenderId)]);
+},t=>[uniqueIndex('candidate_offer_application_product').on(t.applicationId,t.lenderId,t.offerId)]);
 export const competitionConsents=pgTable('loan_competition_consents',{
  applicationId:text('application_id').primaryKey().references(()=>personalLoanApplications.id),
  userId:text('user_id').notNull().references(()=>users.id),

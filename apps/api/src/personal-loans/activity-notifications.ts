@@ -11,7 +11,7 @@ import { decryptIdentity, encryptIdentity } from '../auth/identity-crypto';
 import { parse } from '../payday/payday.dto';
 
 export function notificationUrl(path: string) {
-  if (!/^\/(?:app\/(?:applications\/[A-Za-z0-9-]+|pay)|lender\/applications\/[A-Za-z0-9-]+|applications\/[A-Za-z0-9-]+|money)$/.test(path))
+  if (!/^\/(?:app\/(?:applications\/[A-Za-z0-9-]+|pay|wallet)|lender\/applications\/[A-Za-z0-9-]+|applications\/[A-Za-z0-9-]+|money)$/.test(path))
     throw new BadRequestException('Notification destination unavailable.');
   const admin = path === '/money' || path.startsWith('/applications/');
   const origin = admin ? process.env.ADMIN_APP_URL || 'https://xtra-cash-admin.vercel.app'

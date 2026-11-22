@@ -12,7 +12,7 @@ const schema=require('../dist/db/schema'),{AppModule}=require('../dist/app.modul
  const module=await Test.createTestingModule({imports:[AppModule]}).overrideProvider('DB_BUNDLE').useValue({db,pool:{query:(...args)=>pg.query(...args),end:()=>pg.close()}}).compile();
  const app=module.createNestApplication({logger:false});configureApp(app);await app.listen(0,'127.0.0.1');
  try{
-  const users=await db.insert(schema.users).values(['LENDER','LENDER','CONSUMER','ADMIN'].map((role,i)=>({email:`perf${i}@example.test`,firstName:'Test',lastName:'Account',roles:[role],referralCode:`PERF${i}`}))).returning();
+  const users=await db.insert(schema.users).values(['LENDER','LENDER','CONSUMER','ADMIN','SUPER_ADMIN'].map((role,i)=>({email:`perf${i}@example.test`,firstName:'Test',lastName:'Account',roles:[role],referralCode:`PERF${i}`}))).returning();
   const orgs=await db.insert(schema.lenderOrgs).values(users.slice(0,2).map((u,i)=>({ownerUserId:u.id,name:`Test lender ${i}`,contactEmail:u.email,contactPhone:'+27820000000',availableCents:100000,accreditationStatus:'ACCREDITED',ncrNumber:'NCRCP-TEST-'+i}))).returning();
   // These fixtures represent existing accredited lenders from before fee commitments were introduced.
   await pg.query('UPDATE lender_orgs SET fee_commitment_required=false WHERE id=ANY($1::text[])', [orgs.map(org => org.id)]);
@@ -47,11 +47,13 @@ const schema=require('../dist/db/schema'),{AppModule}=require('../dist/app.modul
   const current = (await http().post(sendOffer).set(headers[0]).send({ ...pricing, initiationFeeCents: 1000 }).expect(201)).body;
   assert.notEqual(first.id, current.id);
   const offers = (await http().get(offerList).set(headers[2]).expect(200)).body;
-  assert.equal(offers.length, 1);
-  assert.equal(offers[0].id, current.id);
-  assert.equal(offers[0].totalRepayableCents, 101000);
+  assert.equal(offers.length, 2);
+  assert.equal(offers[0].id, first.id);
+  assert.equal(offers[1].totalRepayableCents, 101000);
   const notices = (await http().get('/loan-operations/notifications').set(headers[2]).expect(200)).body;
   assert.ok(notices.notifications.some(notice => notice.title === 'Your loan offer is ready'));
+  assert.ok(offers.every(offer => /verification/i.test(offer.selectionIssue)));
+  await db.update(schema.loanOffers).set({active:false}).where(require('drizzle-orm').eq(schema.loanOffers.id, first.offerId));
   await http().post(offerList + '/' + first.id + '/select').set(headers[2]).send({}).expect(409);
   const pendingIdentity = await http().post(offerList + '/' + current.id + '/select').set(headers[2]).send({}).expect(409);
   assert.match(pendingIdentity.body.message, /verification/i);
@@ -70,7 +72,23 @@ const schema=require('../dist/db/schema'),{AppModule}=require('../dist/app.modul
    address: 'Isolated address', identityFileKey: 'isolated-id.jpg', addressFileKey: 'isolated-address.jpg',
    consentAt: new Date(), status: 'VERIFIED',
   });
-  await http().post(offerList + '/' + current.id + '/select').set(headers[2]).send({}).expect(201);
+  // Multiple alternatives from each lender remain visible, including beyond the old three-offer cap.
+  for (let i=0;i<3;i++) await http().post(sendOffer).set(headers[i % 2]).send({...pricing,initiationFeeCents:2000+i*100}).expect(201);
+  await pg.query('UPDATE lender_orgs SET available_cents=0');
+  const available = (await http().get(offerList).set(headers[2]).expect(200)).body;
+  assert.equal(available.length,4);
+  assert.ok(available.every(offer => offer.selectionIssue === null));
+  await db.update(schema.personalLoanApplications).set({monthlyExpensesCents:profile.monthlyIncomeCents}).where(eq(schema.personalLoanApplications.id,application.id));
+  assert.match((await http().get(offerList).set(headers[2]).expect(200)).body.find(o=>o.id===current.id).selectionIssue,/affordability/i);
+  await http().post(offerList + '/' + current.id + '/select').set(headers[2]).send({}).expect(409);
+  await db.update(schema.personalLoanApplications).set(profile).where(eq(schema.personalLoanApplications.id,application.id));
+  // A configured personal exposure limit must still block a deposit-funded offer.
+  await pg.query('INSERT INTO lender_capacity(lender_id,personal_limit,personal_committed,bnpl_limit,bnpl_committed,guarantee_limit,bnpl_customer_limit) VALUES($1,50000,0,0,0,0,0) ON CONFLICT(lender_id) DO UPDATE SET personal_limit=50000', [orgs[0].id]);
+  assert.match((await http().get(offerList).set(headers[2]).expect(200)).body.find(o=>o.id===current.id).selectionIssue,/capacity/i);
+  await http().post(offerList + '/' + current.id + '/select').set(headers[2]).send({}).expect(409);
+  await pg.query('UPDATE lender_capacity SET personal_limit=200000 WHERE lender_id=$1', [orgs[0].id]);
+  const choices = await Promise.all([0,1].map(() => http().post(offerList + '/' + current.id + '/select').set(headers[2]).send({})));
+  assert.deepEqual(choices.map(r=>r.status).sort(),[201,409]);
   assert.equal((await db.query.personalLoanApplications.findFirst()).status, 'OFFERED');
   console.log('PASS: offer without evidence or product, borrower notification, old-quote rejection, verification gate, and agreement preparation.');
   const before=await db.query.loans.findMany();
@@ -103,6 +121,22 @@ const schema=require('../dist/db/schema'),{AppModule}=require('../dist/app.modul
   await http().post(confirmationUrl).set(headers[3]).send(confirmation).expect(201);
   assert.equal((await http().get(deposits).set(headers[2]).expect(200)).body.walletCents,105000);
   assert.ok((await pg.query("select count(*)::int as n from notification_deliveries where channel='EMAIL'")).rows[0].n >= 8);
+  const creditWallet = '/money/wallet/deposits/credit/' + borrowerId;
+  const settled = {amountCents:2500,bankReference:'settled-bank-receipt',note:'Matched settlement account entry',confirmed:true};
+  await http().post(creditWallet).set(headers[3]).send(settled).expect(403);
+  await http().post(creditWallet).set(headers[4]).send({...settled,confirmed:false}).expect(400);
+  await http().post(creditWallet).set(headers[4]).send({...settled,bankReference:confirmation.bankReference}).expect(409);
+  const credited = (await http().post(creditWallet).set(headers[4]).send(settled).expect(201)).body;
+  assert.equal(credited.walletCents,107500);
+  const retried = (await http().post(creditWallet).set(headers[4]).send(settled).expect(201)).body;
+  assert.deepEqual(retried,credited);
+  await http().post(creditWallet).set(headers[4]).send({...settled,amountCents:2600}).expect(409);
+  const overview = (await http().get(deposits).set(headers[2]).expect(200)).body;
+  assert.equal(overview.walletCents,107500);
+  assert.ok(overview.deposits.some(item => item.reference === credited.reference && item.status === 'CONFIRMED'));
+  const walletNotice = (await http().get('/loan-operations/notifications').set(headers[2]).expect(200)).body.notifications;
+  assert.ok(walletNotice.some(item => item.url?.endsWith('/app/wallet') && item.title === 'Wallet top-up confirmed'));
+  console.log('PASS: super admin settled deposit is credited once, appears in the wallet and sends a wallet alert.');
   console.log('PASS: submission and signing alerts, saved signature, confirmed lender funding, and wallet top-up without double credit.');
  }finally{await app.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

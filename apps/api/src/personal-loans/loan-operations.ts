@@ -355,6 +355,7 @@ export class LoanOperationsService {
         applicationId: id,
         lenderId: lender.id,
         name: 'Personal loan',
+        fundingMode: 'LENDER_DEPOSIT',
         productType: 'PERSONAL',
         termMonths: app.termMonths,
         minAmountCents: app.amountCents,
@@ -450,6 +451,7 @@ export class LoanOperationsService {
     const [previous] = await tx.select().from(applicationCandidateOffers).where(and(
       eq(applicationCandidateOffers.applicationId, app.id),
       eq(applicationCandidateOffers.lenderId, product.lenderId),
+      eq(applicationCandidateOffers.offerId, product.id),
     ));
     // Replacing an offer issues a new ID so an open borrower screen cannot select old terms.
     if (previous) await tx.delete(applicationCandidateOffers).where(eq(applicationCandidateOffers.id, previous.id));
@@ -462,6 +464,10 @@ export class LoanOperationsService {
       totalRepayableCents: quote.totalRepayableCents,
       costOfCreditCents: quote.costOfCreditCents,
     }).returning();
+    await tx.insert(applicationEvents).values({
+      applicationId: app.id, actorId: actor.id, status: app.status,
+      message: previous ? 'A lender updated its offer.' : 'A lender sent an offer.',
+    });
     await this.audit.log(actor, 'personal_loan.candidate_offer_submitted', 'personal_loan_application', app.id,
       { lenderId: product.lenderId, offerId: product.id, candidateOfferId: result.id, priorCandidateOfferId: previous?.id }, tx);
     return result;
@@ -471,8 +477,11 @@ export class LoanOperationsService {
     const rows = await conn.select({
       candidate: applicationCandidateOffers, product: loanOffers,
       lenderName: lenderOrgs.name, ownerUserId: lenderOrgs.ownerUserId,
+      personalCapacity: sql<number | null>`(SELECT personal_limit - personal_committed
+        FROM lender_capacity WHERE lender_id=${lenderOrgs.id})`,
     }).from(applicationCandidateOffers)
       .innerJoin(lenderOrgs, eq(lenderOrgs.id, applicationCandidateOffers.lenderId))
+      .innerJoin(users, and(eq(users.id, lenderOrgs.ownerUserId), eq(users.status, 'ACTIVE')))
       .innerJoin(loanOffers, and(eq(loanOffers.id, applicationCandidateOffers.offerId), eq(loanOffers.lenderId, lenderOrgs.id)))
       .where(and(eq(applicationCandidateOffers.applicationId, app.id), eq(applicationCandidateOffers.status, 'SUBMITTED'),
         eq(lenderOrgs.accreditationStatus, 'ACCREDITED'), eq(loanOffers.active, true), eq(loanOffers.productType, 'PERSONAL')))
@@ -485,19 +494,48 @@ export class LoanOperationsService {
       const quote = quoteLoan(app.amountCents, product);
       return quote.totalRepayableCents === candidate.totalRepayableCents
         && quote.monthlyInstallmentCents === candidate.monthlyInstallmentCents;
-    }).slice(0, 3);
+    });
+  }
+
+  private selectionIssue(
+    app: typeof applications.$inferSelect,
+    row: Awaited<ReturnType<LoanOperationsService['currentCandidates']>>[number],
+    credit: Awaited<ReturnType<CreditService['context']>>,
+  ): string | null {
+    if (!credit.profile) return 'Complete identity verification to continue with this offer.';
+    const match = credit.eligible.find(offer => offer.offerId === row.product.id);
+    if (!match) return credit.reasonIfNone ?? 'This offer no longer matches your lending profile.';
+    // A manually priced offer for this request is funded by a lender deposit. The
+    // lender's prefunded platform balance is only required for platform-funded offers.
+    const lenderDeposit = row.product.applicationId === app.id && row.product.fundingMode === 'LENDER_DEPOSIT';
+    const capacity = lenderDeposit
+      ? { ...match, lenderAvailableCents: row.personalCapacity ?? app.amountCents }
+      : match;
+    if (capacity.lenderAvailableCents < app.amountCents)
+      return 'This lender currently has insufficient funding capacity for the offer.';
+    if (app.amountCents > offerCapacity(capacity, credit.affordableCents))
+      return 'The instalment exceeds your current affordability. Contact the lender to review the terms.';
+    return null;
   }
 
   async candidateOffers(a: AuthUser, id: string) {
     const app = await this.db.query.personalLoanApplications.findFirst({ where: and(eq(applications.id, id), eq(applications.userId, a.id)) });
     if (!app) throw new NotFoundException();
     if (!openStates.includes(app.status)) return [];
-    return (await this.currentCandidates(app)).map(({ candidate, product, lenderName }, index) => ({
+    const candidates = await this.currentCandidates(app);
+    if (!candidates.length) return [];
+    const credit = await this.credit.context(app.userId, this.db, 'PERSONAL', app);
+    return candidates.map((row, index) => {
+      const { candidate, product, lenderName } = row;
+      return {
       id: candidate.id, rank: index + 1, lenderName, offerName: product.name,
       monthlyInterestRateBps: product.monthlyInterestRateBps, initiationFeeCents: product.initiationFeeCents,
       monthlyServiceFeeCents: product.monthlyServiceFeeCents, monthlyInstallmentCents: candidate.monthlyInstallmentCents,
+      amountCents: app.amountCents, termMonths: app.termMonths,
+      selectionIssue: this.selectionIssue(app, row, credit),
       totalRepayableCents: candidate.totalRepayableCents, costOfCreditCents: candidate.costOfCreditCents, createdAt: candidate.createdAt,
-    }));
+      };
+    });
   }
 
   async selectCandidate(a: AuthUser, id: string, candidateId: string) {
@@ -510,10 +548,8 @@ export class LoanOperationsService {
       if (!product?.active || product.updatedAt.getTime() !== row.product.updatedAt.getTime())
         throw new ConflictException('This offer changed. Refresh to see current offers.');
       const credit = await this.credit.context(app.userId, tx, 'PERSONAL', app);
-      if (!credit.profile) throw new ConflictException(credit.reasonIfNone ?? 'Complete profile verification before continuing.');
-      const match = credit.eligible.find(offer => offer.offerId === product.id);
-      if (!match || app.amountCents > offerCapacity(match, credit.affordableCents))
-        throw new ConflictException('Eligibility or lender capacity changed. Refresh to see available offers.');
+      const issue = this.selectionIssue(app, row, credit);
+      if (issue) throw new ConflictException(issue);
       await tx.update(applications).set({ lenderId: row.candidate.lenderId, offerId: row.candidate.offerId, status: 'REFERRED' }).where(eq(applications.id, id));
       const agreement = await this.settlement.approve({ id: row.ownerUserId, email: null, roles: ['LENDER'] }, id, approveInput.parse(row.candidate.decisionPayload), tx);
       await tx.update(applicationCandidateOffers).set({ status: sql`CASE WHEN ${applicationCandidateOffers.id} = ${candidateId} THEN 'SELECTED' ELSE 'NOT_SELECTED' END`, updatedAt: new Date() }).where(eq(applicationCandidateOffers.applicationId, id));
