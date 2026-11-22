@@ -218,6 +218,7 @@ export const loanOffers = pgTable(
     welcomeFallback: boolean('welcome_fallback').notNull().default(false),
     suspended: boolean('suspended').notNull().default(false),
     applicationId: text('application_id'),
+    fundingMode: text('funding_mode').$type<'PLATFORM' | 'LENDER_DEPOSIT'>().notNull().default('PLATFORM'),
     incomeMultiple: integer('income_multiple').notNull().default(0),
     active: boolean('active').notNull().default(true),
     monthlyInterestRateBps: integer('monthly_interest_rate_bps').notNull(),

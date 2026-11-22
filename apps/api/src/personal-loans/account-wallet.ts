@@ -1,4 +1,4 @@
-import { BadRequestException, Body, ConflictException, Controller, Get, Injectable, NotFoundException, Param, Post, Put } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Injectable, NotFoundException, Param, Post, Put } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -74,6 +74,65 @@ export class AccountWalletService {
       return result.rows[0];
     });
   }
+  async creditSettledDeposit(actor: AuthUser, userId: string, body: unknown) {
+    if (!actor.roles.includes('SUPER_ADMIN') || actor.supportSessionId) throw new ForbiddenException();
+    if (actor.id === userId) throw new BadRequestException('Another super admin must credit your wallet.');
+    const input = parse(z.object({
+      amountCents: z.number().int().min(100).max(10000000),
+      bankReference: z.string().trim().min(3).max(150),
+      note: z.string().trim().min(3).max(1000),
+      confirmed: z.literal(true),
+    }).strict(), body);
+
+    return this.db.transaction(async tx => {
+      const target = await tx.execute<{wallet_balance_cents: number}>(sql`
+        SELECT wallet_balance_cents FROM users
+        WHERE id=${userId} AND status='ACTIVE' AND 'CONSUMER'=ANY(roles) FOR UPDATE`);
+      if (!target.rows[0]) throw new NotFoundException('An active customer wallet is required.');
+
+      const id = randomUUID();
+      const reference = 'XCW' + id.replace(/-/g,'').slice(0,12).toUpperCase();
+      const inserted = await tx.execute(sql`
+        INSERT INTO wallet_deposits(id,user_id,amount_cents,client_key,reference,status,bank_reference,note,decided_by,decided_at)
+        VALUES(${id},${userId},${input.amountCents},${'staff-credit:' + id},${reference},'CONFIRMED',${input.bankReference},${input.note},${actor.id},now())
+        ON CONFLICT(bank_reference) DO NOTHING RETURNING id`);
+      if (!inserted.rows.length) {
+        const existing = await tx.execute<{
+          reference: string; user_id: string; amount_cents: number; client_key: string; decided_by: string | null;
+        }>(sql`
+          SELECT reference,user_id,amount_cents,client_key,decided_by
+          FROM wallet_deposits WHERE bank_reference=${input.bankReference}`);
+        const prior = existing.rows[0];
+        if (prior?.client_key.startsWith('staff-credit:') && prior.user_id === userId
+          && prior.amount_cents === input.amountCents && prior.decided_by === actor.id)
+          return { reference: prior.reference, walletCents: target.rows[0].wallet_balance_cents };
+        throw new ConflictException('This bank transaction has already been recorded.');
+      }
+
+      const walletCents = await this.creditBalance(tx, userId, input.amountCents, id);
+      await this.audit.log(actor,'wallet.deposit_credited_by_super_admin','wallet_deposit',id,
+        {userId,amountCents:input.amountCents,bankReference:input.bankReference,note:input.note},tx);
+      await tx.execute(sql`
+        INSERT INTO activity_notifications(user_id,event_key,title,body,path,cta,owner)
+        VALUES(${userId},${'wallet-deposit:' + id + ':CONFIRMED'},'Wallet top-up confirmed',
+          'Your confirmed deposit is available in your wallet.','/app/wallet','View wallet','Applicant')
+        ON CONFLICT DO NOTHING`);
+      return { reference, walletCents };
+    });
+  }
+
+  private async creditBalance(tx: DbOrTx, userId: string, amountCents: number, depositId: string) {
+    const updated = await tx.execute<{wallet_balance_cents: number}>(sql`
+      UPDATE users SET wallet_balance_cents=wallet_balance_cents+${amountCents}
+      WHERE id=${userId} AND status='ACTIVE' RETURNING wallet_balance_cents`);
+    if (!updated.rows[0]) throw new BadRequestException('The customer account is unavailable.');
+    await this.ledger.post(tx,{type:'wallet_deposit_confirmed',refType:'wallet_deposit',refId:depositId},[
+      {account:Accounts.bank,amountCents},
+      {account:Accounts.consumerWallet(userId),amountCents:-amountCents},
+    ]);
+    return updated.rows[0].wallet_balance_cents;
+  }
+
   async deposits() {
     const rows = await this.db.execute(sql`SELECT d.*,u.first_name,u.last_name FROM wallet_deposits d JOIN users u ON u.id=d.user_id
       ORDER BY (d.status='PENDING') DESC,d.created_at DESC LIMIT 100`);
@@ -94,15 +153,7 @@ export class AccountWalletService {
       if (row.status !== 'PENDING') throw new ConflictException('This deposit already has a decision.');
       await tx.execute(sql`UPDATE wallet_deposits SET status=${target},bank_reference=${input.bankReference ?? null},
         note=${input.note},decided_by=${actor.id},decided_at=now() WHERE id=${id}`);
-      if (target === 'CONFIRMED') {
-        const credit = await tx.execute(sql`UPDATE users SET wallet_balance_cents=wallet_balance_cents+${row.amount_cents}
-          WHERE id=${row.user_id} AND status='ACTIVE' RETURNING id`);
-        if (!credit.rows.length) throw new BadRequestException('The customer account is unavailable.');
-        await this.ledger.post(tx,{type:'wallet_deposit_confirmed',refType:'wallet_deposit',refId:id},[
-          {account:Accounts.bank,amountCents:row.amount_cents},
-          {account:Accounts.consumerWallet(row.user_id),amountCents:-row.amount_cents},
-        ]);
-      }
+      if (target === 'CONFIRMED') await this.creditBalance(tx, row.user_id, row.amount_cents, id);
       await this.audit.log(actor,'wallet.deposit_'+target.toLowerCase(),'wallet_deposit',id,
         {amountCents:row.amount_cents,bankReference:input.bankReference,note:input.note},tx);
       return {ok:true};
@@ -124,5 +175,9 @@ export class AccountWalletController {
 export class WalletDepositAdminController {
   constructor(private service:AccountWalletService) {}
   @Get() list() { return this.service.deposits(); }
+  @Roles('SUPER_ADMIN') @Post('credit/:userId')
+  credit(@CurrentUser() actor: AuthUser,@Param('userId') userId: string,@Body() body: unknown) {
+    return this.service.creditSettledDeposit(actor,userId,body);
+  }
   @Post(':id/decision') decide(@CurrentUser() actor:AuthUser,@Param('id') id:string,@Body() body:unknown) { return this.service.decide(actor,id,body); }
 }

@@ -2,7 +2,7 @@ function accountAlertUrl(value) {
   try {
     const url = new URL(value);
     const allowedOrigin = [self.location.origin, 'https://xtra-cash.vercel.app', 'https://xtra-cash-admin.vercel.app'].includes(url.origin);
-    if (allowedOrigin && /^\/(?:app\/(?:applications\/[A-Za-z0-9-]+|pay)|lender\/applications\/[A-Za-z0-9-]+|applications\/[A-Za-z0-9-]+|money)$/.test(url.pathname)) return url.href;
+    if (allowedOrigin && /^\/(?:app\/(?:applications\/[A-Za-z0-9-]+|pay|wallet)|lender\/applications\/[A-Za-z0-9-]+|applications\/[A-Za-z0-9-]+|money)$/.test(url.pathname)) return url.href;
   } catch {}
 }
 self.addEventListener('push', event => {

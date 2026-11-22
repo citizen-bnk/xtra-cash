@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { EMPLOYMENT_LABELS, formatZAR, Role } from '@xtra/shared';
-import { Alert, Badge, Button, Card, cx, Input, Loading, Modal, PageHeader, RecordActions, StatusBadge, Table, useAction, useApi, useAuth, useToast } from '@xtra/ui';
+import { Alert, Badge, Button, Card, cx, Field, Input, Loading, Modal, MoneyInput, PageHeader, RecordActions, StatusBadge, Table, useAction, useApi, useAuth, useToast } from '@xtra/ui';
 
 const ALL_ROLES = Object.values(Role);
 
@@ -17,6 +17,31 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
   const [newPassword, setNewPassword] = useState('');
   const [passwordNotice, setPasswordNotice] = useState('');
   const [statusAction, setStatusAction] = useState<'ACTIVE' | 'SUSPENDED' | null>(null);
+  const [walletOpen, setWalletOpen] = useState(false);
+  const [walletAmount, setWalletAmount] = useState<number | null>(null);
+  const [bankReference, setBankReference] = useState('');
+  const [depositNote, setDepositNote] = useState('');
+  const [depositConfirmed, setDepositConfirmed] = useState(false);
+  const [walletError, setWalletError] = useState('');
+  const [crediting, setCrediting] = useState(false);
+  async function creditWallet() {
+    if (crediting || !walletAmount || !depositConfirmed) return;
+    setCrediting(true);
+    setWalletError('');
+    try {
+      const result = await client.request<{walletCents: number; reference: string}>('POST',
+        '/money/wallet/deposits/credit/' + encodeURIComponent(id), {
+          amountCents: walletAmount, bankReference, note: depositNote, confirmed: true,
+        });
+      setWalletOpen(false);
+      toast('Wallet credited. New balance ' + formatZAR(result.walletCents));
+      void user.reload();
+    } catch (error) {
+      setWalletError(error instanceof Error ? error.message : 'Unable to credit this wallet.');
+    } finally {
+      setCrediting(false);
+    }
+  }
   const status = useAction(async (s: 'ACTIVE' | 'SUSPENDED') => {
     await client.admin.setUserStatus(id, s);
     toast(s === 'SUSPENDED' ? 'User suspended, sessions revoked and cards frozen' : 'User reactivated');
@@ -39,6 +64,7 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
   if (!user.data) return user.error ? <Alert tone="red">{user.error}</Alert> : <Loading />;
   const u = user.data;
   const isSuper = me?.roles.includes('SUPER_ADMIN');
+  const canCreditWallet = isSuper && u.roles.includes('CONSUMER') && u.status === 'ACTIVE' && u.id !== me?.id;
   return (
     <div className="space-y-6">
       <Link href="/users" className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink"><ArrowLeft className="h-4 w-4" /> Users</Link>
@@ -67,6 +93,10 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
           <h2 className="font-bold">Account</h2>
           <Kv k="Roles" v={<div className="flex flex-wrap justify-end gap-1">{u.roles.map((r) => <Badge key={r}>{r}</Badge>)}</div>} />
           <Kv k="Wallet" v={formatZAR(u.walletBalanceCents)} />
+          {canCreditWallet && <Button size="sm" variant="secondary" onClick={() => {
+            setWalletAmount(null); setBankReference(''); setDepositNote('');
+            setDepositConfirmed(false); setWalletError(''); setWalletOpen(true);
+          }}>Credit wallet</Button>}
           <Kv k="Referral code" v={u.referralCode} />
           {u.affiliate && <Kv k="Commission balance" v={formatZAR(u.affiliate.commissionBalanceCents)} />}
           {u.lender && <Kv k="Lender stall" v={<Link className="underline" href={`/lenders/${u.lender.id}`}>{u.lender.name}</Link>} />}
@@ -131,6 +161,17 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
           ]}
         />
       </div>
+      <Modal open={walletOpen} onClose={() => { if (!crediting) setWalletOpen(false); }} title="Credit customer wallet">
+        <form className="space-y-3" onSubmit={event => { event.preventDefault(); void creditWallet(); }}>
+          <p className="text-sm text-muted">{u.firstName} {u.lastName} · Current balance {formatZAR(u.walletBalanceCents)}</p>
+          <Field label="Deposit amount"><MoneyInput cents={walletAmount} onCents={setWalletAmount} /></Field>
+          <Field label="Bank transaction reference"><Input required minLength={3} maxLength={150} value={bankReference} onChange={event => setBankReference(event.target.value)} /></Field>
+          <Field label="Receipt note"><Input required minLength={3} maxLength={1000} value={depositNote} onChange={event => setDepositNote(event.target.value)} /></Field>
+          <label className="flex items-start gap-2 text-sm"><input className="mt-1" type="checkbox" checked={depositConfirmed} onChange={event => setDepositConfirmed(event.target.checked)} />I verified that this deposit cleared in the XTRA-CASH settlement account.</label>
+          {walletError && <Alert tone="red">{walletError}</Alert>}
+          <Button type="submit" className="w-full" loading={crediting} disabled={!depositConfirmed || !walletAmount || walletAmount < 100 || walletAmount > 10000000 || bankReference.trim().length < 3 || depositNote.trim().length < 3}>Credit {formatZAR(walletAmount ?? 0)}</Button>
+        </form>
+      </Modal>
       <Modal open={rolesOpen} onClose={() => setRolesOpen(false)} title="Edit roles">
         <div className="flex flex-wrap gap-2">
           {ALL_ROLES.map((r) => (

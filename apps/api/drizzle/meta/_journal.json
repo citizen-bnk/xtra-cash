@@ -253,6 +253,13 @@
       "when": 1795200000000,
       "tag": "0035_loan_notifications_wallet",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1795300000000,
+      "tag": "0036_multiple_candidate_offers",
+      "breakpoints": true
     }
   ]
 }

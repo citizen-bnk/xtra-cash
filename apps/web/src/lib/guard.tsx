@@ -10,7 +10,7 @@ export function RequireRole({ roles, children, fallback = '/app', signedOutRoute
   const { me, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const needsName = !['/app', '/app/profile', '/app/activity', '/app/loans', '/lender', '/affiliate', '/security'].includes(pathname);
+  const needsName = !['/app', '/app/profile', '/app/activity', '/app/loans', '/app/wallet', '/lender', '/affiliate', '/security'].includes(pathname);
   const allowed = !!me && roles.some((r) => me.roles.includes(r));
   useEffect(() => {
     if (loading) return;
